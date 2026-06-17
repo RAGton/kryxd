@@ -318,7 +318,10 @@ mod tests {
         assert!(cfg.contains(r#"mountpoint = "/""#));
         assert!(cfg.contains(r#"size = "512M""#));
         // ESP recebe type EF00; partição root NÃO.
-        assert!(cfg.contains("EF00"), "ESP vfat em /boot deve receber type EF00");
+        assert!(
+            cfg.contains("EF00"),
+            "ESP vfat em /boot deve receber type EF00"
+        );
         assert_eq!(cfg.matches("EF00").count(), 1, "apenas o ESP deve ser EF00");
     }
 
