@@ -509,7 +509,11 @@ pub fn render_users_generated(plan: &InstallPlan) -> String {
     let admin = plan.user.admin;
 
     // Fallback de segurança caso chegue UID inválido do frontend
-    let uid = if plan.user.uid >= 1000 { plan.user.uid } else { 1000 };
+    let uid = if plan.user.uid >= 1000 {
+        plan.user.uid
+    } else {
+        1000
+    };
 
     let groups = if admin {
         r#"[ "wheel" "networkmanager" "video" "audio" ]"#
@@ -541,9 +545,10 @@ pub fn render_users_generated(plan: &InstallPlan) -> String {
             .filter(|k| valid_prefixes.iter().any(|&p| k.starts_with(p)))
             .map(|k| {
                 // Escapar para string normal do Nix ("...")
-                let escaped = k.replace('\\', "\\\\")
-                               .replace('"', "\\\"")
-                               .replace("${", "\\${");
+                let escaped = k
+                    .replace('\\', "\\\\")
+                    .replace('"', "\\\"")
+                    .replace("${", "\\${");
                 format!("      \"{}\"\n", escaped)
             })
             .collect::<String>();
@@ -551,10 +556,7 @@ pub fn render_users_generated(plan: &InstallPlan) -> String {
         if keys_nix.is_empty() {
             String::new()
         } else {
-            format!(
-                "    openssh.authorizedKeys.keys = [\n{}    ];\n",
-                keys_nix
-            )
+            format!("    openssh.authorizedKeys.keys = [\n{}    ];\n", keys_nix)
         }
     };
 
@@ -594,7 +596,12 @@ async fn write_features_generated(plan: &InstallPlan) -> Result<(), String> {
 
     // O SSH do sistema instalado é habilitado se target_remote_access for true
     // OU se a feature 'network.openssh' foi selecionada no wizard.
-    let has_openssh_feature = plan.features.get("network").and_then(|n| n.get("network.openssh")).and_then(|v| v.as_bool()).unwrap_or(false);
+    let has_openssh_feature = plan
+        .features
+        .get("network")
+        .and_then(|n| n.get("network.openssh"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let openssh_block = if plan.target_remote_access.enabled || has_openssh_feature {
         "  services.openssh.enable = true;\n"
     } else {
@@ -1072,9 +1079,9 @@ mod tests {
                 email: "".into(),
                 authorized_keys: vec![
                     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI test-key".into(), // valid
-                    "ssh-rsa AAAAB3NzaC1...".into(), // valid
-                    "invalid-key-algo AAAAB3...".into(), // invalid algorithm
-                    "ssh-ed25519 AAA\nBBB".into(), // invalid newline
+                    "ssh-rsa AAAAB3NzaC1...".into(),                         // valid
+                    "invalid-key-algo AAAAB3...".into(),                     // invalid algorithm
+                    "ssh-ed25519 AAA\nBBB".into(),                           // invalid newline
                     "ssh-ed25519 ${builtins.readFile \"/etc/shadow\"}".into(), // valid algo, but trying nix injection
                 ],
             },

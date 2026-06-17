@@ -106,6 +106,11 @@ export default function Network({ wizard, onChange, validation }) {
   const wanEnabled = Boolean(wizard.wanInterface);
   const sameNicSelected = wizard.mgmtInterface && wizard.wanInterface && wizard.mgmtInterface === wizard.wanInterface;
 
+  // netApplyBusy: bloqueia edição enquanto o backend aplica /network/apply.
+  // Antes era write-only no App.jsx — agora a UI reage para impedir que o
+  // usuário troque interface/IP/modo durante uma aplicação em andamento.
+  const netApplyBusy = Boolean(wizard.netApplyBusy);
+
   const refreshStatus = useCallback(async () => {
     try { 
       const status = await installerApi.getNetworkStatus();
@@ -383,6 +388,7 @@ export default function Network({ wizard, onChange, validation }) {
                 type="button"
                 className={wizard.mgmtMode === 'dhcp' ? 'btn-primary' : 'btn-secondary'}
                 onClick={() => onChange({ mgmtMode: 'dhcp' })}
+                disabled={netApplyBusy}
               >
                 DHCP (IP automático)
               </button>
@@ -390,6 +396,7 @@ export default function Network({ wizard, onChange, validation }) {
                 type="button"
                 className={wizard.mgmtMode === 'static' ? 'btn-primary' : 'btn-secondary'}
                 onClick={() => onChange({ mgmtMode: 'static' })}
+                disabled={netApplyBusy}
               >
                 Manual (IP estático)
               </button>
@@ -403,6 +410,7 @@ export default function Network({ wizard, onChange, validation }) {
                   className="input-shell"
                   value={wizard.mgmtInterface}
                   onChange={(event) => onChange({ mgmtInterface: event.target.value, lanIdentified: false })}
+                  disabled={netApplyBusy}
                 >
                   <option value="">Selecione uma interface</option>
                   {ifaceNames.map((item) => (
@@ -416,12 +424,12 @@ export default function Network({ wizard, onChange, validation }) {
                 <>
                   <div>
                     <label className="label-text" htmlFor="serverIp">IP do servidor</label>
-                    <input id="serverIp" className="input-shell" value={wizard.serverIp} onChange={handleIpv4Change('serverIp')} inputMode="numeric" />
+                    <input id="serverIp" className="input-shell" value={wizard.serverIp} onChange={handleIpv4Change('serverIp')} inputMode="numeric" disabled={netApplyBusy} />
                     <FieldError message={fieldErrors.serverIp} />
                   </div>
                   <div>
                     <label className="label-text" htmlFor="mgmtNetmask">Mascara / prefixo</label>
-                    <select id="mgmtNetmask" className="input-shell" value={wizard.mgmtNetmask} onChange={(event) => onChange({ mgmtNetmask: event.target.value })}>
+                    <select id="mgmtNetmask" className="input-shell" value={wizard.mgmtNetmask} onChange={(event) => onChange({ mgmtNetmask: event.target.value })} disabled={netApplyBusy}>
                       <option value="255.255.255.0">255.255.255.0 (/24)</option>
                       <option value="255.255.255.128">255.255.255.128 (/25)</option>
                       <option value="255.255.255.252">255.255.255.252 (/30)</option>
@@ -431,12 +439,12 @@ export default function Network({ wizard, onChange, validation }) {
                   </div>
                   <div>
                     <label className="label-text" htmlFor="mgmtGateway">Gateway</label>
-                    <input id="mgmtGateway" className="input-shell" value={wizard.mgmtGateway} onChange={handleIpv4Change('mgmtGateway')} inputMode="numeric" />
+                    <input id="mgmtGateway" className="input-shell" value={wizard.mgmtGateway} onChange={handleIpv4Change('mgmtGateway')} inputMode="numeric" disabled={netApplyBusy} />
                     <FieldError message={fieldErrors.mgmtGateway} />
                   </div>
                   <div>
                     <label className="label-text" htmlFor="mgmtDns">DNS</label>
-                    <input id="mgmtDns" className="input-shell" value={wizard.mgmtDns} onChange={(event) => onChange({ mgmtDns: event.target.value })} />
+                    <input id="mgmtDns" className="input-shell" value={wizard.mgmtDns} onChange={(event) => onChange({ mgmtDns: event.target.value })} disabled={netApplyBusy} />
                     <FieldError message={fieldErrors.mgmtDns} />
                   </div>
                 </>
@@ -454,6 +462,7 @@ export default function Network({ wizard, onChange, validation }) {
                   className="input-shell"
                   value={wizard.httpPort}
                   onChange={(event) => onChange({ httpPort: Number(event.target.value || 0) })}
+                  disabled={netApplyBusy}
                 />
                 <FieldError message={fieldErrors.httpPort} />
               </div>
@@ -465,6 +474,7 @@ export default function Network({ wizard, onChange, validation }) {
                 className="h-4 w-4 rounded"
                 checked={Boolean(wizard.lanIdentified)}
                 onChange={(event) => onChange({ lanIdentified: event.target.checked })}
+                disabled={netApplyBusy}
               />
               Confirmei fisicamente a interface LAN/PXE ({wizard.mgmtInterface || 'não selecionada'}).
             </label>
@@ -489,7 +499,7 @@ export default function Network({ wizard, onChange, validation }) {
 
                 <div>
                   <label className="label-text" htmlFor="wanInterface">Interface WAN</label>
-                  <select id="wanInterface" className="input-shell" value={wizard.wanInterface} onChange={(event) => handleWanInterfaceChange(event.target.value)}>
+                  <select id="wanInterface" className="input-shell" value={wizard.wanInterface} onChange={(event) => handleWanInterfaceChange(event.target.value)} disabled={netApplyBusy}>
                     <option value="">Sem uplink dedicado</option>
                     {ifaceNames
                       .filter((item) => item !== wizard.mgmtInterface)
@@ -503,13 +513,13 @@ export default function Network({ wizard, onChange, validation }) {
                 {wanEnabled ? (
                   <>
                     <div className="grid gap-2 sm:grid-cols-3">
-                      <button type="button" className={wizard.wanMode === 'dhcp' ? 'btn-primary' : 'btn-secondary'} onClick={() => onChange({ wanMode: 'dhcp' })}>
+                      <button type="button" className={wizard.wanMode === 'dhcp' ? 'btn-primary' : 'btn-secondary'} onClick={() => onChange({ wanMode: 'dhcp' })} disabled={netApplyBusy}>
                         DHCP
                       </button>
-                      <button type="button" className={wizard.wanMode === 'static' ? 'btn-primary' : 'btn-secondary'} onClick={() => onChange({ wanMode: 'static' })}>
+                      <button type="button" className={wizard.wanMode === 'static' ? 'btn-primary' : 'btn-secondary'} onClick={() => onChange({ wanMode: 'static' })} disabled={netApplyBusy}>
                         IP estático
                       </button>
-                      <button type="button" className={wizard.wanMode === 'pppoe' ? 'btn-primary' : 'btn-secondary'} onClick={() => onChange({ wanMode: 'pppoe' })}>
+                      <button type="button" className={wizard.wanMode === 'pppoe' ? 'btn-primary' : 'btn-secondary'} onClick={() => onChange({ wanMode: 'pppoe' })} disabled={netApplyBusy}>
                         PPPoE
                       </button>
                     </div>
@@ -518,12 +528,12 @@ export default function Network({ wizard, onChange, validation }) {
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div>
                           <label className="label-text" htmlFor="wanAddress">IP WAN</label>
-                          <input id="wanAddress" className="input-shell" value={wizard.wanAddress} onChange={handleIpv4Change('wanAddress')} inputMode="numeric" />
+                          <input id="wanAddress" className="input-shell" value={wizard.wanAddress} onChange={handleIpv4Change('wanAddress')} inputMode="numeric" disabled={netApplyBusy} />
                           <FieldError message={fieldErrors.wanAddress} />
                         </div>
                         <div>
                           <label className="label-text" htmlFor="wanNetmask">Mascara WAN</label>
-                          <select id="wanNetmask" className="input-shell" value={wizard.wanNetmask} onChange={(event) => onChange({ wanNetmask: event.target.value })}>
+                          <select id="wanNetmask" className="input-shell" value={wizard.wanNetmask} onChange={(event) => onChange({ wanNetmask: event.target.value })} disabled={netApplyBusy}>
                             <option value="255.255.255.0">255.255.255.0 (/24)</option>
                             <option value="255.255.255.128">255.255.255.128 (/25)</option>
                             <option value="255.255.255.252">255.255.255.252 (/30)</option>
@@ -533,12 +543,12 @@ export default function Network({ wizard, onChange, validation }) {
                         </div>
                         <div>
                           <label className="label-text" htmlFor="wanGateway">Gateway WAN</label>
-                          <input id="wanGateway" className="input-shell" value={wizard.wanGateway} onChange={handleIpv4Change('wanGateway')} inputMode="numeric" />
+                          <input id="wanGateway" className="input-shell" value={wizard.wanGateway} onChange={handleIpv4Change('wanGateway')} inputMode="numeric" disabled={netApplyBusy} />
                           <FieldError message={fieldErrors.wanGateway} />
                         </div>
                         <div>
                           <label className="label-text" htmlFor="wanDns">DNS WAN</label>
-                          <input id="wanDns" className="input-shell" value={wizard.wanDns} onChange={(event) => onChange({ wanDns: event.target.value })} />
+                          <input id="wanDns" className="input-shell" value={wizard.wanDns} onChange={(event) => onChange({ wanDns: event.target.value })} disabled={netApplyBusy} />
                           <FieldError message={fieldErrors.wanDns} />
                         </div>
                       </div>
@@ -576,6 +586,7 @@ export default function Network({ wizard, onChange, validation }) {
                         className="h-4 w-4 rounded"
                         checked={Boolean(wizard.wanIdentified)}
                         onChange={(event) => onChange({ wanIdentified: event.target.checked })}
+                        disabled={netApplyBusy}
                       />
                       Confirmei fisicamente a interface WAN ({wizard.wanInterface || 'não selecionada'}).
                     </label>
@@ -610,6 +621,29 @@ export default function Network({ wizard, onChange, validation }) {
         {error ? (
           <div className="mt-4 rounded-2xl border border-rose-400/25 bg-rose-400/10 p-3 text-sm text-rose-200">
             {error}
+          </div>
+        ) : null}
+
+        {netApplyBusy ? (
+          <div className="mt-4 rounded-2xl border border-cyan-400/25 bg-cyan-400/10 p-3 text-sm text-cyan-100" role="status" aria-live="polite">
+            <div className="flex items-center gap-2 font-semibold text-cyan-50">
+              <span className="inline-block animate-spin">↻</span> Aplicando configuração de rede…
+            </div>
+            <div className="mt-1 text-xs text-cyan-200/80">Os campos estão bloqueados e o avanço está suspenso até o backend responder.</div>
+          </div>
+        ) : null}
+
+        {wizard.netApplyError ? (
+          <div className="mt-4 rounded-2xl border border-rose-400/25 bg-rose-400/10 p-3 text-sm text-rose-200">
+            <div className="font-semibold text-rose-50">Falha ao aplicar a rede</div>
+            <div className="mt-1">{wizard.netApplyError}</div>
+            <div className="mt-2 text-xs text-rose-200/70">O avanço foi bloqueado. Ajuste os dados e tente novamente.</div>
+          </div>
+        ) : null}
+
+        {wizard.networkDhcpPending ? (
+          <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm text-amber-100">
+            <span className="font-bold text-amber-200">DHCP pendente:</span> a configuração foi aplicada, mas a interface ainda não recebeu um IP via DHCP. O endereço será obtido na rede; o avanço foi liberado mesmo assim.
           </div>
         ) : null}
 

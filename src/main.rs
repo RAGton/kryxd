@@ -151,7 +151,9 @@ pub struct PartitionSpec {
     pub format: bool,
 }
 
-fn default_user_uid() -> u32 { 1000 }
+fn default_user_uid() -> u32 {
+    1000
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct PlanUser {

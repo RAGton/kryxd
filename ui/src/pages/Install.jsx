@@ -21,6 +21,8 @@ function stageTone(state) {
 
 export default function Install({ draft, uiState, validation, onChange }) {
   const logRef = useRef(null);
+  // Mantém o auto-scroll "colado no fim" apenas enquanto o usuário não rolou para cima.
+  const stickToBottomRef = useRef(true);
   const [rebootBusy, setRebootBusy] = useState(false);
   const [showSafetyModal, setShowSafetyModal] = useState(false);
   const [safetyChecked, setSafetyChecked] = useState(false);
@@ -35,8 +37,16 @@ export default function Install({ draft, uiState, validation, onChange }) {
 
   useEffect(() => {
     if (!logRef.current) return;
+    // Só força o scroll para o fim se o usuário ainda estiver colado na base.
+    if (!stickToBottomRef.current) return;
     logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [executionState.logTail]);
+
+  // Recalcula se o usuário está (aproximadamente) no fim do console a cada rolagem.
+  const handleLogScroll = (event) => {
+    const el = event.currentTarget;
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  };
 
   const phase = executionState.phase;
   const runtimePhase = executionState.status.currentPhase;
@@ -233,7 +243,8 @@ export default function Install({ draft, uiState, validation, onChange }) {
 
         <pre
           ref={logRef}
-          className="min-h-0 flex-1 overflow-auto bg-[#020703] px-5 py-4 text-xs leading-6 text-[#9ef7bd]"
+          onScroll={handleLogScroll}
+          className="min-h-[240px] max-h-[420px] flex-1 overflow-y-auto overflow-x-auto whitespace-pre-wrap break-words font-mono bg-[#020703] px-5 py-4 text-xs leading-6 text-[#9ef7bd]"
         >
           {executionState.logTail}
         </pre>
