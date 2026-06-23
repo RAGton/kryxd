@@ -71,10 +71,8 @@ body {
   height: 52px;
   padding: 0 20px;
   gap: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(15, 19, 24, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
   flex-shrink: 0;
 }
 
@@ -162,10 +160,8 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  background: rgba(15, 19, 24, 0.5); /* var(--bg2) but transparent */
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--bg2);
+  border: 1px solid var(--border);
   border-radius: var(--rlg);
   overflow: hidden;
   padding: 20px 24px;
@@ -205,10 +201,8 @@ body {
   height: 56px;
   padding: 0 20px;
   gap: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(15, 19, 24, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
   flex-shrink: 0;
 }
 
