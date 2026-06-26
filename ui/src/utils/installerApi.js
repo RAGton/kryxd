@@ -46,6 +46,12 @@ async function requestJson(path, options = {}) {
   const body = await parseResponseBody(response);
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new InstallerApiError(
+        'Não autorizado: Token de instalador inválido ou ausente.',
+        { status: 401, body }
+      );
+    }
     throw new InstallerApiError(
       resolveApiErrorMessage(body, `Falha ao acessar ${path}.`),
       {
@@ -198,7 +204,10 @@ export const installerApi = {
 
     const result = await requestJson('/dry-run', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 
+        'content-type': 'application/json',
+        'X-Kryonix-Installer-Token': sessionStorage.getItem('installer_token') || '',
+      },
       body: JSON.stringify(kryonixPlan),
     });
 
@@ -225,7 +234,10 @@ export const installerApi = {
     window.__kryonix_running = true;
     return requestJson('/install', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 
+        'content-type': 'application/json',
+        'X-Kryonix-Installer-Token': sessionStorage.getItem('installer_token') || '',
+      },
       body: JSON.stringify(kryonixPlan),
     });
   },

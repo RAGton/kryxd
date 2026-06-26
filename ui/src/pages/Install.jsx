@@ -26,6 +26,13 @@ export default function Install({ draft, uiState, validation, onChange }) {
   const [rebootBusy, setRebootBusy] = useState(false);
   const [showSafetyModal, setShowSafetyModal] = useState(false);
   const [safetyChecked, setSafetyChecked] = useState(false);
+  const [installerToken, setInstallerToken] = useState(() => sessionStorage.getItem('installer_token') || '');
+
+  const handleTokenChange = (e) => {
+    const value = e.target.value;
+    setInstallerToken(value);
+    sessionStorage.setItem('installer_token', value);
+  };
 
   const {
     executionState,
@@ -280,11 +287,22 @@ export default function Install({ draft, uiState, validation, onChange }) {
               <span>Entendo que <b>TODOS</b> os dados nos discos selecionados serão permanentemente apagados.</span>
             </label>
 
+            <div className="mt-6 flex flex-col gap-2">
+              <label className="text-sm font-semibold text-rose-200">Token de Autenticação</label>
+              <input
+                type="password"
+                className="input text-white bg-black/40 border-rose-500/30 focus:border-rose-400 placeholder:text-rose-200/30"
+                placeholder="Insira o X-Kryonix-Installer-Token fornecido pelo backend"
+                value={installerToken}
+                onChange={handleTokenChange}
+              />
+            </div>
+
             <div className="modal-actions mt-8">
               <button className="btn-secondary" onClick={() => setShowSafetyModal(false)}>Cancelar</button>
               <button 
                 className="btn-primary bg-red-600 border-red-500 hover:bg-red-500 disabled:opacity-30" 
-                disabled={!safetyChecked} 
+                disabled={!safetyChecked || installerToken.trim().length === 0}
                 onClick={handleFinalConfirm}
               >
                 Confirmar e Instalar
