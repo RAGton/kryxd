@@ -23,7 +23,10 @@ use std::convert::Infallible;
 use std::process::Command;
 use std::sync::Arc;
 use tokio::sync::{RwLock, broadcast};
-use tower_http::{cors::{CorsLayer, AllowOrigin, Any}, services::ServeDir};
+use tower_http::{
+    cors::{AllowOrigin, Any, CorsLayer},
+    services::ServeDir,
+};
 
 // ── Shared state ──────────────────────────────────────────────────────────────
 
@@ -275,9 +278,8 @@ async fn main() {
         .build()
         .expect("Failed to build HTTP client");
 
-    let installer_token = std::env::var("KRYONIX_INSTALLER_TOKEN").unwrap_or_else(|_| {
-        uuid::Uuid::new_v4().to_string()
-    });
+    let installer_token = std::env::var("KRYONIX_INSTALLER_TOKEN")
+        .unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
     println!("============================================================");
     println!("KRYONIX INSTALLER TOKEN: {}", installer_token);
     println!("Pass this token in the X-Kryonix-Installer-Token header.");
@@ -341,23 +343,31 @@ async fn main() {
             CorsLayer::new()
                 .allow_methods(Any)
                 .allow_headers(Any)
-                .allow_origin(AllowOrigin::predicate(|origin: &axum::http::HeaderValue, _request_parts| {
-                    if let Ok(s) = origin.to_str() {
-                        s.starts_with("http://127.0.0.1") || s.starts_with("http://localhost") || s.starts_with("http://[::1]")
-                    } else {
-                        false
-                    }
-                }))
+                .allow_origin(AllowOrigin::predicate(
+                    |origin: &axum::http::HeaderValue, _request_parts| {
+                        if let Ok(s) = origin.to_str() {
+                            s.starts_with("http://127.0.0.1")
+                                || s.starts_with("http://localhost")
+                                || s.starts_with("http://[::1]")
+                        } else {
+                            false
+                        }
+                    },
+                )),
         )
         .with_state(state)
         .fallback_service(ServeDir::new(ui_dir).fallback(ServeDir::new("ui/static")));
 
     let bind_addr =
         std::env::var("KRYONIX_INSTALLER_BIND").unwrap_or_else(|_| "127.0.0.1:8080".to_string());
-        
-    if (bind_addr.starts_with("0.0.0.0") || bind_addr.starts_with("[::]")) 
-        && std::env::var("KRYONIX_ALLOW_REMOTE_BIND").is_err() {
-        eprintln!("ERROR: Destructive API is binding to {} without explicit authorization.", bind_addr);
+
+    if (bind_addr.starts_with("0.0.0.0") || bind_addr.starts_with("[::]"))
+        && std::env::var("KRYONIX_ALLOW_REMOTE_BIND").is_err()
+    {
+        eprintln!(
+            "ERROR: Destructive API is binding to {} without explicit authorization.",
+            bind_addr
+        );
         eprintln!("If you are absolutely sure you want to expose the installer to the network,");
         eprintln!("set KRYONIX_ALLOW_REMOTE_BIND=1 in your environment.");
         std::process::exit(1);
@@ -564,7 +574,7 @@ async fn probe() -> Result<Json<serde_json::Value>, ApiError> {
 async fn plan(Json(req): Json<PlanRequest>) -> Json<InstallPlan> {
     Json(InstallPlan {
         version: 1,
-            confirmed_features: vec![],
+        confirmed_features: vec![],
         hostname: req.hostname.unwrap_or_else(|| "kryonix".into()),
         timezone: req.timezone.unwrap_or_else(|| "America/Cuiaba".into()),
         locale: req.locale.unwrap_or_else(|| "pt_BR.UTF-8".into()),
@@ -605,7 +615,8 @@ fn hash_password_if_needed(plan: &mut InstallPlan) {
                 .output()
             {
                 if output.status.success() {
-                    plan.user.hashed_password = Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+                    plan.user.hashed_password =
+                        Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
                 }
             }
         }
@@ -617,27 +628,38 @@ async fn dry_run(
     headers: axum::http::HeaderMap,
     Json(mut plan): Json<InstallPlan>,
 ) -> impl IntoResponse {
-    let token = headers.get("X-Kryonix-Installer-Token").and_then(|v| v.to_str().ok()).unwrap_or("");
+    let token = headers
+        .get("X-Kryonix-Installer-Token")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
     if token != state.installer_token {
-        return (StatusCode::UNAUTHORIZED, Json(ErrorResponse {
-            error: "UNAUTHORIZED".into(),
-            details: Some("Token X-Kryonix-Installer-Token inválido ou ausente.".into()),
-        })).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(ErrorResponse {
+                error: "UNAUTHORIZED".into(),
+                details: Some("Token X-Kryonix-Installer-Token inválido ou ausente.".into()),
+            }),
+        )
+            .into_response();
     }
-    
+
     hash_password_if_needed(&mut plan);
     let mut result = validate_plan(&plan);
-    
+
     if result.ok {
         // P0.5: Run real disko dry-run to validate disk config
         if let Err(e) = executor::partition::run_disko_dry_run(&plan).await {
             result.ok = false;
-            result.checks.push(Check::fail(format!("Disko dry-run falhou: {}", e)));
+            result
+                .checks
+                .push(Check::fail(format!("Disko dry-run falhou: {}", e)));
         } else {
-            result.checks.push(Check::pass("Disko dry-run concluído com sucesso"));
+            result
+                .checks
+                .push(Check::pass("Disko dry-run concluído com sucesso"));
         }
     }
-    
+
     // 200 somente se ok==true; 422 se o plano/alvo é semanticamente inválido.
     // (Body/JSON malformado já vira 400/422 no extractor Json antes de chegar aqui.)
     let status = if result.ok {
@@ -836,17 +858,36 @@ fn validate_plan(plan: &InstallPlan) -> DryRunResult {
         let feature_id = format!("{}.{}", domain, name);
         // TODO: Futuramente consumir do docs/FEATURE_REGISTRY.md do core
         match feature_id.as_str() {
-            "remote.openssh" | "network.openssh" | "system.impermanence" | "security.tpm" | 
-            "storage.zfs" | "mcp.enabled" | "desktop.waywallen" | "desktop.hyprland" | 
-            "desktop.plasma" | "gaming.steam" | "gaming.gamemode" | "development.rust" |
-            "development.docker" | "observability.prometheus" => FeatureStatus::Supported,
-            
-            "ai.local_llm" | "ai.ollama" | "virtualization.vms" => FeatureStatus::PartialRequiresConfirmation,
-            
-            "ai.lightrag" | "ai.open-webui" | "ai.openWebui" | "remote.desktop.server" |
-            "remote.desktop.client" | "ai.brain.client" | "ai.brain.server" => FeatureStatus::BlockedStub,
-            
-            "network.legacy_bridge" | "system.legacy_boot" | "remoteDesktop" => FeatureStatus::BlockedLegacy,
+            "remote.openssh"
+            | "network.openssh"
+            | "system.impermanence"
+            | "security.tpm"
+            | "storage.zfs"
+            | "mcp.enabled"
+            | "desktop.waywallen"
+            | "desktop.hyprland"
+            | "desktop.plasma"
+            | "gaming.steam"
+            | "gaming.gamemode"
+            | "development.rust"
+            | "development.docker"
+            | "observability.prometheus" => FeatureStatus::Supported,
+
+            "ai.local_llm" | "ai.ollama" | "virtualization.vms" => {
+                FeatureStatus::PartialRequiresConfirmation
+            }
+
+            "ai.lightrag"
+            | "ai.open-webui"
+            | "ai.openWebui"
+            | "remote.desktop.server"
+            | "remote.desktop.client"
+            | "ai.brain.client"
+            | "ai.brain.server" => FeatureStatus::BlockedStub,
+
+            "network.legacy_bridge" | "system.legacy_boot" | "remoteDesktop" => {
+                FeatureStatus::BlockedLegacy
+            }
             _ => FeatureStatus::Unknown,
         }
     }
@@ -859,11 +900,17 @@ fn validate_plan(plan: &InstallPlan) -> DryRunResult {
                         let feature_id = format!("{}.{}", domain_name, key);
                         match classify_feature(domain_name, key) {
                             FeatureStatus::Supported => {
-                                checks.push(Check::pass(format!("Feature '{}' é suportada.", feature_id)));
+                                checks.push(Check::pass(format!(
+                                    "Feature '{}' é suportada.",
+                                    feature_id
+                                )));
                             }
                             FeatureStatus::PartialRequiresConfirmation => {
                                 if plan.confirmed_features.contains(&feature_id) {
-                                    checks.push(Check::pass(format!("Feature '{}' parcial ativada com confirmação.", feature_id)));
+                                    checks.push(Check::pass(format!(
+                                        "Feature '{}' parcial ativada com confirmação.",
+                                        feature_id
+                                    )));
                                 } else {
                                     checks.push(Check::fail(format!(
                                         "Feature '{}' é parcial. Requer confirmação explícita no payload (confirmed_features).",
@@ -988,7 +1035,10 @@ async fn install(
     headers: axum::http::HeaderMap,
     Json(mut plan): Json<InstallPlan>,
 ) -> impl IntoResponse {
-    let token = headers.get("X-Kryonix-Installer-Token").and_then(|v| v.to_str().ok()).unwrap_or("");
+    let token = headers
+        .get("X-Kryonix-Installer-Token")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
     if token != state.installer_token {
         return (
             StatusCode::UNAUTHORIZED,
@@ -1230,7 +1280,11 @@ mod tests {
             "system": { "impermanence": true }
         });
         let res = validate_plan(&plan);
-        assert!(res.checks.iter().any(|c| c.ok && c.message.contains("suportada")));
+        assert!(
+            res.checks
+                .iter()
+                .any(|c| c.ok && c.message.contains("suportada"))
+        );
     }
 
     #[test]
@@ -1241,7 +1295,11 @@ mod tests {
         });
         let res = validate_plan(&plan);
         assert!(!res.ok);
-        assert!(res.checks.iter().any(|c| !c.ok && c.message.contains("desconhecida")));
+        assert!(
+            res.checks
+                .iter()
+                .any(|c| !c.ok && c.message.contains("desconhecida"))
+        );
     }
 
     #[test]
@@ -1252,7 +1310,11 @@ mod tests {
         });
         let res = validate_plan(&plan);
         assert!(!res.ok);
-        assert!(res.checks.iter().any(|c| !c.ok && c.message.contains("stub")));
+        assert!(
+            res.checks
+                .iter()
+                .any(|c| !c.ok && c.message.contains("stub"))
+        );
     }
 
     #[test]
@@ -1263,7 +1325,11 @@ mod tests {
         });
         let res = validate_plan(&plan);
         assert!(!res.ok);
-        assert!(res.checks.iter().any(|c| !c.ok && c.message.contains("legacy")));
+        assert!(
+            res.checks
+                .iter()
+                .any(|c| !c.ok && c.message.contains("legacy"))
+        );
     }
 
     #[test]
@@ -1274,7 +1340,11 @@ mod tests {
         });
         let res = validate_plan(&plan);
         assert!(!res.ok);
-        assert!(res.checks.iter().any(|c| !c.ok && c.message.contains("parcial")));
+        assert!(
+            res.checks
+                .iter()
+                .any(|c| !c.ok && c.message.contains("parcial"))
+        );
     }
 
     #[test]
@@ -1285,7 +1355,11 @@ mod tests {
         });
         plan.confirmed_features = vec!["ai.ollama".into()];
         let res = validate_plan(&plan);
-        assert!(res.checks.iter().any(|c| c.ok && c.message.contains("confirmação")));
+        assert!(
+            res.checks
+                .iter()
+                .any(|c| c.ok && c.message.contains("confirmação"))
+        );
     }
 
     // ── Testes de contrato UI↔backend ─────────────────────────────────────────
