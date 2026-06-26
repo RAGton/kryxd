@@ -314,6 +314,7 @@ mod tests {
                 authorized_keys: vec![],
             },
             features: serde_json::json!({}),
+            confirmed_features: vec![],
             network: Default::default(),
         }
     }

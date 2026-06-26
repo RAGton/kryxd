@@ -1182,6 +1182,7 @@ mod tests {
         use crate::{InstallPlan, PlanDisk, PlanUser, TargetRemoteAccessPlan};
         let plan = InstallPlan {
             version: 1,
+            confirmed_features: vec![],
             hostname: "test".into(),
             timezone: "UTC".into(),
             locale: "en_US.UTF-8".into(),
@@ -1230,6 +1231,7 @@ mod tests {
         use crate::{InstallPlan, PlanDisk, PlanUser, TargetRemoteAccessPlan};
         let plan = InstallPlan {
             version: 1,
+            confirmed_features: vec![],
             hostname: "test".into(),
             timezone: "UTC".into(),
             locale: "en_US.UTF-8".into(),
@@ -1281,6 +1283,7 @@ mod tests {
         use crate::{InstallPlan, PlanDisk, PlanUser, TargetRemoteAccessPlan};
         let plan = InstallPlan {
             version: 1,
+            confirmed_features: vec![],
             hostname: "test".into(),
             timezone: "UTC".into(),
             locale: "en_US.UTF-8".into(),

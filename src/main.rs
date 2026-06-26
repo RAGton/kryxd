@@ -96,6 +96,8 @@ pub struct InstallPlan {
     pub user: PlanUser,
     pub features: serde_json::Value,
     #[serde(default)]
+    pub confirmed_features: Vec<String>,
+    #[serde(default)]
     pub network: NetworkPlan,
     /// Controla se openssh deve ser habilitado no sistema instalado.
     /// Mapeado de `remoteAccess.enabled` pelo mapper da UI.
@@ -562,6 +564,7 @@ async fn probe() -> Result<Json<serde_json::Value>, ApiError> {
 async fn plan(Json(req): Json<PlanRequest>) -> Json<InstallPlan> {
     Json(InstallPlan {
         version: 1,
+            confirmed_features: vec![],
         hostname: req.hostname.unwrap_or_else(|| "kryonix".into()),
         timezone: req.timezone.unwrap_or_else(|| "America/Cuiaba".into()),
         locale: req.locale.unwrap_or_else(|| "pt_BR.UTF-8".into()),
@@ -820,18 +823,77 @@ fn validate_plan(plan: &InstallPlan) -> DryRunResult {
         ok = false;
     }
 
-    // P0.8: Block stub features
-    let blocked_features = vec!["ai.lightrag", "ai.open-webui", "ai.openWebui", "openWebui", "open-webui"];
+    // P0.8: Feature Gating with strict allowlist
+    enum FeatureStatus {
+        Supported,
+        PartialRequiresConfirmation,
+        BlockedStub,
+        BlockedLegacy,
+        Unknown,
+    }
+
+    fn classify_feature(domain: &str, name: &str) -> FeatureStatus {
+        let feature_id = format!("{}.{}", domain, name);
+        // TODO: Futuramente consumir do docs/FEATURE_REGISTRY.md do core
+        match feature_id.as_str() {
+            "remote.openssh" | "network.openssh" | "system.impermanence" | "security.tpm" | 
+            "storage.zfs" | "mcp.enabled" | "desktop.waywallen" | "desktop.hyprland" | 
+            "desktop.plasma" | "gaming.steam" | "gaming.gamemode" | "development.rust" |
+            "development.docker" | "observability.prometheus" => FeatureStatus::Supported,
+            
+            "ai.local_llm" | "ai.ollama" | "virtualization.vms" => FeatureStatus::PartialRequiresConfirmation,
+            
+            "ai.lightrag" | "ai.open-webui" | "ai.openWebui" | "remote.desktop.server" |
+            "remote.desktop.client" | "ai.brain.client" | "ai.brain.server" => FeatureStatus::BlockedStub,
+            
+            "network.legacy_bridge" | "system.legacy_boot" | "remoteDesktop" => FeatureStatus::BlockedLegacy,
+            _ => FeatureStatus::Unknown,
+        }
+    }
+
     if let Some(obj) = plan.features.as_object() {
-        for domain in obj.values() {
+        for (domain_name, domain) in obj {
             if let Some(features) = domain.as_object() {
                 for (key, val) in features {
-                    if val.as_bool().unwrap_or(false) && blocked_features.contains(&key.as_str()) {
-                        checks.push(Check::fail(format!(
-                            "Feature '{}' está marcada como stub/legacy e não pode ser ativada de forma segura no momento.",
-                            key
-                        )));
-                        ok = false;
+                    if val.as_bool().unwrap_or(false) {
+                        let feature_id = format!("{}.{}", domain_name, key);
+                        match classify_feature(domain_name, key) {
+                            FeatureStatus::Supported => {
+                                checks.push(Check::pass(format!("Feature '{}' é suportada.", feature_id)));
+                            }
+                            FeatureStatus::PartialRequiresConfirmation => {
+                                if plan.confirmed_features.contains(&feature_id) {
+                                    checks.push(Check::pass(format!("Feature '{}' parcial ativada com confirmação.", feature_id)));
+                                } else {
+                                    checks.push(Check::fail(format!(
+                                        "Feature '{}' é parcial. Requer confirmação explícita no payload (confirmed_features).",
+                                        feature_id
+                                    )));
+                                    ok = false;
+                                }
+                            }
+                            FeatureStatus::BlockedStub => {
+                                checks.push(Check::fail(format!(
+                                    "Feature '{}' é um stub e não pode ser ativada.",
+                                    feature_id
+                                )));
+                                ok = false;
+                            }
+                            FeatureStatus::BlockedLegacy => {
+                                checks.push(Check::fail(format!(
+                                    "Feature '{}' é legacy e não pode ser ativada.",
+                                    feature_id
+                                )));
+                                ok = false;
+                            }
+                            FeatureStatus::Unknown => {
+                                checks.push(Check::fail(format!(
+                                    "Feature '{}' é desconhecida e não pode ser ativada pelo installer.",
+                                    feature_id
+                                )));
+                                ok = false;
+                            }
+                        }
                     }
                 }
             }
@@ -1132,6 +1194,7 @@ mod tests {
     fn make_plan(disk: &str, hostname: &str, user: &str) -> InstallPlan {
         InstallPlan {
             version: 1,
+            confirmed_features: vec![],
             hostname: hostname.into(),
             timezone: "America/Cuiaba".into(),
             locale: "pt_BR.UTF-8".into(),
@@ -1158,6 +1221,71 @@ mod tests {
             network: Default::default(),
             target_remote_access: Default::default(),
         }
+    }
+
+    #[test]
+    fn test_feature_supported_pass() {
+        let mut plan = make_plan("/dev/null", "teste", "admin");
+        plan.features = serde_json::json!({
+            "system": { "impermanence": true }
+        });
+        let res = validate_plan(&plan);
+        assert!(res.checks.iter().any(|c| c.ok && c.message.contains("suportada")));
+    }
+
+    #[test]
+    fn test_feature_unknown_fails() {
+        let mut plan = make_plan("/dev/null", "teste", "admin");
+        plan.features = serde_json::json!({
+            "madeup": { "feature": true }
+        });
+        let res = validate_plan(&plan);
+        assert!(!res.ok);
+        assert!(res.checks.iter().any(|c| !c.ok && c.message.contains("desconhecida")));
+    }
+
+    #[test]
+    fn test_feature_stub_fails() {
+        let mut plan = make_plan("/dev/null", "teste", "admin");
+        plan.features = serde_json::json!({
+            "ai": { "lightrag": true }
+        });
+        let res = validate_plan(&plan);
+        assert!(!res.ok);
+        assert!(res.checks.iter().any(|c| !c.ok && c.message.contains("stub")));
+    }
+
+    #[test]
+    fn test_feature_legacy_fails() {
+        let mut plan = make_plan("/dev/null", "teste", "admin");
+        plan.features = serde_json::json!({
+            "system": { "legacy_boot": true }
+        });
+        let res = validate_plan(&plan);
+        assert!(!res.ok);
+        assert!(res.checks.iter().any(|c| !c.ok && c.message.contains("legacy")));
+    }
+
+    #[test]
+    fn test_feature_partial_without_confirmation_fails() {
+        let mut plan = make_plan("/dev/null", "teste", "admin");
+        plan.features = serde_json::json!({
+            "ai": { "ollama": true }
+        });
+        let res = validate_plan(&plan);
+        assert!(!res.ok);
+        assert!(res.checks.iter().any(|c| !c.ok && c.message.contains("parcial")));
+    }
+
+    #[test]
+    fn test_feature_partial_with_confirmation_passes() {
+        let mut plan = make_plan("/dev/null", "teste", "admin");
+        plan.features = serde_json::json!({
+            "ai": { "ollama": true }
+        });
+        plan.confirmed_features = vec!["ai.ollama".into()];
+        let res = validate_plan(&plan);
+        assert!(res.checks.iter().any(|c| c.ok && c.message.contains("confirmação")));
     }
 
     // ── Testes de contrato UI↔backend ─────────────────────────────────────────
