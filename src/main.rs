@@ -23,7 +23,7 @@ use std::convert::Infallible;
 use std::process::Command;
 use std::sync::Arc;
 use tokio::sync::{RwLock, broadcast};
-use tower_http::{cors::CorsLayer, services::ServeDir};
+use tower_http::{cors::{CorsLayer, AllowOrigin, Any}, services::ServeDir};
 
 // ── Shared state ──────────────────────────────────────────────────────────────
 
@@ -35,6 +35,8 @@ pub struct AppState {
     pub auth: auth::SharedAuthState,
     /// Reusable HTTP client (connection pooling, rustls)
     pub http_client: reqwest::Client,
+    /// Token for destructive API calls
+    pub installer_token: String,
 }
 
 // ── Common error type ─────────────────────────────────────────────────────────
@@ -220,7 +222,7 @@ impl Check {
     }
 }
 
-#[derive(Serialize, Clone, Default)]
+#[derive(Serialize, Deserialize, Clone, Default)]
 struct InstallStatus {
     running: bool,
     #[serde(rename = "exitCode")]
@@ -235,6 +237,21 @@ struct InstallStatus {
     have_plan: bool,
     #[serde(rename = "canInstall")]
     can_install: bool,
+}
+
+fn save_install_state(status: &InstallStatus) {
+    if let Ok(json) = serde_json::to_string_pretty(status) {
+        let _ = std::fs::write("/tmp/kryonix-install-state.json", json);
+    }
+}
+
+fn load_install_state() -> InstallStatus {
+    if let Ok(json) = std::fs::read_to_string("/tmp/kryonix-install-state.json") {
+        if let Ok(status) = serde_json::from_str(&json) {
+            return status;
+        }
+    }
+    InstallStatus::default()
 }
 
 #[derive(Deserialize)]
@@ -256,12 +273,21 @@ async fn main() {
         .build()
         .expect("Failed to build HTTP client");
 
+    let installer_token = std::env::var("KRYONIX_INSTALLER_TOKEN").unwrap_or_else(|_| {
+        uuid::Uuid::new_v4().to_string()
+    });
+    println!("============================================================");
+    println!("KRYONIX INSTALLER TOKEN: {}", installer_token);
+    println!("Pass this token in the X-Kryonix-Installer-Token header.");
+    println!("============================================================");
+
     let state = Arc::new(AppState {
         log_sender: Arc::new(log_tx),
         progress_tx: Arc::new(progress_tx),
-        install_status: Arc::new(RwLock::new(InstallStatus::default())),
+        install_status: Arc::new(RwLock::new(load_install_state())),
         auth: auth::new_auth_state(),
         http_client,
+        installer_token,
     });
 
     let ui_dir = std::env::var("KRYONIX_INSTALLER_UI_DIR")
@@ -309,12 +335,32 @@ async fn main() {
         .route("/api/partition", post(partition_endpoint))
         .route("/api/reboot", post(reboot_endpoint))
         .route("/api/stream", get(stream_logs))
-        .layer(CorsLayer::permissive())
+        .layer(
+            CorsLayer::new()
+                .allow_methods(Any)
+                .allow_headers(Any)
+                .allow_origin(AllowOrigin::predicate(|origin: &axum::http::HeaderValue, _request_parts| {
+                    if let Ok(s) = origin.to_str() {
+                        s.starts_with("http://127.0.0.1") || s.starts_with("http://localhost") || s.starts_with("http://[::1]")
+                    } else {
+                        false
+                    }
+                }))
+        )
         .with_state(state)
         .fallback_service(ServeDir::new(ui_dir).fallback(ServeDir::new("ui/static")));
 
     let bind_addr =
         std::env::var("KRYONIX_INSTALLER_BIND").unwrap_or_else(|_| "127.0.0.1:8080".to_string());
+        
+    if (bind_addr.starts_with("0.0.0.0") || bind_addr.starts_with("[::]")) 
+        && std::env::var("KRYONIX_ALLOW_REMOTE_BIND").is_err() {
+        eprintln!("ERROR: Destructive API is binding to {} without explicit authorization.", bind_addr);
+        eprintln!("If you are absolutely sure you want to expose the installer to the network,");
+        eprintln!("set KRYONIX_ALLOW_REMOTE_BIND=1 in your environment.");
+        std::process::exit(1);
+    }
+
     let listener = tokio::net::TcpListener::bind(&bind_addr).await.unwrap();
     println!(
         "Kryonix Installer API → http://{}",
@@ -563,9 +609,32 @@ fn hash_password_if_needed(plan: &mut InstallPlan) {
     }
 }
 
-async fn dry_run(Json(mut plan): Json<InstallPlan>) -> impl IntoResponse {
+async fn dry_run(
+    State(state): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
+    Json(mut plan): Json<InstallPlan>,
+) -> impl IntoResponse {
+    let token = headers.get("X-Kryonix-Installer-Token").and_then(|v| v.to_str().ok()).unwrap_or("");
+    if token != state.installer_token {
+        return (StatusCode::UNAUTHORIZED, Json(ErrorResponse {
+            error: "UNAUTHORIZED".into(),
+            details: Some("Token X-Kryonix-Installer-Token inválido ou ausente.".into()),
+        })).into_response();
+    }
+    
     hash_password_if_needed(&mut plan);
-    let result = validate_plan(&plan);
+    let mut result = validate_plan(&plan);
+    
+    if result.ok {
+        // P0.5: Run real disko dry-run to validate disk config
+        if let Err(e) = executor::partition::run_disko_dry_run(&plan).await {
+            result.ok = false;
+            result.checks.push(Check::fail(format!("Disko dry-run falhou: {}", e)));
+        } else {
+            result.checks.push(Check::pass("Disko dry-run concluído com sucesso"));
+        }
+    }
+    
     // 200 somente se ok==true; 422 se o plano/alvo é semanticamente inválido.
     // (Body/JSON malformado já vira 400/422 no extractor Json antes de chegar aqui.)
     let status = if result.ok {
@@ -573,7 +642,7 @@ async fn dry_run(Json(mut plan): Json<InstallPlan>) -> impl IntoResponse {
     } else {
         StatusCode::UNPROCESSABLE_ENTITY
     };
-    (status, Json(result))
+    (status, Json(result)).into_response()
 }
 
 /// Verifica se o hostname está dentro do subset seguro (RFC-1123 light):
@@ -751,6 +820,24 @@ fn validate_plan(plan: &InstallPlan) -> DryRunResult {
         ok = false;
     }
 
+    // P0.8: Block stub features
+    let blocked_features = vec!["ai.lightrag", "ai.open-webui", "ai.openWebui", "openWebui", "open-webui"];
+    if let Some(obj) = plan.features.as_object() {
+        for domain in obj.values() {
+            if let Some(features) = domain.as_object() {
+                for (key, val) in features {
+                    if val.as_bool().unwrap_or(false) && blocked_features.contains(&key.as_str()) {
+                        checks.push(Check::fail(format!(
+                            "Feature '{}' está marcada como stub/legacy e não pode ser ativada de forma segura no momento.",
+                            key
+                        )));
+                        ok = false;
+                    }
+                }
+            }
+        }
+    }
+
     DryRunResult { ok, checks }
 }
 
@@ -836,8 +923,21 @@ struct SafetyResponse {
 
 async fn install(
     State(state): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
     Json(mut plan): Json<InstallPlan>,
 ) -> impl IntoResponse {
+    let token = headers.get("X-Kryonix-Installer-Token").and_then(|v| v.to_str().ok()).unwrap_or("");
+    if token != state.installer_token {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(ErrorResponse {
+                error: "UNAUTHORIZED".into(),
+                details: Some("Token X-Kryonix-Installer-Token inválido ou ausente.".into()),
+            }),
+        )
+            .into_response();
+    }
+
     hash_password_if_needed(&mut plan);
 
     // dry-run mode → only validate, never touch disks
@@ -903,6 +1003,7 @@ async fn install(
         status.last_log_line = Some("job aceito; iniciando executor real".to_string());
         status.have_plan = true;
         status.can_install = true;
+        save_install_state(&status);
     }
 
     let job_id = uuid::Uuid::new_v4().to_string();
@@ -925,6 +1026,7 @@ async fn install(
                 status.current_phase = Some("done".into());
                 status.last_error = None;
                 status.last_log_line = Some("Instalação concluída pelo executor real".into());
+                save_install_state(&status);
             }
             Err(error) => {
                 let _ = tx.send(ProgressEvent {
@@ -940,6 +1042,7 @@ async fn install(
                 status.current_phase = Some("error".into());
                 status.last_error = Some(error.clone());
                 status.last_log_line = Some(error);
+                save_install_state(&status);
             }
         }
     });

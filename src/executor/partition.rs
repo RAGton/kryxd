@@ -43,6 +43,30 @@ pub async fn run_disko(
     Ok(())
 }
 
+pub async fn run_disko_dry_run(plan: &InstallPlan) -> Result<(), String> {
+    let config = generate_disko_config(plan);
+    let config_path = "/tmp/kryonix-disko-config.nix";
+
+    tokio::fs::write(config_path, config)
+        .await
+        .map_err(|e| format!("Falha ao escrever config disko: {e}"))?;
+
+    let result = tokio::process::Command::new("disko")
+        .args(["--mode", "dry-run", config_path])
+        .output()
+        .await
+        .map_err(|e| format!("disko dry-run não encontrado ou falhou ao iniciar: {e}"))?;
+
+    if !result.status.success() {
+        return Err(format!(
+            "disko dry-run falhou: {}",
+            String::from_utf8_lossy(&result.stderr)
+        ));
+    }
+
+    Ok(())
+}
+
 fn generate_disko_config(plan: &InstallPlan) -> String {
     if plan.disk.profile == "manual" {
         return generate_disko_config_manual(plan);
