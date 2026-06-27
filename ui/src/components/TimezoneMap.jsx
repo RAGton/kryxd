@@ -16,6 +16,41 @@ import {
   projectTimezoneCoordinate,
 } from '../utils/timezoneProjection.js';
 
+function getSmartFramingStyle(location) {
+  if (!location || !location.countryCode) {
+    return { transform: 'scale(1) translate(0, 0)', transition: 'transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)' };
+  }
+
+  const cc = location.countryCode;
+
+  // América do Sul
+  if (['BR', 'AR', 'CL', 'CO', 'PE', 'VE', 'EC', 'BO', 'PY', 'UY', 'GY', 'SR', 'GF'].includes(cc)) {
+    return { transform: 'scale(1.7) translate(12%, -25%)', transition: 'transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)' };
+  }
+
+  // América do Norte
+  if (['US', 'CA', 'MX'].includes(cc)) {
+    return { transform: 'scale(1.5) translate(18%, 15%)', transition: 'transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)' };
+  }
+
+  // Europa
+  if (['GB', 'FR', 'DE', 'IT', 'ES', 'PT', 'NL', 'BE', 'CH', 'AT', 'SE', 'NO', 'FI', 'DK', 'IE', 'PL', 'CZ', 'RO', 'GR', 'HU'].includes(cc)) {
+    return { transform: 'scale(1.9) translate(-8%, 28%)', transition: 'transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)' };
+  }
+
+  // Ásia
+  if (['CN', 'JP', 'IN', 'KR', 'ID', 'TH', 'VN', 'MY', 'PH', 'SG', 'TW', 'HK'].includes(cc)) {
+    return { transform: 'scale(1.6) translate(-25%, 5%)', transition: 'transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)' };
+  }
+
+  // Oceania
+  if (['AU', 'NZ'].includes(cc)) {
+    return { transform: 'scale(1.8) translate(-35%, -30%)', transition: 'transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)' };
+  }
+
+  return { transform: 'scale(1) translate(0, 0)', transition: 'transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)' };
+}
+
 function findZoneOverlayKey(location, layers) {
   if (!location || !layers || layers.size === 0) return '';
 
@@ -140,14 +175,14 @@ export default function TimezoneMap({ locations = [], selectedLocation, value, o
 
   return (
     <div className="section-panel relative flex h-full min-h-0 w-full flex-col overflow-hidden p-2 lg:p-3">
-      <div className="mb-2 flex items-start justify-between gap-3">
+      <div className="mb-3 flex items-start justify-between gap-3 px-1">
         <div>
-          <h3 className="text-xl font-bold text-white">Mapa global</h3>
-          <p className="mt-1 text-sm text-slate-400">
-            Visual inspirado diretamente no Calamares: mapa base, máscara ativa por faixa e pino posicional.
+          <h3 className="text-xl font-black text-slate-900 dark:text-white">Mapa global</h3>
+          <p className="mt-1 text-[13px] font-medium text-slate-500 dark:text-slate-400">
+            Selecione a região no mapa. Baseado no motor original do Calamares.
           </p>
         </div>
-        <div className="metric-chip border-amber-200/60 bg-amber-300/25 text-amber-50">
+        <div className="metric-chip bg-accent-blue/10 text-accent-blue border-accent-blue/20">
           {activeLocation?.label || value || 'Nenhum fuso selecionado'}
         </div>
       </div>
@@ -155,8 +190,8 @@ export default function TimezoneMap({ locations = [], selectedLocation, value, o
       <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[24px] border border-cyan-400/20 bg-[radial-gradient(circle_at_top,rgba(15,23,42,0.96),rgba(2,6,23,0.9))] shadow-[inset_0_0_0_1px_rgba(34,211,238,0.06)]">
         <div
           ref={mapPlaneRef}
-          className="relative w-full max-w-full cursor-pointer overflow-hidden rounded-[20px]"
-          style={{ aspectRatio: `${CALAMARES_MAP_WIDTH} / ${CALAMARES_MAP_HEIGHT}` }}
+          className="relative w-full max-w-full cursor-pointer rounded-[20px] will-change-transform origin-center"
+          style={{ aspectRatio: `${CALAMARES_MAP_WIDTH} / ${CALAMARES_MAP_HEIGHT}`, ...getSmartFramingStyle(activeLocation) }}
           onClick={handleMapClick}
         >
           <img
@@ -177,10 +212,17 @@ export default function TimezoneMap({ locations = [], selectedLocation, value, o
 
           {activeLocation ? (
             <>
+              <div
+                className="pointer-events-none absolute z-0 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-blue/30 animate-ping"
+                style={{
+                  left: `${(activeLocation.x / CALAMARES_MAP_WIDTH) * 100}%`,
+                  top: `${(activeLocation.y / CALAMARES_MAP_HEIGHT) * 100}%`,
+                }}
+              />
               <img
                 src={CALAMARES_PIN_IMAGE}
                 alt="Marcador de timezone"
-                className="pointer-events-none absolute z-10 h-8 w-8 -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_10px_18px_rgba(0,0,0,0.45)] select-none"
+                className="pointer-events-none absolute z-10 h-8 w-8 -translate-x-1/2 -translate-y-[80%] drop-shadow-[0_12px_16px_rgba(0,0,0,0.6)] select-none brightness-110"
                 style={{
                   left: `${(activeLocation.x / CALAMARES_MAP_WIDTH) * 100}%`,
                   top: `${(activeLocation.y / CALAMARES_MAP_HEIGHT) * 100}%`,
@@ -188,7 +230,7 @@ export default function TimezoneMap({ locations = [], selectedLocation, value, o
                 draggable="false"
               />
               <div
-                className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[185%] rounded-full border border-amber-100/90 bg-amber-300/95 px-3 py-1.5 text-xs font-black text-slate-950 shadow-xl"
+                className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-[220%] rounded-xl border border-white/10 bg-slate-900/90 px-3.5 py-1.5 text-xs font-bold text-white shadow-2xl backdrop-blur-md whitespace-nowrap"
                 style={{
                   left: `${(activeLocation.x / CALAMARES_MAP_WIDTH) * 100}%`,
                   top: `${(activeLocation.y / CALAMARES_MAP_HEIGHT) * 100}%`,
@@ -203,15 +245,14 @@ export default function TimezoneMap({ locations = [], selectedLocation, value, o
         </div>
 
         {activeLocation ? (
-          <div className="pointer-events-none absolute left-4 top-4 max-w-[260px] rounded-2xl border border-amber-200/70 bg-slate-950/96 px-3 py-2.5 text-xs text-amber-50 shadow-2xl backdrop-blur-xl">
-            <div className="font-black text-amber-200">{activeLocation.label}</div>
-            <div className="mt-1 text-amber-50">{activeLocation.timezone}</div>
-            <div className="mt-1 text-amber-100">{activeLocation.group}</div>
-            <div className="mt-1 text-[11px] text-amber-200/90">
+          <div className="pointer-events-none absolute left-4 bottom-4 max-w-[280px] rounded-2xl border border-white/10 bg-[rgba(2,6,23,0.7)] px-4 py-3 text-[13px] text-white shadow-2xl backdrop-blur-xl">
+            <div className="font-bold text-accent-blue">{activeLocation.label}</div>
+            <div className="mt-1 font-medium text-slate-200">{activeLocation.timezone}</div>
+            <div className="mt-1 text-[11px] text-slate-400">
               {Number(activeLocation.latitude).toFixed(4)}, {Number(activeLocation.longitude).toFixed(4)}
             </div>
             {activeOverlayKey ? (
-              <div className="mt-1 text-[11px] text-amber-100/80">Faixa visual: UTC {activeOverlayKey}</div>
+              <div className="mt-1.5 text-[11px] font-bold tracking-wide text-accent-blue/80 uppercase">Banda visual: UTC {activeOverlayKey}</div>
             ) : null}
           </div>
         ) : null}

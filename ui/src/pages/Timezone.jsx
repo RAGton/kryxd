@@ -159,12 +159,33 @@ export default function Timezone({ wizard, onChange, validation }) {
 
   // Prepara as opções para o KxCombobox
   const timezoneOptions = useMemo(() => {
-    return mergedLocations.map(loc => ({
-      id: loc.timezone,
-      label: loc.timezone,
-      desc: `${loc.label} • ${loc.group}`
-    }));
+    return mergedLocations.map(loc => {
+      const isBrasil = loc.countryCode === 'BR' || loc.group?.includes('Brasil') || loc.timezone?.includes('Noronha');
+      const countrySuffix = isBrasil && !loc.group?.includes('Brasil') ? ', Brasil' : '';
+      const displayGroup = loc.group ? `${loc.group}${countrySuffix}` : (loc.countryCode === 'BR' ? 'Brasil' : loc.countryCode);
+
+      return {
+        id: loc.timezone,
+        label: `${loc.label}${displayGroup ? ` — ${displayGroup}` : ''}`,
+        desc: loc.timezone
+      };
+    });
   }, [mergedLocations]);
+
+  // Sugestões Rápidas (Fusos Comuns)
+  const quickSuggestions = useMemo(() => {
+    if (!selectedLocation?.countryCode) return [];
+    if (selectedLocation.countryCode === 'BR') {
+      return [
+        'America/Sao_Paulo',
+        'America/Cuiaba',
+        'America/Manaus',
+        'America/Recife',
+        'America/Belem'
+      ];
+    }
+    return [];
+  }, [selectedLocation?.countryCode]);
 
   // Data e Hora simulada para o preview local
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -189,8 +210,8 @@ export default function Timezone({ wizard, onChange, validation }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-6 lg:flex-row">
-      {/* 70% Coluna Principal de Configuração */}
-      <div className="flex flex-1 flex-col overflow-y-auto pr-2 custom-scrollbar">
+      {/* 72% Coluna Principal de Configuração */}
+      <div className="flex flex-[0.72] flex-col overflow-y-auto pr-2 custom-scrollbar">
         <div className="mb-4">
           <h2 className="text-sm font-bold text-slate-900 dark:text-white">Fuso Horário</h2>
           <p className="mt-1 text-[12px] font-medium text-slate-500 dark:text-slate-400">
@@ -214,7 +235,7 @@ export default function Timezone({ wizard, onChange, validation }) {
           <FieldError message={fieldErrors.timeZone} />
         </div>
 
-        <div className="min-h-[300px] flex-1 rounded-xl overflow-hidden border border-slate-200/50 dark:border-white/10 shadow-sm">
+        <div className="min-h-[480px] flex-1 rounded-xl overflow-hidden border border-slate-200/50 dark:border-white/10 shadow-sm relative">
           <TimezoneMap
             locations={mappableLocations}
             selectedLocation={selectedLocation}
@@ -222,56 +243,53 @@ export default function Timezone({ wizard, onChange, validation }) {
             onChange={({ location }) => applyLocation(location)}
           />
         </div>
-        
+
         {error && (
           <div className="mt-4 text-[11px] font-medium text-warning dark:text-warning">
             <span className="font-bold">Aviso:</span> {error}
           </div>
         )}
+
+        {quickSuggestions.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Sugestões:</span>
+            {quickSuggestions.map(tz => {
+              const tzLoc = mergedLocations.find(l => l.timezone === tz);
+              if (!tzLoc) return null;
+              return (
+                <button
+                  key={tz}
+                  type="button"
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                    wizard.timeZone === tz
+                      ? 'bg-accent-blue/10 border-accent-blue/30 text-accent-blue'
+                      : 'bg-white/50 border-slate-200/50 text-slate-600 hover:border-slate-300 dark:bg-white/5 dark:border-white/10 dark:text-slate-300 dark:hover:border-white/20'
+                  }`}
+                  onClick={() => applyLocation(tzLoc)}
+                >
+                  {tzLoc.label.split('/')[0]} ({tzLoc.timezone.split('/')[1]?.replace('_', ' ') || tz})
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* 30% Coluna Lateral de Resumo */}
-      <div className="w-full shrink-0 lg:w-[280px] lg:border-l lg:border-slate-200/50 lg:pl-6 lg:dark:border-white/10">
-        <div className="rounded-xl border border-slate-200/50 bg-slate-50/50 p-5 dark:border-white/5 dark:bg-white/[0.02]">
-          <h3 className="mb-4 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
-            Resumo do Fuso
-          </h3>
-          
-          <div className="flex flex-col gap-4">
-            <div>
-              <div className="text-[10px] uppercase text-slate-400 dark:text-slate-500 font-bold">Fuso Selecionado</div>
-              <div className="text-[13px] font-bold text-slate-900 dark:text-white mt-0.5 break-all">
-                {wizard.timeZone || '—'}
-              </div>
-            </div>
-            
-            <div>
-              <div className="text-[10px] uppercase text-slate-400 dark:text-slate-500 font-bold">Região</div>
-              <div className="text-[13px] font-bold text-slate-900 dark:text-white mt-0.5">
-                {selectedLocation?.label || '—'}
-              </div>
-            </div>
-            
-            <div className="border-t border-slate-200/50 pt-3 dark:border-white/10">
-              <div className="text-[10px] uppercase text-slate-400 dark:text-slate-500 font-bold">Hora Local Prevista</div>
-              <div className="text-xl font-bold text-accent-blue mt-0.5">
-                {formattedTime}
-              </div>
+      {/* 28% Coluna Lateral de Resumo */}
+      <div className="w-full shrink-0 flex-[0.28] flex flex-col justify-start lg:border-l lg:border-slate-200/50 lg:pl-6 lg:dark:border-white/10">
+        <div className="flex flex-col gap-5">
+          <div>
+            <h3 className="mb-4 text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+              Fuso Selecionado
+            </h3>
+            <div className="text-[15px] font-bold text-accent-blue break-all">
+              {wizard.timeZone || '—'}
             </div>
 
-            {selectedLocation?.latitude !== undefined && selectedLocation?.longitude !== undefined && (
-              <div className="border-t border-slate-200/50 pt-3 dark:border-white/10">
-                <div className="text-[10px] uppercase text-slate-400 dark:text-slate-500 font-bold">Coordenadas</div>
-                <div className="text-[11px] font-medium text-slate-600 dark:text-slate-400 mt-0.5">
-                  {Number(selectedLocation.latitude).toFixed(4)}, {Number(selectedLocation.longitude).toFixed(4)}
-                </div>
-              </div>
-            )}
-            
-            <div className="mt-2">
+            {wizard.timeZone && wizard.timeZone !== 'Etc/UTC' && (
               <button
                 type="button"
-                className="btn-secondary w-full !text-xs !py-2"
+                className="mt-3 w-max text-[11px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors flex items-center gap-1.5"
                 onClick={() => applyLocation(decorateTimezoneLocation({
                   timezone: 'Etc/UTC',
                   label: 'UTC',
@@ -281,10 +299,53 @@ export default function Timezone({ wizard, onChange, validation }) {
                   countryCode: '',
                 }))}
               >
-                Usar UTC
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Mudar para UTC
               </button>
+            )}
+          </div>
+
+          <div className="border-t border-slate-200/50 pt-5 dark:border-white/5">
+            <div className="text-[10px] uppercase text-slate-400 dark:text-slate-500 font-bold">Localidade</div>
+            <div className="text-[13px] font-semibold text-slate-900 dark:text-white mt-1">
+              {selectedLocation?.label ? `${selectedLocation.label} — ${selectedLocation.group}` : '—'}
             </div>
           </div>
+
+          <div className="border-t border-slate-200/50 pt-5 dark:border-white/5">
+            <div className="text-[10px] uppercase text-slate-400 dark:text-slate-500 font-bold">Hora Local Prevista</div>
+            <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1 tracking-tight">
+              {formattedTime}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200/50 pt-5 dark:border-white/5">
+            <div className="text-[10px] uppercase text-slate-400 dark:text-slate-500 font-bold">UTC Offset</div>
+            <div className="text-[13px] font-semibold text-slate-600 dark:text-slate-400 mt-1">
+              {(() => {
+                if (!wizard.timeZone) return '—';
+                try {
+                  const date = new Date();
+                  const tzString = date.toLocaleString('en-US', { timeZone: wizard.timeZone, timeZoneName: 'longOffset' });
+                  const match = tzString.match(/GMT([+-]\d{2}:\d{2})/);
+                  if (match) return `UTC ${match[1]}`;
+                  if (tzString.includes('GMT')) return 'UTC ±00:00';
+                  return '—';
+                } catch {
+                  return '—';
+                }
+              })()}
+            </div>
+          </div>
+
+          {selectedLocation?.latitude !== undefined && selectedLocation?.longitude !== undefined && (
+            <div className="border-t border-slate-200/50 pt-5 dark:border-white/5">
+              <div className="text-[10px] uppercase text-slate-400 dark:text-slate-500 font-bold">Coordenadas</div>
+              <div className="text-[12px] font-medium text-slate-500 dark:text-slate-500 mt-1">
+                {Number(selectedLocation.latitude).toFixed(4)}, {Number(selectedLocation.longitude).toFixed(4)}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
