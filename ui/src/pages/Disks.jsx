@@ -202,7 +202,7 @@ function TabDiscos({ diskInventory, loadingDisks, diskError, partitions, wizard,
   return (
     <div className="p-2 space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-white tracking-wide">Inventário de Discos</h2>
+        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Inventário de Discos</h3>
         <button
           type="button"
           className="rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 px-3 py-1.5 text-xs text-white transition-colors"
@@ -254,8 +254,8 @@ function TabPlanoAutomatico({ wizard, eligiblePaths }) {
 
   return (
     <div className="p-2 space-y-6">
-      <div>
-        <h2 className="text-lg font-bold text-white tracking-wide mb-1">Prévia do Particionamento</h2>
+      <div className="mb-2">
+        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Prévia do Particionamento</h3>
         <p className="text-xs text-slate-400">O layout abaixo será aplicado automaticamente no disco {wizard.sysDisk}.</p>
       </div>
 
@@ -502,10 +502,10 @@ export default function Disks({ wizard, uiState, onChange, validation }) {
       </div>
 
       {/* Coluna Lateral - Direita (30%) */}
-      <div className="w-[340px] shrink-0 flex flex-col gap-4">
+      <div className="w-[340px] shrink-0 flex flex-col gap-4 overflow-y-auto min-h-0 pb-2 custom-scrollbar pr-1">
         
         {/* Card do Disco Selecionado */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+        <div className="shrink-0 rounded-2xl border border-white/10 bg-white/5 p-5">
           <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">Disco Selecionado</h3>
           
           {!selectedDiskRecord ? (
@@ -540,7 +540,7 @@ export default function Disks({ wizard, uiState, onChange, validation }) {
         </div>
 
         {/* Card de Segurança da Operação (Destrutivo) */}
-        <div className={`rounded-2xl border p-5 transition-colors ${
+        <div className={`shrink-0 rounded-2xl border p-5 transition-colors ${
           !selectedDiskRecord ? 'opacity-50 pointer-events-none border-white/5 bg-black/20' : 
           destructiveConfirmed ? 'border-warning/30 bg-warning/5' : 'border-danger/30 bg-danger/10'
         }`}>

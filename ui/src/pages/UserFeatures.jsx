@@ -24,23 +24,23 @@ export default function UserFeatures({ wizard, onChange }) {
           if (featuresInDomain.length === 0) return null;
 
           return (
-            <div key={domain} className="bg-gray-800/30 border border-gray-700/50 p-6 rounded-xl">
-              <h3 className="text-lg font-bold text-white mb-4 uppercase tracking-wider text-sm">{featuresInDomain[0].category}</h3>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div key={domain} className="mb-6">
+              <h3 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-widest">{featuresInDomain[0].category}</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 {featuresInDomain.map(feature => {
                   const isSelected = wizard.selectedFeatures?.includes(feature.id);
                   return (
                     <label 
                       key={feature.id}
-                      className={`flex items-start space-x-4 p-4 rounded-lg border cursor-pointer transition-all ${
-                        isSelected ? 'border-purple-500 bg-purple-500/10' : 'border-gray-700 bg-gray-900/50 hover:border-gray-600'
+                      className={`flex items-start space-x-4 p-4 rounded-xl border cursor-pointer transition-all ${
+                        isSelected ? 'border-accent-blue bg-accent-blue/10 shadow-md' : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'
                       }`}
                     >
                       <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => handleToggle(feature.id)}
-                        className="form-checkbox mt-1 h-5 w-5 text-purple-500 bg-gray-900 border-gray-700 rounded focus:ring-purple-500 focus:ring-offset-gray-900"
+                        className="form-checkbox mt-1 h-5 w-5 text-accent-blue bg-black/40 border-white/20 rounded focus:ring-accent-blue appearance-none checked:appearance-auto cursor-pointer"
                       />
                       <div className="flex-1">
                         <div className="flex justify-between items-start">
@@ -49,9 +49,9 @@ export default function UserFeatures({ wizard, onChange }) {
                         <p className="text-xs text-gray-400 mb-2">{feature.description}</p>
                         
                         {feature.badges && feature.badges.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-2">
+                          <div className="flex flex-wrap gap-1.5 mt-2">
                             {feature.badges.map(badge => (
-                              <span key={badge} className="px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider rounded bg-gray-700 text-gray-300">
+                              <span key={badge} className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest rounded border border-white/10 bg-black/30 text-slate-300">
                                 {badge}
                               </span>
                             ))}

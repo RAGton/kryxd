@@ -170,7 +170,7 @@ export default function Summary({ wizard, uiState, onChange, validation }) {
 
   return (
     <div className="grid h-full min-h-0 gap-6 lg:grid-cols-[7fr_3fr] animate-fade-in-up">
-      <section className="flex flex-col min-h-0 overflow-y-auto pr-2 pb-6">
+      <section className="flex flex-col min-h-0 overflow-y-auto pr-2 pb-6 custom-scrollbar">
 
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -254,7 +254,7 @@ export default function Summary({ wizard, uiState, onChange, validation }) {
         </div>
       </section>
 
-      <section className="flex flex-col min-h-0 bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-2xl shadow-sm p-6 overflow-y-auto">
+      <section className="flex flex-col min-h-0 bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-2xl shadow-sm p-6 overflow-y-auto custom-scrollbar">
         <div>
           <div className="rounded-xl border border-slate-200/50 dark:border-white/10 bg-slate-50 dark:bg-slate-950/60 p-4">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-text-muted">Checklist crítico</div>
