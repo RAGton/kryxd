@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { installerApi, getInstallerApiErrorMessage } from '../utils/installerApi.js';
 import {
   buildRaidPlanSummary,
@@ -13,7 +14,7 @@ import {
   validateSplitDiskLayout,
 } from '../utils/storagePlanner.js';
 
-const TABS = ['Discos', 'Plano automático', 'Manual', 'RAID'];
+const TABS_ID = ['automatic', 'manual', 'lvm', 'raid'];
 
 /* ── helpers ── */
 
@@ -21,17 +22,12 @@ function arraysEqual(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-function uniqueStrings(items) {
-  return Array.from(new Set((Array.isArray(items) ? items : []).filter(Boolean)));
-}
-
 function getDiskCapacityLabel(disk) {
   if (disk.sizeBytes > 0) return disk.sizeLabel || formatBytes(disk.sizeBytes);
   if (disk.size) return disk.size;
-  return 'Tamanho indisponível';
+  return 'N/A';
 }
 
-/** CSS class para colorir o segmento de partição */
 function segClass(part) {
   const mp = (part.mountpoint || '').toLowerCase();
   const fs = (part.fstype || '').toLowerCase();
@@ -44,7 +40,6 @@ function segClass(part) {
   return 'pseg-other';
 }
 
-/** Formata label legível para a partição */
 function partLabel(part) {
   if (part.mountpoint) return part.mountpoint;
   if (part.label) return part.label;
@@ -58,7 +53,7 @@ function PartitionBar({ partitions, totalBytes }) {
   if (!partitions || partitions.length === 0) {
     return (
       <div className="partition-bar mt-3 border border-white/5 bg-black/20 rounded h-2 overflow-hidden flex">
-        <div className="bg-slate-600/30 flex-1" title="Sem partições detectadas" />
+        <div className="bg-slate-600/30 flex-1" />
       </div>
     );
   }
@@ -69,8 +64,7 @@ function PartitionBar({ partitions, totalBytes }) {
     <div className="mt-3">
       <div className="partition-bar border border-white/5 bg-black/20 rounded h-2 overflow-hidden flex">
         {partitions.map((p, i) => {
-          const size = Number(p.size_bytes || p.size || 0); // fallback size could be string, but partition data usually has size in bytes? Wait, lsblk returns size as string. Let's assume size in bytes exists or we approximate it.
-          // Fallback: equal flex if size parsing fails
+          const size = Number(p.size_bytes || p.size || 0);
           const pct = total > 0 ? Math.max((size / total) * 100, 1) : 100/partitions.length;
           return (
             <div
@@ -94,7 +88,8 @@ function PartitionBar({ partitions, totalBytes }) {
   );
 }
 
-function DiskCard({ disk, selected, partData, onClick }) {
+function DiskCard({ disk, selected, partData, onClick, mode = 'single' }) {
+  const { t } = useTranslation();
   const partitions = partData?.blockdevices?.[0]?.children ?? [];
   const totalSize = partData?.blockdevices?.[0]?.size ?? disk.size_bytes;
   const blocked = disk.eligible === false;
@@ -110,14 +105,20 @@ function DiskCard({ disk, selected, partData, onClick }) {
             : 'border-white/10 bg-white/5 cursor-pointer hover:border-white/20 hover:bg-white/10'
       }`}
       onClick={blocked ? undefined : onClick}
-      role="button"
+      role={mode === 'multi' ? "checkbox" : "button"}
+      aria-checked={mode === 'multi' ? selected : undefined}
       aria-disabled={blocked}
       tabIndex={blocked ? -1 : 0}
       onKeyDown={e => !blocked && (e.key === 'Enter' || e.key === ' ') && onClick?.()}
     >
       <div className="flex items-center justify-between mb-1">
         <div className="flex flex-col gap-0.5">
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-center gap-3">
+            {mode === 'multi' && (
+              <div className={`w-4 h-4 rounded border flex items-center justify-center ${selected ? 'bg-accent-blue border-accent-blue text-black' : 'border-white/30 bg-black/40'}`}>
+                {selected && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+              </div>
+            )}
             <span className={`text-[14px] font-bold ${selected ? 'text-accent-blue' : 'text-white'}`}>{disk.path ?? `/dev/${disk.name}`}</span>
           </div>
           {disk.model && (
@@ -126,7 +127,7 @@ function DiskCard({ disk, selected, partData, onClick }) {
         </div>
         {blocked ? (
           <span className="rounded bg-danger/10 border border-danger/20 px-2 py-0.5 text-[10px] font-bold text-danger">
-            Bloqueado
+            {t('storage.automatic.blockedLabel')}
           </span>
         ) : (
           <span className={`rounded border px-2 py-0.5 text-[11px] font-bold ${
@@ -140,9 +141,9 @@ function DiskCard({ disk, selected, partData, onClick }) {
       </div>
 
       <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-medium text-slate-400 uppercase tracking-wider">
-        {disk.type && <span className="bg-black/20 px-1.5 py-0.5 rounded border border-white/5">TIPO: {disk.type}</span>}
+        {disk.type && <span className="bg-black/20 px-1.5 py-0.5 rounded border border-white/5">TYPE: {disk.type}</span>}
         {disk.readonly && <span className="text-danger bg-danger/10 px-1.5 py-0.5 rounded border border-danger/20">READ-ONLY</span>}
-        {disk.removable && <span className="text-warning bg-warning/10 px-1.5 py-0.5 rounded border border-warning/20">REMOVÍVEL</span>}
+        {disk.removable && <span className="text-warning bg-warning/10 px-1.5 py-0.5 rounded border border-warning/20">REMOVABLE</span>}
       </div>
 
       <PartitionBar partitions={partitions} totalBytes={totalSize} />
@@ -152,215 +153,428 @@ function DiskCard({ disk, selected, partData, onClick }) {
           ⚠ {reason}
         </div>
       )}
-
-      {selected && !blocked && (
-        <div className="mt-3 text-[11px] font-bold text-accent-blue flex items-center gap-1.5">
-          <span className="w-4 h-4 rounded-full bg-accent-blue/20 flex items-center justify-center">✓</span>
-          Disco selecionado para o sistema
-        </div>
-      )}
     </div>
   );
 }
 
-/* ── aba Discos ── */
-
-function TabDiscos({ diskInventory, loadingDisks, diskError, partitions, wizard, onChange, eligibleDisks, eligiblePaths, onReload }) {
-  if (loadingDisks) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-slate-400">
-        <div className="mr-3 h-4 w-4 animate-spin rounded-full border-2 border-accent-blue border-t-transparent" />
-        Detectando armazenamento...
-      </div>
-    );
-  }
-
-  if (diskError) {
-    return (
-      <div className="p-4">
-        <div className="py-4 text-[13px] font-medium text-danger">✗ {diskError}</div>
-      </div>
-    );
-  }
-
+function TabAutomatico({ wizard, eligibleDisks, partitions, onChange, onReload, eligiblePaths, diskInventory }) {
+  const { t } = useTranslation();
+  const hasDisk = eligiblePaths.has(wizard.sysDisk);
   const blocked = diskInventory.filter(d => d.eligible === false);
 
-  const cardFor = (disk) => (
-    <DiskCard
-      key={disk.path}
-      disk={disk}
-      selected={wizard.sysDisk === disk.path}
-      partData={partitions[disk.name ?? disk.path?.split('/').pop()]}
-      onClick={() => {
-        if (eligiblePaths.has(disk.path)) {
-          onChange({ sysDisk: disk.path, selectedDisks: [disk.path] });
-        }
-      }}
-    />
-  );
-
   return (
-    <div className="p-2 space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Inventário de Discos</h3>
+    <div className="p-4 space-y-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-bold text-white">{t('storage.automatic.title')}</h3>
         <button
           type="button"
           className="rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 px-3 py-1.5 text-xs text-white transition-colors"
           onClick={onReload}
         >
-          ↻ Atualizar lista
+          {t('storage.automatic.reload')}
         </button>
       </div>
 
       <div>
         <div className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-          Discos elegíveis ({eligibleDisks.length})
+          {t('storage.automatic.targetDisk')} ({eligibleDisks.length})
         </div>
         {eligibleDisks.length === 0 ? (
           <div className="py-3 text-[13px] font-medium text-slate-400 border border-white/5 bg-white/5 rounded-xl text-center">
-            Nenhum disco elegível detectado para instalação.
+            {t('storage.automatic.noEligible')}
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3">{eligibleDisks.map(cardFor)}</div>
+          <div className="grid grid-cols-1 gap-3">
+            {eligibleDisks.map(disk => (
+              <DiskCard
+                key={disk.path}
+                disk={disk}
+                selected={wizard.sysDisk === disk.path}
+                partData={partitions[disk.name ?? disk.path?.split('/').pop()]}
+                onClick={() => {
+                  if (eligiblePaths.has(disk.path)) {
+                    onChange({ sysDisk: disk.path, selectedDisks: [disk.path] });
+                  }
+                }}
+              />
+            ))}
+          </div>
         )}
       </div>
 
       {blocked.length > 0 && (
         <div>
-          <div className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            Discos não elegíveis ({blocked.length})
+          <div className="mb-3 mt-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            {t('storage.automatic.blockedDisks')} ({blocked.length})
           </div>
-          <div className="grid grid-cols-1 gap-3">{blocked.map(cardFor)}</div>
+          <div className="grid grid-cols-1 gap-3 opacity-80">
+            {blocked.map(disk => (
+              <DiskCard
+                key={disk.path}
+                disk={disk}
+                selected={false}
+                partData={partitions[disk.name ?? disk.path?.split('/').pop()]}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hasDisk && (
+        <div className="pt-6 border-t border-white/5 mt-6 animate-fade-in">
+          <h3 className="text-sm font-bold text-white mb-2">{t('storage.automatic.previewTitle')}</h3>
+          <p className="text-xs text-slate-400 mb-4">{t('storage.automatic.previewDesc')} {wizard.sysDisk}.</p>
+          
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 mb-4">
+            <div className="flex h-8 w-full rounded-md overflow-hidden border border-white/10 bg-black/40">
+              <div className="w-[10%] bg-indigo-500/80 border-r border-black flex items-center justify-center">
+                <span className="text-[10px] font-bold text-white">EFI</span>
+              </div>
+              <div className="flex-1 bg-accent-blue/80 flex items-center justify-center relative overflow-hidden">
+                <span className="text-[11px] font-bold text-white z-10">ROOT BTRFS (~100%)</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="bg-white/5 uppercase tracking-wider text-[10px] font-bold text-slate-400">
+                <tr>
+                  <th className="px-4 py-3">{t('storage.manual.mountpoint')}</th>
+                  <th className="px-4 py-3">{t('storage.manual.filesystem')}</th>
+                  <th className="px-4 py-3">{t('storage.manual.size')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                <tr className="hover:bg-white/[0.02]">
+                  <td className="px-4 py-3 font-mono text-indigo-400">/boot/efi</td>
+                  <td className="px-4 py-3">vfat (FAT32)</td>
+                  <td className="px-4 py-3">512 MiB</td>
+                </tr>
+                <tr className="hover:bg-white/[0.02]">
+                  <td className="px-4 py-3 font-mono text-accent-blue">/</td>
+                  <td className="px-4 py-3">BTRFS</td>
+                  <td className="px-4 py-3">~100%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-/* ── aba Plano Automático ── */
+function TabManual({ wizard, onChange, eligibleDisks }) {
+  const { t } = useTranslation();
+  const parts = wizard.manualPartitions || [];
+  
+  const addPartition = () => {
+    onChange({
+      manualPartitions: [...parts, { device: eligibleDisks[0]?.path || '', mountpoint: '', fstype: 'btrfs', size: '20GiB', format: true }]
+    });
+  };
+  
+  return (
+    <div className="p-4">
+      <div className="mb-4 bg-warning/10 border border-warning/20 rounded-xl p-4 flex gap-3 text-warning text-sm">
+        <span className="text-xl">⚠</span>
+        <div>
+          <strong className="block mb-1">{t('storage.manual.warningTitle')}</strong>
+          {t('storage.manual.warningDesc')}
+        </div>
+      </div>
 
-function TabPlanoAutomatico({ wizard, eligiblePaths }) {
-  const hasDisk = eligiblePaths.has(wizard.sysDisk);
-  const enableSrvData = shouldRecommendSrvData(wizard.profileId, wizard.selectedFeatures);
-  const subvolumes = enableSrvData ? ['@', '@home', '@nix', '@log', '@srv'] : ['@', '@home', '@nix', '@log'];
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-bold text-white">{t('storage.manual.title')}</h3>
+        <button type="button" onClick={addPartition} className="px-3 py-1.5 bg-accent-blue text-black text-xs font-bold rounded hover:bg-accent-blue/80 transition-colors">
+          {t('storage.manual.addPartition')}
+        </button>
+      </div>
 
-  if (!hasDisk) {
+      <div className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] mb-6">
+        <table className="w-full text-left text-xs text-slate-300">
+          <thead className="bg-white/5 uppercase tracking-wider text-[10px] font-bold text-slate-400">
+            <tr>
+              <th className="px-4 py-3">{t('storage.manual.disk')}</th>
+              <th className="px-4 py-3">{t('storage.manual.size')}</th>
+              <th className="px-4 py-3">{t('storage.manual.filesystem')}</th>
+              <th className="px-4 py-3">{t('storage.manual.mountpoint')}</th>
+              <th className="px-4 py-3 text-right">{t('storage.manual.action')}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {parts.length === 0 ? (
+              <tr>
+                <td colSpan="5" className="px-4 py-8 text-center text-slate-400 italic">{t('storage.manual.empty')}</td>
+              </tr>
+            ) : parts.map((p, i) => (
+              <tr key={i} className="hover:bg-white/[0.02]">
+                <td className="px-4 py-2">
+                  <select className="input-shell text-xs py-1 px-2" value={p.device} onChange={e => {
+                    const np = [...parts]; np[i].device = e.target.value; onChange({manualPartitions: np});
+                  }}>
+                    {eligibleDisks.map(d => <option key={d.path} value={d.path}>{d.path}</option>)}
+                  </select>
+                </td>
+                <td className="px-4 py-2">
+                  <input type="text" className="input-shell text-xs py-1 px-2 w-24" value={p.size} onChange={e => {
+                    const np = [...parts]; np[i].size = e.target.value; onChange({manualPartitions: np});
+                  }} placeholder="20GiB" />
+                </td>
+                <td className="px-4 py-2">
+                  <select className="input-shell text-xs py-1 px-2" value={p.fstype} onChange={e => {
+                    const np = [...parts]; np[i].fstype = e.target.value; onChange({manualPartitions: np});
+                  }}>
+                    <option value="btrfs">BTRFS</option>
+                    <option value="ext4">EXT4</option>
+                    <option value="vfat">FAT32 (EFI)</option>
+                    <option value="swap">SWAP</option>
+                  </select>
+                </td>
+                <td className="px-4 py-2">
+                  <input type="text" className="input-shell text-xs py-1 px-2 w-32" value={p.mountpoint} onChange={e => {
+                    const np = [...parts]; np[i].mountpoint = e.target.value; onChange({manualPartitions: np});
+                  }} placeholder="/" />
+                </td>
+                <td className="px-4 py-2 text-right">
+                  <button type="button" onClick={() => {
+                    const np = parts.filter((_, idx) => idx !== i); onChange({manualPartitions: np});
+                  }} className="text-danger hover:text-white px-2 py-1 rounded bg-danger/10 hover:bg-danger/20 transition-colors">{t('storage.manual.remove')}</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {parts.length > 0 && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+          <div className="flex h-8 w-full rounded-md overflow-hidden border border-white/10 bg-black/40">
+            {parts.map((p, i) => (
+              <div key={i} className={`${i%2===0 ? 'bg-indigo-500/80' : 'bg-accent-blue/80'} border-r border-black/20 flex items-center justify-center min-w-[20px]`} style={{flex: p.size.includes('100%') ? '1' : `0 0 ${Math.min(parseInt(p.size)||10, 100)}%`}}>
+                <span className="text-[10px] font-bold text-white px-1 truncate">{p.mountpoint || 'raw'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TabLVM({ wizard, onChange, eligibleDisks }) {
+  const { t } = useTranslation();
+  const lvm = wizard.lvmPlan || { vgName: 'kryonix-vg', physicalVolumes: [], logicalVolumes: [] };
+  
+  const togglePV = (path) => {
+    const pvs = new Set(lvm.physicalVolumes);
+    if (pvs.has(path)) pvs.delete(path);
+    else pvs.add(path);
+    onChange({ lvmPlan: { ...lvm, physicalVolumes: Array.from(pvs) }});
+  };
+
+  const addLV = () => {
+    onChange({ lvmPlan: { ...lvm, logicalVolumes: [...lvm.logicalVolumes, { name: '', size: '', mountpoint: '/', fstype: 'btrfs' }]}});
+  };
+  
+  return (
+    <div className="p-4">
+      <div className="mb-4 bg-warning/10 border border-warning/20 rounded-xl p-4 flex gap-3 text-warning text-sm">
+        <span className="text-xl">⚠</span>
+        <div>
+          <strong className="block mb-1">{t('storage.lvm.warningTitle')}</strong>
+          {t('storage.lvm.warningDesc')}
+        </div>
+      </div>
+
+      <h3 className="text-sm font-bold text-white mb-3">{t('storage.lvm.physicalVolumes')}</h3>
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        {eligibleDisks.map(disk => {
+          const isSel = lvm.physicalVolumes.includes(disk.path);
+          return (
+            <label key={disk.path} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${isSel ? 'bg-accent-blue/10 border-accent-blue/40' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}>
+              <input type="checkbox" className="hidden" checked={isSel} onChange={() => togglePV(disk.path)} />
+              <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSel ? 'bg-accent-blue border-accent-blue text-black' : 'border-white/30 bg-black/40'}`}>
+                {isSel && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+              </div>
+              <div>
+                <div className="text-sm font-bold text-white">{disk.path}</div>
+                <div className="text-[10px] text-slate-400">{getDiskCapacityLabel(disk)}</div>
+              </div>
+            </label>
+          )
+        })}
+      </div>
+
+      <h3 className="text-sm font-bold text-white mb-2">{t('storage.lvm.vgStep')}</h3>
+      <div className="mb-6">
+        <input type="text" className="input-shell w-full max-w-xs" value={lvm.vgName} onChange={e => onChange({ lvmPlan: { ...lvm, vgName: e.target.value }})} placeholder="vg0" />
+      </div>
+
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-bold text-white">{t('storage.lvm.logicalVolumes')}</h3>
+        <button type="button" onClick={addLV} className="px-3 py-1.5 bg-accent-blue text-black text-xs font-bold rounded hover:bg-accent-blue/80 transition-colors">
+          {t('storage.lvm.newLV')}
+        </button>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
+        <table className="w-full text-left text-xs text-slate-300">
+          <thead className="bg-white/5 uppercase tracking-wider text-[10px] font-bold text-slate-400">
+            <tr>
+              <th className="px-4 py-3">{t('storage.lvm.lvName')}</th>
+              <th className="px-4 py-3">{t('storage.lvm.size')}</th>
+              <th className="px-4 py-3">{t('storage.lvm.mountpoint')}</th>
+              <th className="px-4 py-3 text-right">{t('storage.lvm.action')}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {lvm.logicalVolumes.length === 0 ? (
+              <tr>
+                <td colSpan="4" className="px-4 py-8 text-center text-slate-400 italic">{t('storage.lvm.empty')}</td>
+              </tr>
+            ) : lvm.logicalVolumes.map((lv, i) => (
+              <tr key={i} className="hover:bg-white/[0.02]">
+                <td className="px-4 py-2">
+                  <input type="text" className="input-shell text-xs py-1 px-2 w-32" value={lv.name} onChange={e => {
+                    const nl = [...lvm.logicalVolumes]; nl[i].name = e.target.value; onChange({lvmPlan: {...lvm, logicalVolumes: nl}});
+                  }} />
+                </td>
+                <td className="px-4 py-2">
+                  <input type="text" className="input-shell text-xs py-1 px-2 w-24" value={lv.size} onChange={e => {
+                    const nl = [...lvm.logicalVolumes]; nl[i].size = e.target.value; onChange({lvmPlan: {...lvm, logicalVolumes: nl}});
+                  }} />
+                </td>
+                <td className="px-4 py-2">
+                  <input type="text" className="input-shell text-xs py-1 px-2 w-24" value={lv.mountpoint} onChange={e => {
+                    const nl = [...lvm.logicalVolumes]; nl[i].mountpoint = e.target.value; onChange({lvmPlan: {...lvm, logicalVolumes: nl}});
+                  }} />
+                </td>
+                <td className="px-4 py-2 text-right">
+                  <button type="button" onClick={() => {
+                    const nl = lvm.logicalVolumes.filter((_, idx) => idx !== i); onChange({lvmPlan: {...lvm, logicalVolumes: nl}});
+                  }} className="text-danger hover:text-white px-2 py-1 rounded bg-danger/10 hover:bg-danger/20 transition-colors">{t('storage.lvm.remove')}</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function TabRAID({ wizard, onChange, eligibleDisks }) {
+  const { t } = useTranslation();
+  const raid = wizard.raidPlan || { level: 'raid1', devices: [], filesystem: 'btrfs', mountpoint: '/' };
+  
+  const toggleDevice = (path) => {
+    const devs = new Set(raid.devices);
+    if (devs.has(path)) devs.delete(path);
+    else devs.add(path);
+    onChange({ raidPlan: { ...raid, devices: Array.from(devs) }});
+  };
+
+  const raidOpts = getRaidOptionsForSelection(eligibleDisks.filter(d => raid.devices.includes(d.path)));
+  const currentOpt = raidOpts.find(o => o.id === raid.level);
+
+  if (eligibleDisks.length < 2) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-slate-400">
-        Selecione um disco elegível na aba Discos primeiro.
+      <div className="p-4 flex items-center justify-center h-full">
+        <div className="text-center p-6 border border-white/10 bg-white/5 rounded-2xl max-w-sm">
+          <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10 text-white">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+          </div>
+          <h3 className="text-lg font-bold text-white mb-2">{t('storage.raid.unavailable')}</h3>
+          <p className="text-sm text-slate-400">{t('storage.raid.requiresTwoDisks')}</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-2 space-y-6">
-      <div className="mb-2">
-        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Prévia do Particionamento</h3>
-        <p className="text-xs text-slate-400">O layout abaixo será aplicado automaticamente no disco {wizard.sysDisk}.</p>
-      </div>
-
-      {/* Visual Bar */}
-      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-        <div className="flex h-8 w-full rounded-md overflow-hidden border border-white/10 bg-black/40">
-          <div className="w-[10%] bg-indigo-500/80 border-r border-black flex items-center justify-center" title="EFI System Partition (512 MiB)">
-            <span className="text-[10px] font-bold text-white">EFI</span>
-          </div>
-          <div className="flex-1 bg-accent-blue/80 flex items-center justify-center relative overflow-hidden" title="BTRFS Root (Restante do disco)">
-            <span className="text-[11px] font-bold text-white z-10">ROOT BTRFS (~100%)</span>
-          </div>
-        </div>
-        <div className="mt-3 flex items-center gap-6 text-[11px] font-medium text-slate-400">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-indigo-500/80" />
-            <span>/boot/efi (FAT32)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-accent-blue/80" />
-            <span>/ (BTRFS)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Technical Table */}
+    <div className="p-4 space-y-6">
       <div>
-        <h3 className="text-sm font-bold text-white mb-3">Detalhes Técnicos do Plano</h3>
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-white/5 uppercase tracking-wider text-[10px] font-bold text-slate-400">
-              <tr>
-                <th className="px-4 py-3">Montagem</th>
-                <th className="px-4 py-3">Filesystem</th>
-                <th className="px-4 py-3">Tamanho</th>
-                <th className="px-4 py-3">Detalhes</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              <tr className="hover:bg-white/[0.02]">
-                <td className="px-4 py-3 font-mono text-indigo-400">/boot/efi</td>
-                <td className="px-4 py-3">vfat (FAT32)</td>
-                <td className="px-4 py-3">512 MiB</td>
-                <td className="px-4 py-3 text-slate-400">Partição de boot UEFI</td>
-              </tr>
-              <tr className="hover:bg-white/[0.02]">
-                <td className="px-4 py-3 font-mono text-accent-blue">/</td>
-                <td className="px-4 py-3">BTRFS</td>
-                <td className="px-4 py-3">Restante livre</td>
-                <td className="px-4 py-3">
-                  <span className="text-[10px] text-slate-400 block mb-1">Subvolumes:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {subvolumes.map(sv => (
-                      <span key={sv} className="bg-white/10 border border-white/10 rounded px-1.5 py-0.5 text-white">{sv}</span>
-                    ))}
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <h3 className="text-sm font-bold text-white mb-3">{t('storage.raid.level')}</h3>
+        <div className="grid grid-cols-2 gap-3">
+          {raidOpts.map(opt => (
+            <label key={opt.id} className={`flex flex-col gap-1 p-3 rounded-xl border cursor-pointer transition-colors ${raid.level === opt.id ? 'bg-accent-blue/10 border-accent-blue/40' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}>
+              <input type="radio" name="raidLevel" className="hidden" checked={raid.level === opt.id} onChange={() => onChange({ raidPlan: { ...raid, level: opt.id }})} />
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-white text-sm">{opt.label}</span>
+                <span className="text-[10px] uppercase tracking-wider text-slate-400">{opt.shortLabel}</span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">{opt.description}</p>
+            </label>
+          ))}
         </div>
       </div>
+
+      <div>
+        <h3 className="text-sm font-bold text-white mb-3">{t('storage.raid.selectDisks')}</h3>
+        <div className="grid grid-cols-1 gap-2">
+          {eligibleDisks.map(disk => {
+            const isSel = raid.devices.includes(disk.path);
+            return (
+              <label key={disk.path} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${isSel ? 'bg-accent-blue/10 border-accent-blue/40' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}>
+                <input type="checkbox" className="hidden" checked={isSel} onChange={() => toggleDevice(disk.path)} />
+                <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSel ? 'bg-accent-blue border-accent-blue text-black' : 'border-white/30 bg-black/40'}`}>
+                  {isSel && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                </div>
+                <div className="flex-1 flex items-center justify-between">
+                  <div className="text-sm font-bold text-white">{disk.path}</div>
+                  <div className="text-xs text-slate-400">{getDiskCapacityLabel(disk)}</div>
+                </div>
+              </label>
+            )
+          })}
+        </div>
+      </div>
+      
+      {currentOpt && raid.devices.length > 0 && (
+        <div className={`p-4 rounded-xl border ${currentOpt.enabled ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-warning/10 border-warning/20'}`}>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-white mb-2">{t('storage.raid.estimatedPlan')}</h4>
+          {!currentOpt.enabled ? (
+            <div className="text-sm text-warning">
+              {currentOpt.blockingReasons[0]}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-slate-400">{t('storage.raid.effectiveCapacity')}:</span>
+                <span className="font-bold text-white">{currentOpt.summary?.usableLabel || '?'}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-slate-400">{t('storage.raid.faultTolerance')}:</span>
+                <span className="font-bold text-white">{currentOpt.summary?.faultTolerance}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
-
-/* ── aba Manual ── */
-function TabManual() {
-  return (
-    <div className="p-4 text-sm text-slate-400">
-      <p>Modo manual não implementado nesta versão. A refatoração focou no fluxo principal.</p>
-    </div>
-  );
-}
-
-/* ── aba RAID ── */
-function TabRAID() {
-  return (
-    <div className="p-4 text-sm text-slate-400">
-      <p>Modo RAID avançado. Layout mantido como fallback original.</p>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════
-   COMPONENTE PRINCIPAL
-══════════════════════════════════════════════════════════════ */
 
 export default function Disks({ wizard, uiState, onChange, validation }) {
-  const [activeTab, setActiveTab] = useState(0);
+  const { t } = useTranslation();
+  const modeIndex = TABS_ID.indexOf(wizard.storageMode);
+  const activeTab = modeIndex >= 0 ? modeIndex : 0;
 
-  /* ── discos ── */
+  const setActiveTab = (index) => {
+    onChange({ storageMode: TABS_ID[index] });
+  };
+
   const [diskInventory, setDiskInventory] = useState([]);
   const [loadingDisks, setLoadingDisks]   = useState(true);
   const [diskError, setDiskError]         = useState('');
   const [reloadKey, setReloadKey]         = useState(0);
   const reloadDisks = () => setReloadKey(k => k + 1);
 
-  /* ── partições por device name ── */
   const [partitions, setPartitions] = useState({});
-
-  /* ── confirmação destrutiva local ── */
   const [destructiveConfirmed, setDestructiveConfirmed] = useState(uiState.destructiveConfirmed || false);
 
-  /* carregar lista de discos */
   useEffect(() => {
     let cancelled = false;
     setLoadingDisks(true);
@@ -372,7 +586,7 @@ export default function Disks({ wizard, uiState, onChange, validation }) {
       })
       .catch(err => {
         if (!cancelled) {
-          setDiskError(getInstallerApiErrorMessage(err, 'Erro ao carregar discos.'));
+          setDiskError(getInstallerApiErrorMessage(err, 'Error'));
           setDiskInventory([]);
         }
       })
@@ -381,7 +595,6 @@ export default function Disks({ wizard, uiState, onChange, validation }) {
     return () => { cancelled = true; };
   }, [reloadKey]);
 
-  /* carregar partições para cada disco depois da lista chegar */
   useEffect(() => {
     if (diskInventory.length === 0) return;
     let cancelled = false;
@@ -403,60 +616,78 @@ export default function Disks({ wizard, uiState, onChange, validation }) {
 
   const eligibleDisks  = useMemo(() => diskInventory.filter(d => d.eligible), [diskInventory]);
   const eligiblePaths  = useMemo(() => new Set(eligibleDisks.map(d => d.path)), [eligibleDisks]);
-  const layoutMode     = wizard.diskProfile === 'raid' ? 'raid' : wizard.diskProfile === 'manual' ? 'manual' : wizard.diskMode === 'two' ? 'split' : 'single';
-  const singleValidation = useMemo(() => validateSingleDiskLayout(diskInventory, wizard.sysDisk), [diskInventory, wizard.sysDisk]);
+  const layoutMode     = wizard.storageMode || 'automatic';
 
-  /* update UI state destructive confirmed when it changes locally */
   useEffect(() => {
     if (destructiveConfirmed !== uiState.destructiveConfirmed) {
       onChange({ destructiveConfirmed });
     }
   }, [destructiveConfirmed, uiState.destructiveConfirmed, onChange]);
 
-  /* sync state → wizard */
   useEffect(() => {
     if (loadingDisks) return;
     const firstEligible  = eligibleDisks[0]?.path || '';
     const patch = {};
 
-    if (layoutMode === 'single') {
+    if (layoutMode === 'automatic') {
       const nextSys = eligiblePaths.has(wizard.sysDisk) ? wizard.sysDisk : firstEligible;
-      if (wizard.diskProfile !== 'single') patch.diskProfile = 'single';
-      if (wizard.diskMode    !== 'one')    patch.diskMode    = 'one';
-      if (wizard.sysDisk     !== nextSys)  patch.sysDisk     = nextSys;
-      if (wizard.dataDisk)                 patch.dataDisk    = '';
+      if (wizard.sysDisk !== nextSys) patch.sysDisk = nextSys;
       if (!arraysEqual(wizard.selectedDisks || [], nextSys ? [nextSys] : [])) patch.selectedDisks = nextSys ? [nextSys] : [];
-      if (wizard.rootFs !== 'btrfs') patch.rootFs = 'btrfs';
-      if (wizard.dataFs !== 'btrfs') patch.dataFs = 'btrfs';
     }
 
-    // Storage issues calculation (only blocking if destructive not confirmed)
-    let storageIssues = [...singleValidation.blockingReasons];
-    if (wizard.sysDisk && !destructiveConfirmed) {
-      storageIssues.push('Você deve marcar a caixa de confirmação da operação destrutiva.');
+    let storageIssues = [];
+    
+    const hasDisksSelected = 
+      (layoutMode === 'automatic' && wizard.sysDisk) || 
+      (layoutMode === 'raid' && wizard.raidPlan?.devices?.length > 0) ||
+      (layoutMode === 'lvm' && wizard.lvmPlan?.physicalVolumes?.length > 0) ||
+      (layoutMode === 'manual' && wizard.manualPartitions?.length > 0);
+
+    if (hasDisksSelected && !destructiveConfirmed) {
+      storageIssues.push(t('storage.destructive.confirm'));
     }
 
-    if (!arraysEqual(storageIssues,   uiState.storageBlockingIssues || [])) patch.storageBlockingIssues = storageIssues;
-    if (!arraysEqual(singleValidation.warnings, uiState.storageWarnings || [])) patch.storageWarnings   = singleValidation.warnings;
+    if (!arraysEqual(storageIssues, uiState.storageBlockingIssues || [])) patch.storageBlockingIssues = storageIssues;
     
     if (Object.keys(patch).length > 0) onChange(patch);
   }, [diskInventory, eligibleDisks, eligiblePaths, layoutMode, loadingDisks,
-      onChange, singleValidation,
-      uiState.storageBlockingIssues, uiState.storageWarnings, destructiveConfirmed,
-      wizard.dataDisk, wizard.dataFs, wizard.diskMode, wizard.diskProfile,
-      wizard.rootFs, wizard.selectedDisks, wizard.sysDisk]);
+      onChange, uiState.storageBlockingIssues, destructiveConfirmed,
+      wizard.sysDisk, wizard.raidPlan, wizard.lvmPlan, wizard.manualPartitions, wizard.selectedDisks, t]);
 
-  const selectedDiskRecord = useMemo(() => diskInventory.find(d => d.path === wizard.sysDisk), [diskInventory, wizard.sysDisk]);
+  let affectedCapacity = 0;
+  let affectedDisksText = '';
+  
+  if (layoutMode === 'automatic' && wizard.sysDisk) {
+    const d = diskInventory.find(d => d.path === wizard.sysDisk);
+    if (d) { affectedCapacity = d.sizeBytes; affectedDisksText = d.path; }
+  } else if (layoutMode === 'raid' && wizard.raidPlan?.devices?.length > 0) {
+    const sel = diskInventory.filter(d => wizard.raidPlan.devices.includes(d.path));
+    affectedCapacity = sel.reduce((a, b) => a + (b.sizeBytes || 0), 0);
+    affectedDisksText = `${sel.length} ${t('storage.manual.disk')}s`;
+  } else if (layoutMode === 'lvm' && wizard.lvmPlan?.physicalVolumes?.length > 0) {
+    const sel = diskInventory.filter(d => wizard.lvmPlan.physicalVolumes.includes(d.path));
+    affectedCapacity = sel.reduce((a, b) => a + (b.sizeBytes || 0), 0);
+    affectedDisksText = `${sel.length} ${t('storage.manual.disk')}s (LVM)`;
+  } else if (layoutMode === 'manual' && wizard.manualPartitions?.length > 0) {
+    const pds = Array.from(new Set(wizard.manualPartitions.map(p => p.device).filter(Boolean)));
+    const sel = diskInventory.filter(d => pds.includes(d.path));
+    affectedCapacity = sel.reduce((a, b) => a + (b.sizeBytes || 0), 0);
+    affectedDisksText = `${sel.length} ${t('storage.manual.disk')}s`;
+  }
 
-  /* ── render 70/30 ── */
+  const tabLabels = [
+    t('storage.tabs.automatic'),
+    t('storage.tabs.manual'),
+    t('storage.tabs.lvm'),
+    t('storage.tabs.raid')
+  ];
+
   return (
     <div className="flex h-full gap-6">
       
-      {/* Coluna Principal - Esquerda (70%) */}
       <div className="flex-1 min-w-0 flex flex-col h-full bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden">
-        {/* Barra de 4 abas */}
         <div className="shrink-0 flex border-b border-white/5 bg-black/20">
-          {TABS.map((label, i) => {
+          {tabLabels.map((label, i) => {
             const isActive = activeTab === i;
             return (
               <button
@@ -475,73 +706,68 @@ export default function Disks({ wizard, uiState, onChange, validation }) {
           })}
         </div>
 
-        {/* Conteúdo da aba ativa */}
-        <div className="flex-1 overflow-auto">
-          {activeTab === 0 && (
-            <TabDiscos
-              diskInventory={diskInventory}
-              loadingDisks={loadingDisks}
-              diskError={diskError}
-              partitions={partitions}
-              wizard={wizard}
-              onChange={onChange}
-              eligibleDisks={eligibleDisks}
-              eligiblePaths={eligiblePaths}
-              onReload={reloadDisks}
-            />
+        <div className="flex-1 overflow-auto custom-scrollbar">
+          {loadingDisks ? (
+            <div className="flex h-full items-center justify-center text-sm text-slate-400">
+              <div className="mr-3 h-4 w-4 animate-spin rounded-full border-2 border-accent-blue border-t-transparent" />
+              {t('storage.plan.detecting')}
+            </div>
+          ) : diskError ? (
+            <div className="p-4">
+              <div className="py-4 text-[13px] font-medium text-danger">✗ {diskError}</div>
+            </div>
+          ) : (
+            <>
+              {activeTab === 0 && (
+                <TabAutomatico
+                  wizard={wizard}
+                  onChange={onChange}
+                  eligibleDisks={eligibleDisks}
+                  eligiblePaths={eligiblePaths}
+                  diskInventory={diskInventory}
+                  partitions={partitions}
+                  onReload={reloadDisks}
+                />
+              )}
+              {activeTab === 1 && <TabManual wizard={wizard} onChange={onChange} eligibleDisks={eligibleDisks} />}
+              {activeTab === 2 && <TabLVM wizard={wizard} onChange={onChange} eligibleDisks={eligibleDisks} />}
+              {activeTab === 3 && <TabRAID wizard={wizard} onChange={onChange} eligibleDisks={eligibleDisks} />}
+            </>
           )}
-          {activeTab === 1 && (
-            <TabPlanoAutomatico
-              wizard={wizard}
-              eligiblePaths={eligiblePaths}
-            />
-          )}
-          {activeTab === 2 && <TabManual />}
-          {activeTab === 3 && <TabRAID />}
         </div>
       </div>
 
-      {/* Coluna Lateral - Direita (30%) */}
       <div className="w-[340px] shrink-0 flex flex-col gap-4 overflow-y-auto min-h-0 pb-2 custom-scrollbar pr-1">
         
-        {/* Card do Disco Selecionado */}
         <div className="shrink-0 rounded-2xl border border-white/10 bg-white/5 p-5">
-          <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">Disco Selecionado</h3>
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">{t('storage.plan.title')}</h3>
           
-          {!selectedDiskRecord ? (
+          {!affectedDisksText ? (
             <div className="text-sm text-slate-400 text-center py-4">
-              Nenhum disco elegível selecionado.
+              {t('storage.plan.empty')}
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              <div>
-                <div className="text-xl font-bold text-white mb-1">{selectedDiskRecord.path}</div>
-                {selectedDiskRecord.model && (
-                  <div className="text-xs text-slate-400">{selectedDiskRecord.model}</div>
-                )}
-              </div>
-              
               <div className="flex flex-col gap-2 mt-2">
                 <div className="flex justify-between items-center text-xs border-b border-white/5 pb-2">
-                  <span className="text-slate-500">Capacidade</span>
-                  <span className="font-bold text-white">{getDiskCapacityLabel(selectedDiskRecord)}</span>
+                  <span className="text-slate-500">{t('storage.plan.mode')}</span>
+                  <span className="font-bold text-white uppercase">{layoutMode}</span>
                 </div>
                 <div className="flex justify-between items-center text-xs border-b border-white/5 pb-2">
-                  <span className="text-slate-500">Tipo</span>
-                  <span className="font-bold text-white uppercase">{selectedDiskRecord.type || 'N/A'}</span>
+                  <span className="text-slate-500">{t('storage.plan.targets')}</span>
+                  <span className="font-bold text-accent-blue truncate max-w-[150px]">{affectedDisksText}</span>
                 </div>
                 <div className="flex justify-between items-center text-xs">
-                  <span className="text-slate-500">Layout</span>
-                  <span className="font-bold text-accent-blue">Automático</span>
+                  <span className="text-slate-500">{t('storage.plan.capacity')}</span>
+                  <span className="font-bold text-white">{formatBytes(affectedCapacity)}</span>
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Card de Segurança da Operação (Destrutivo) */}
         <div className={`shrink-0 rounded-2xl border p-5 transition-colors ${
-          !selectedDiskRecord ? 'opacity-50 pointer-events-none border-white/5 bg-black/20' : 
+          !affectedDisksText ? 'opacity-50 pointer-events-none border-white/5 bg-black/20' : 
           destructiveConfirmed ? 'border-warning/30 bg-warning/5' : 'border-danger/30 bg-danger/10'
         }`}>
           <div className="flex items-center gap-3 mb-3">
@@ -551,12 +777,12 @@ export default function Disks({ wizard, uiState, onChange, validation }) {
               </svg>
             </div>
             <h3 className={`text-sm font-bold ${destructiveConfirmed ? 'text-warning' : 'text-danger'}`}>
-              Segurança da Operação
+              {t('storage.destructive.title')}
             </h3>
           </div>
           
           <p className="text-xs text-slate-300 leading-relaxed mb-5">
-            Ao prosseguir, todas as partições existentes no disco selecionado serão <strong>apagadas de forma permanente</strong>. Não será possível recuperar os dados anteriores.
+            {t('storage.destructive.description')}
           </p>
 
           <label className="flex items-start gap-3 cursor-pointer group">
@@ -567,7 +793,7 @@ export default function Disks({ wizard, uiState, onChange, validation }) {
               onChange={(e) => setDestructiveConfirmed(e.target.checked)}
             />
             <span className={`text-xs leading-tight font-medium transition-colors ${destructiveConfirmed ? 'text-warning' : 'text-slate-300 group-hover:text-white'}`}>
-              Entendo que o disco selecionado será apagado e reparticionado.
+              {t('storage.destructive.confirm')}
             </span>
           </label>
         </div>

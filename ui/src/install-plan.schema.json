@@ -96,7 +96,7 @@
         },
         "profile": {
           "type": "string",
-          "enum": ["single", "raid", "manual"]
+          "enum": ["single", "raid", "manual", "lvm"]
         },
         "selectedDisks": {
           "type": "array",
