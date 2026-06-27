@@ -14,6 +14,11 @@
   --kx-muted: #64748b;
   --kx-primary: #2563eb;
   --kx-primary-soft: rgba(37, 99, 235, 0.10);
+  --kx-input-bg: rgba(255, 255, 255, 0.92);
+  --kx-input-border: var(--kx-border);
+  --kx-input-text: var(--kx-text);
+  --kx-input-placeholder: var(--kx-muted);
+  --kx-focus-ring: var(--kx-primary-soft);
   --kx-success: #16a34a;
   --kx-warning: #d97706;
   --kx-danger: #dc2626;
@@ -60,21 +65,86 @@
   --kx-success: #22c55e;
   --kx-warning: #f59e0b;
   --kx-danger: #ef4444;
+  --kx-input-bg: rgba(2, 6, 23, 0.72);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
 
 body {
-  background: var(--bg);
-  background-image: radial-gradient(circle at top right, rgba(59, 130, 246, 0.15) 0%, transparent 40%),
-                    radial-gradient(circle at bottom left, rgba(6, 182, 212, 0.1) 0%, transparent 30%);
-  color: var(--text);
+  background: var(--kx-bg);
+  background-image: radial-gradient(circle at top right, rgba(59, 130, 246, 0.05) 0%, transparent 40%),
+                    radial-gradient(circle at bottom left, rgba(6, 182, 212, 0.03) 0%, transparent 30%);
+  color: var(--kx-text);
   font-family: var(--font);
   margin: 0;
   min-height: 100vh;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Form Controls (kx) ────────────────────────────────────────────────── */
+
+.kx-input,
+.kx-select,
+.kx-textarea {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--kx-input-border);
+  background: var(--kx-input-bg);
+  color: var(--kx-input-text);
+  outline: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+.kx-input::placeholder,
+.kx-textarea::placeholder {
+  color: var(--kx-input-placeholder);
+}
+
+.kx-input:focus,
+.kx-select:focus,
+.kx-textarea:focus {
+  border-color: var(--kx-primary);
+  box-shadow: 0 0 0 3px var(--kx-focus-ring);
+}
+
+.kx-select option {
+  background: var(--kx-surface-elevated);
+  color: var(--kx-text);
+}
+
+.dark .kx-select option {
+  background: #111c31;
+  color: #f3f7fb;
+}
+
+.kx-input[type="number"] {
+  color-scheme: dark;
+}
+
+html:not(.dark) .kx-input[type="number"] {
+  color-scheme: light;
+}
+
+.kx-field-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--kx-text-secondary);
+  margin-bottom: 6px;
+}
+
+.kx-field-hint {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--kx-muted);
+  margin-top: 4px;
 }
 
 .shell {
@@ -616,7 +686,7 @@ textarea:focus-visible {
 
   /* btn-primary Tailwind permanece intacto para as páginas internas */
   .btn-primary {
-    @apply px-6 py-3 rounded-lg font-bold transition-all focus:ring-2 focus:ring-accent-blue/60 bg-accent-blue text-white hover:bg-accent-blue/90 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 disabled:opacity-80;
+    @apply px-6 py-3 rounded-lg font-bold transition-all focus:ring-2 focus:ring-accent-blue bg-accent-blue text-white hover:bg-accent-blue disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 disabled:opacity-80;
   }
 
   .btn-secondary {
@@ -628,7 +698,7 @@ textarea:focus-visible {
   }
 
   .input-shell {
-    @apply w-full rounded-xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition focus:border-accent-blue focus:ring-2 focus:ring-accent-blue/20;
+    @apply w-full rounded-xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition focus:border-accent-blue focus:ring-2 focus:ring-accent-blue;
   }
 
   .label-text {

@@ -83,6 +83,7 @@ export default function Network({ wizard, onChange, validation }) {
   const [wifiSsid, setWifiSsid] = useState('');
   const [wifiPassword, setWifiPassword] = useState('');
   const [showWifiPassword, setShowWifiPassword] = useState(false);
+  const [showPppoePassword, setShowPppoePassword] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [connectMsg, setConnectMsg] = useState('');
 
@@ -334,10 +335,10 @@ export default function Network({ wizard, onChange, validation }) {
             {/* Linha 1: Interface & Porta */}
             <div className="grid gap-6 sm:grid-cols-2">
               <div>
-                <label className="block text-sm font-bold text-slate-900 dark:text-slate-200 mb-2" htmlFor="mgmtInterface">Interface de Rede (LAN/PXE)</label>
+                <label className="kx-field-label" htmlFor="mgmtInterface">Interface de Rede (LAN/PXE)</label>
                 <select
                   id="mgmtInterface"
-                  className="w-full bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-slate-900 dark:text-slate-200 text-sm rounded-lg focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue block p-3 transition-colors shadow-sm"
+                  className="kx-select p-3"
                   value={wizard.mgmtInterface}
                   onChange={(event) => onChange({ mgmtInterface: event.target.value, lanIdentified: false })}
                   disabled={netApplyBusy}
@@ -351,11 +352,11 @@ export default function Network({ wizard, onChange, validation }) {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-900 dark:text-slate-200 mb-2" htmlFor="httpPort">Porta HTTP do Painel</label>
+                <label className="kx-field-label" htmlFor="httpPort">Porta HTTP do Painel</label>
                 <input
                   id="httpPort"
                   type="number"
-                  className="w-full bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-slate-900 dark:text-slate-200 text-sm rounded-lg focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue block p-3 transition-colors shadow-sm"
+                  className="kx-input p-3"
                   value={wizard.httpPort}
                   onChange={(event) => onChange({ httpPort: Number(event.target.value || 0) })}
                   disabled={netApplyBusy}
@@ -382,13 +383,13 @@ export default function Network({ wizard, onChange, validation }) {
                 {/* Linha 2: IP e Máscara */}
                 <div className="grid gap-6 sm:grid-cols-2 pt-4 border-t border-slate-200/50 dark:border-white/5">
                   <div>
-                    <label className="block text-sm font-bold text-slate-900 dark:text-slate-200 mb-2" htmlFor="serverIp">Endereço IP do Servidor</label>
-                    <input id="serverIp" className="w-full bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-slate-900 dark:text-slate-200 text-sm rounded-lg focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue block p-3 shadow-sm" value={wizard.serverIp} onChange={handleIpv4Change('serverIp')} inputMode="numeric" disabled={netApplyBusy} placeholder="Ex: 192.168.1.100" />
+                    <label className="kx-field-label" htmlFor="serverIp">Endereço IP do Servidor</label>
+                    <input id="serverIp" className="kx-input p-3" value={wizard.serverIp} onChange={handleIpv4Change('serverIp')} inputMode="numeric" disabled={netApplyBusy} placeholder="Ex: 192.168.1.100" />
                     <FieldError message={fieldErrors.serverIp} />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-900 dark:text-slate-200 mb-2" htmlFor="mgmtNetmask">Máscara de Sub-rede</label>
-                    <select id="mgmtNetmask" className="w-full bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-slate-900 dark:text-slate-200 text-sm rounded-lg focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue block p-3 shadow-sm" value={wizard.mgmtNetmask} onChange={(event) => onChange({ mgmtNetmask: event.target.value })} disabled={netApplyBusy}>
+                    <label className="kx-field-label" htmlFor="mgmtNetmask">Máscara de Sub-rede</label>
+                    <select id="mgmtNetmask" className="kx-select p-3" value={wizard.mgmtNetmask} onChange={(event) => onChange({ mgmtNetmask: event.target.value })} disabled={netApplyBusy}>
                       <option value="255.255.255.0">255.255.255.0 (/24)</option>
                       <option value="255.255.255.128">255.255.255.128 (/25)</option>
                       <option value="255.255.255.252">255.255.255.252 (/30)</option>
@@ -401,123 +402,30 @@ export default function Network({ wizard, onChange, validation }) {
                 {/* Linha 3: Gateway e DNS 1 */}
                 <div className="grid gap-6 sm:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-bold text-slate-900 dark:text-slate-200 mb-2" htmlFor="mgmtGateway">Gateway Padrão</label>
-                    <input id="mgmtGateway" className="w-full bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-slate-900 dark:text-slate-200 text-sm rounded-lg focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue block p-3 shadow-sm" value={wizard.mgmtGateway} onChange={handleIpv4Change('mgmtGateway')} inputMode="numeric" disabled={netApplyBusy} placeholder="Ex: 192.168.1.1" />
+                    <label className="kx-field-label" htmlFor="mgmtGateway">Gateway Padrão</label>
+                    <input id="mgmtGateway" className="kx-input p-3" value={wizard.mgmtGateway} onChange={handleIpv4Change('mgmtGateway')} inputMode="numeric" disabled={netApplyBusy} placeholder="Ex: 192.168.1.1" />
                     <FieldError message={fieldErrors.mgmtGateway} />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-900 dark:text-slate-200 mb-2" htmlFor="dns1">Servidor DNS Primário</label>
-                    <input id="dns1" className="w-full bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-slate-900 dark:text-slate-200 text-sm rounded-lg focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue block p-3 shadow-sm" value={dns1} onChange={(e) => setDns(e.target.value, dns2)} disabled={netApplyBusy} placeholder="Ex: 1.1.1.1" />
+                    <label className="kx-field-label" htmlFor="dns1">Servidor DNS Primário</label>
+                    <input id="dns1" className="kx-input p-3" value={dns1} onChange={(e) => setDns(e.target.value, dns2)} disabled={netApplyBusy} placeholder="Ex: 1.1.1.1" />
                   </div>
                 </div>
 
                 {/* Linha 4: DNS 2 e Domínio */}
                 <div className="grid gap-6 sm:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-bold text-slate-900 dark:text-slate-200 mb-2" htmlFor="dns2">Servidor DNS Secundário <span className="text-slate-400 font-normal text-xs ml-1">(Opcional)</span></label>
-                    <input id="dns2" className="w-full bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-slate-900 dark:text-slate-200 text-sm rounded-lg focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue block p-3 shadow-sm" value={dns2} onChange={(e) => setDns(dns1, e.target.value)} disabled={netApplyBusy} placeholder="Ex: 8.8.8.8" />
+                    <label className="kx-field-label" htmlFor="dns2">Servidor DNS Secundário <span className="normal-case text-xs font-normal ml-1">(Opcional)</span></label>
+                    <input id="dns2" className="kx-input p-3" value={dns2} onChange={(e) => setDns(dns1, e.target.value)} disabled={netApplyBusy} placeholder="Ex: 8.8.8.8" />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-900 dark:text-slate-200 mb-2" htmlFor="mgmtDomain">Search Domain <span className="text-slate-400 font-normal text-xs ml-1">(Opcional)</span></label>
-                    <input id="mgmtDomain" className="w-full bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-slate-900 dark:text-slate-200 text-sm rounded-lg focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue block p-3 shadow-sm" value={wizard.mgmtDomain || ''} onChange={(e) => onChange({ mgmtDomain: e.target.value })} disabled={netApplyBusy} placeholder="Ex: local.kryonix.net" />
+                    <label className="kx-field-label" htmlFor="mgmtDomain">Search Domain <span className="normal-case text-xs font-normal ml-1">(Opcional)</span></label>
+                    <input id="mgmtDomain" className="kx-input p-3" value={wizard.mgmtDomain || ''} onChange={(e) => onChange({ mgmtDomain: e.target.value })} disabled={netApplyBusy} placeholder="Ex: local.kryonix.net" />
                   </div>
                 </div>
               </div>
             )}
           </div>
-        </div>
-
-        {/* Advanced Settings (WAN) */}
-        <div className="mt-6 bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-2xl shadow-sm overflow-hidden">
-          <details className="group" onToggle={(e) => setShowWanAdvanced(e.currentTarget.open)} open={showWanAdvanced}>
-            <summary className="flex items-center justify-between gap-4 p-5 cursor-pointer list-none select-none hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-bold text-slate-900 dark:text-slate-200">Rede WAN (Avançado)</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${wanEnabled ? 'bg-accent-blue/10 text-accent-blue' : 'bg-slate-200/50 dark:bg-white/5 text-slate-500'}`}>
-                  {wanEnabled ? 'Ativada' : 'Opcional'}
-                </span>
-              </div>
-              <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </summary>
-
-            <div className="p-5 pt-0 border-t border-slate-200/50 dark:border-white/5 mt-2 space-y-5 animate-fade-in">
-              <p className="text-sm text-slate-500 dark:text-slate-400">Configure uma interface dedicada para uplink de internet apenas se o servidor possuir uma porta dedicada para WAN.</p>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-900 dark:text-slate-200 mb-2" htmlFor="wanInterface">Interface WAN</label>
-                <select id="wanInterface" className="w-full sm:max-w-xs bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-slate-900 dark:text-slate-200 text-sm rounded-lg focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue block p-3 shadow-sm" value={wizard.wanInterface} onChange={(event) => handleWanInterfaceChange(event.target.value)} disabled={netApplyBusy}>
-                  <option value="">Sem uplink dedicado</option>
-                  {ifaceNames
-                    .filter((item) => item !== wizard.mgmtInterface)
-                    .map((item) => (
-                      <option key={item} value={item}>{item}</option>
-                    ))}
-                </select>
-                <FieldError message={fieldErrors.wanInterface} />
-              </div>
-
-              {wanEnabled && (
-                <div className="pt-4 border-t border-slate-200/50 dark:border-white/5">
-                  <div className="inline-flex bg-slate-200/50 dark:bg-bg-surface/50 p-1 rounded-lg border border-slate-200/50 dark:border-white/5 mb-5">
-                    <button type="button" className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${wizard.wanMode === 'dhcp' ? 'bg-white dark:bg-bg-elevated text-accent-blue shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`} onClick={() => onChange({ wanMode: 'dhcp' })} disabled={netApplyBusy}>DHCP</button>
-                    <button type="button" className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${wizard.wanMode === 'static' ? 'bg-white dark:bg-bg-elevated text-accent-blue shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`} onClick={() => onChange({ wanMode: 'static' })} disabled={netApplyBusy}>IP estático</button>
-                    <button type="button" className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${wizard.wanMode === 'pppoe' ? 'bg-white dark:bg-bg-elevated text-accent-blue shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`} onClick={() => onChange({ wanMode: 'pppoe' })} disabled={netApplyBusy}>PPPoE</button>
-                  </div>
-
-                  {wizard.wanMode === 'static' && (
-                    <div className="grid gap-4 sm:grid-cols-2 animate-fade-in">
-                      <div>
-                        <label className="block text-sm font-bold text-slate-900 dark:text-slate-200 mb-1" htmlFor="wanAddress">IP WAN</label>
-                        <input id="wanAddress" className="w-full bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-sm rounded-lg p-2.5" value={wizard.wanAddress} onChange={handleIpv4Change('wanAddress')} inputMode="numeric" disabled={netApplyBusy} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-slate-900 dark:text-slate-200 mb-1" htmlFor="wanNetmask">Mascara WAN</label>
-                        <select id="wanNetmask" className="w-full bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-sm rounded-lg p-2.5" value={wizard.wanNetmask} onChange={(event) => onChange({ wanNetmask: event.target.value })} disabled={netApplyBusy}>
-                          <option value="255.255.255.0">255.255.255.0 (/24)</option>
-                          <option value="255.255.255.128">255.255.255.128 (/25)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-slate-900 dark:text-slate-200 mb-1" htmlFor="wanGateway">Gateway WAN</label>
-                        <input id="wanGateway" className="w-full bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-sm rounded-lg p-2.5" value={wizard.wanGateway} onChange={handleIpv4Change('wanGateway')} inputMode="numeric" disabled={netApplyBusy} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-slate-900 dark:text-slate-200 mb-1" htmlFor="wanDns">DNS WAN</label>
-                        <input id="wanDns" className="w-full bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-sm rounded-lg p-2.5" value={wizard.wanDns} onChange={(event) => onChange({ wanDns: event.target.value })} disabled={netApplyBusy} />
-                      </div>
-                    </div>
-                  )}
-
-                  {wizard.wanMode === 'pppoe' && (
-                    <div className="grid gap-4 sm:grid-cols-2 animate-fade-in">
-                      <div>
-                        <label className="block text-sm font-bold text-slate-900 dark:text-slate-200 mb-1" htmlFor="pppoeUser">Usuário PPPoE</label>
-                        <input id="pppoeUser" className="w-full bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-sm rounded-lg p-2.5" value={wizard.pppoeUser || ''} onChange={(event) => onChange({ pppoeUser: event.target.value })} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-slate-900 dark:text-slate-200 mb-1" htmlFor="pppoePassword">Senha PPPoE</label>
-                        <div className="flex gap-2">
-                          <input id="pppoePassword" type={showPppoePassword ? 'text' : 'password'} className="w-full bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-sm rounded-lg p-2.5" value={wizard.pppoePassword || ''} onChange={(event) => onChange({ pppoePassword: event.target.value })} />
-                          <button type="button" className="px-3 py-2 bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 transition-colors" onClick={() => setShowPppoePassword(!showPppoePassword)}>
-                            {showPppoePassword ? 'Ocultar' : 'Mostrar'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mt-5">
-                    <label className="flex items-start gap-3 bg-slate-50 dark:bg-slate-950/40 p-4 rounded-xl border border-slate-200/50 dark:border-white/5 cursor-pointer">
-                      <input type="checkbox" className="mt-1 h-4 w-4 rounded border-slate-300 text-accent-blue focus:ring-accent-blue" checked={Boolean(wizard.wanIdentified)} onChange={(event) => onChange({ wanIdentified: event.target.checked })} disabled={netApplyBusy} />
-                      <span className="text-sm text-slate-700 dark:text-slate-300">Confirmei a seleção física da interface WAN <strong>({wizard.wanInterface})</strong> e os parâmetros acima estão corretos.</span>
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
-          </details>
         </div>
 
         {/* Application & Validation Errors inline */}
@@ -608,17 +516,17 @@ export default function Network({ wizard, onChange, validation }) {
                 <p className="text-xs text-slate-500 mb-3">Rede Wi-Fi detectada. Conecte-se para continuar online.</p>
                 <div className="space-y-3">
                   <div className="flex gap-2">
-                    <select className="flex-1 bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-xs rounded p-2" value={selectedWifiIface} onChange={(e) => setSelectedWifiIface(e.target.value)}>
+                    <select className="kx-select flex-1 p-2 text-xs" value={selectedWifiIface} onChange={(e) => setSelectedWifiIface(e.target.value)}>
                       {wifiIfaces.map(i => <option key={i.name} value={i.name}>{i.name}</option>)}
                     </select>
-                    <button type="button" className="px-3 py-2 bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded text-xs font-medium hover:bg-slate-200 dark:hover:bg-white/10 transition-colors" onClick={scanWifi} disabled={wifiScanning || !selectedWifiIface}>
+                    <button type="button" className="px-3 py-2 bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-lg text-xs font-medium hover:bg-slate-200 dark:hover:bg-white/10 transition-colors" onClick={scanWifi} disabled={wifiScanning || !selectedWifiIface}>
                       {wifiScanning ? 'Buscando…' : 'Buscar'}
                     </button>
                   </div>
 
                   {wifiList.length > 0 && (
                     <div className="space-y-2 animate-fade-in">
-                      <select className="w-full bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-xs rounded p-2" value={wifiSsid} onChange={(e) => setWifiSsid(e.target.value)}>
+                      <select className="kx-select w-full p-2 text-xs" value={wifiSsid} onChange={(e) => setWifiSsid(e.target.value)}>
                         <option value="">Selecione a rede</option>
                         {wifiList.map((w) => (
                           <option key={w.ssid} value={w.ssid}>{w.ssid} ({w.signal}%)</option>
@@ -626,8 +534,8 @@ export default function Network({ wizard, onChange, validation }) {
                       </select>
                       {wifiSsid && (
                         <div className="flex gap-2">
-                          <input type="password" placeholder="Senha" className="flex-1 bg-white dark:bg-bg-surface border border-slate-300 dark:border-white/10 text-xs rounded p-2" value={wifiPassword} onChange={(e) => setWifiPassword(e.target.value)} />
-                          <button type="button" className="px-3 py-2 bg-accent-blue text-white rounded text-xs font-bold hover:bg-blue-600 transition-colors shadow-sm" onClick={connectWifi} disabled={connecting}>
+                          <input type="password" placeholder="Senha" className="kx-input flex-1 p-2 text-xs" value={wifiPassword} onChange={(e) => setWifiPassword(e.target.value)} />
+                          <button type="button" className="px-3 py-2 bg-accent-blue text-white rounded-lg text-xs font-bold hover:bg-blue-600 transition-colors shadow-sm" onClick={connectWifi} disabled={connecting}>
                             {connecting ? '...' : 'Conectar'}
                           </button>
                         </div>
@@ -665,9 +573,111 @@ export default function Network({ wizard, onChange, validation }) {
           </div>
         </div>
 
+        {/* Advanced Settings (WAN) no modo contextual */}
+        <div className="mb-8">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 px-1">WAN / Internet</h3>
+          <div className="bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-2xl shadow-sm overflow-hidden">
+            <div className="p-5 flex flex-col gap-3">
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-medium text-slate-700 dark:text-slate-300">Status</span>
+                <span className={`font-bold ${wanEnabled ? 'text-accent-blue' : 'text-slate-500'}`}>{wanEnabled ? 'Ativada' : 'Sem uplink dedicado'}</span>
+              </div>
+              {wanEnabled && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-medium text-slate-700 dark:text-slate-300">Interface</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-200">{wizard.wanInterface}</span>
+                </div>
+              )}
+            </div>
+
+            <details className="group border-t border-slate-200/50 dark:border-white/5" onToggle={(e) => setShowWanAdvanced(e.currentTarget.open)} open={showWanAdvanced}>
+              <summary className="flex items-center justify-between gap-4 p-4 cursor-pointer list-none select-none hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-50/50 dark:bg-black/10">
+                Configurar WAN avançado
+                <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </summary>
+
+              <div className="p-4 space-y-4 animate-fade-in bg-slate-50/30 dark:bg-black/5">
+                <div>
+                  <label className="kx-field-label" htmlFor="wanInterface">Interface WAN</label>
+                  <select id="wanInterface" className="kx-select p-2.5 text-sm" value={wizard.wanInterface} onChange={(event) => handleWanInterfaceChange(event.target.value)} disabled={netApplyBusy}>
+                    <option value="">Nenhuma</option>
+                    {ifaceNames
+                      .filter((item) => item !== wizard.mgmtInterface)
+                      .map((item) => (
+                        <option key={item} value={item}>{item}</option>
+                      ))}
+                  </select>
+                  <FieldError message={fieldErrors.wanInterface} />
+                </div>
+
+                {wanEnabled && (
+                  <div className="pt-2">
+                    <div className="inline-flex w-full bg-slate-200/50 dark:bg-bg-surface/50 p-1 rounded-lg border border-slate-200/50 dark:border-white/5 mb-4">
+                      <button type="button" className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${wizard.wanMode === 'dhcp' ? 'bg-white dark:bg-bg-elevated text-accent-blue shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`} onClick={() => onChange({ wanMode: 'dhcp' })} disabled={netApplyBusy}>DHCP</button>
+                      <button type="button" className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${wizard.wanMode === 'static' ? 'bg-white dark:bg-bg-elevated text-accent-blue shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`} onClick={() => onChange({ wanMode: 'static' })} disabled={netApplyBusy}>IP Estático</button>
+                      <button type="button" className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${wizard.wanMode === 'pppoe' ? 'bg-white dark:bg-bg-elevated text-accent-blue shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`} onClick={() => onChange({ wanMode: 'pppoe' })} disabled={netApplyBusy}>PPPoE</button>
+                    </div>
+
+                    {wizard.wanMode === 'static' && (
+                      <div className="grid gap-4 sm:grid-cols-2 animate-fade-in">
+                        <div>
+                          <label className="kx-field-label" htmlFor="wanAddress">IP WAN</label>
+                          <input id="wanAddress" className="kx-input p-2.5 text-sm" value={wizard.wanAddress} onChange={handleIpv4Change('wanAddress')} inputMode="numeric" disabled={netApplyBusy} />
+                        </div>
+                        <div>
+                          <label className="kx-field-label" htmlFor="wanNetmask">Mascara WAN</label>
+                          <select id="wanNetmask" className="kx-select p-2.5 text-sm" value={wizard.wanNetmask} onChange={(event) => onChange({ wanNetmask: event.target.value })} disabled={netApplyBusy}>
+                            <option value="255.255.255.0">255.255.255.0 (/24)</option>
+                            <option value="255.255.255.128">255.255.255.128 (/25)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="kx-field-label" htmlFor="wanGateway">Gateway WAN</label>
+                          <input id="wanGateway" className="kx-input p-2.5 text-sm" value={wizard.wanGateway} onChange={handleIpv4Change('wanGateway')} inputMode="numeric" disabled={netApplyBusy} />
+                        </div>
+                        <div>
+                          <label className="kx-field-label" htmlFor="wanDns">DNS WAN</label>
+                          <input id="wanDns" className="kx-input p-2.5 text-sm" value={wizard.wanDns} onChange={(event) => onChange({ wanDns: event.target.value })} disabled={netApplyBusy} />
+                        </div>
+                      </div>
+                    )}
+
+                    {wizard.wanMode === 'pppoe' && (
+                      <div className="grid gap-4 animate-fade-in">
+                        <div>
+                          <label className="kx-field-label" htmlFor="pppoeUser">Usuário PPPoE</label>
+                          <input id="pppoeUser" className="kx-input p-2.5 text-sm" value={wizard.pppoeUser || ''} onChange={(event) => onChange({ pppoeUser: event.target.value })} />
+                        </div>
+                        <div>
+                          <label className="kx-field-label" htmlFor="pppoePassword">Senha PPPoE</label>
+                          <div className="flex gap-2">
+                            <input id="pppoePassword" type={showPppoePassword ? 'text' : 'password'} className="kx-input flex-1 p-2.5 text-sm" value={wizard.pppoePassword || ''} onChange={(event) => onChange({ pppoePassword: event.target.value })} />
+                            <button type="button" className="px-3 py-2 bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 transition-colors text-xs font-medium" onClick={() => setShowPppoePassword(!showPppoePassword)}>
+                              {showPppoePassword ? 'Ocultar' : 'Mostrar'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-5">
+                      <label className="flex items-start gap-3 bg-slate-100/50 dark:bg-slate-950/40 p-3 rounded-lg border border-slate-200/50 dark:border-white/5 cursor-pointer">
+                        <input type="checkbox" className="mt-0.5 h-4 w-4 rounded border-slate-300 text-accent-blue focus:ring-accent-blue" checked={Boolean(wizard.wanIdentified)} onChange={(event) => onChange({ wanIdentified: event.target.checked })} disabled={netApplyBusy} />
+                        <span className="text-xs text-slate-700 dark:text-slate-300">Confirmei a interface WAN selecionada.</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </details>
+          </div>
+        </div>
+
         {/* Checklist e Avisos */}
         <div>
-          <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 px-1">Checklist de Liberação</h3>
+          <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 px-1">Requisitos de Avanço</h3>
           <div className="bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-2xl p-5 shadow-sm">
             <ul className="space-y-3 text-sm">
               <li className="flex items-center gap-3">
