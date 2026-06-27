@@ -3,6 +3,8 @@ import Layout from './components/Layout.jsx';
 import FooterFixed from './components/FooterFixed.jsx';
 import Welcome from './pages/Welcome.jsx';
 import Eula from './pages/Eula.jsx';
+import Localization from './pages/Localization.jsx';
+import Timezone from './pages/Timezone.jsx';
 import Network from './pages/Network.jsx';
 import Source from './pages/Source.jsx';
 import RemoteAccess from './pages/RemoteAccess.jsx';
@@ -65,14 +67,24 @@ const STEPS = [
     subtitle: 'Aceite explícito antes de qualquer ação destrutiva ou configuração do sistema.',
   },
   {
-    id: 'network',
-    title: 'Topologia de Rede',
-    subtitle: 'WAN, LAN e parâmetros essenciais de rede.',
-  },
-  {
     id: 'source',
     title: 'Fonte de Instalação',
     subtitle: 'Offline ou repositório GitHub remoto.',
+  },
+  {
+    id: 'localization',
+    title: 'Idioma e Teclado',
+    subtitle: 'Preferências de localização para a interface do sistema.',
+  },
+  {
+    id: 'timezone',
+    title: 'Fuso Horário',
+    subtitle: 'Sincronização de data e hora locais.',
+  },
+  {
+    id: 'network',
+    title: 'Topologia de Rede',
+    subtitle: 'WAN, LAN e parâmetros essenciais de rede.',
   },
   {
     id: 'hostSelection',
@@ -118,6 +130,7 @@ const STEPS = [
 
 const PHASES = [
   { id: 'prep', title: 'Preparação', steps: ['welcome', 'eula', 'source'] },
+  { id: 'localization', title: 'Localização', steps: ['localization', 'timezone'] },
   { id: 'network', title: 'Rede', steps: ['network', 'hostSelection'] },
   { id: 'system', title: 'Sistema', steps: ['profile', 'systemFeatures', 'userFeatures'] },
   { id: 'storage', title: 'Armazenamento', steps: ['disks'] },
@@ -324,10 +337,14 @@ export default function App() {
         return <Welcome {...pageProps} />;
       case 'eula':
         return <Eula {...pageProps} />;
-      case 'network':
-        return <Network {...pageProps} />;
       case 'source':
         return <Source {...pageProps} />;
+      case 'localization':
+        return <Localization {...pageProps} />;
+      case 'timezone':
+        return <Timezone {...pageProps} />;
+      case 'network':
+        return <Network {...pageProps} />;
       case 'remoteAccess':
         return <RemoteAccess {...pageProps} />;
       case 'hostSelection':
@@ -351,15 +368,7 @@ export default function App() {
     }
   })();
 
-  // Aplicar tema escuro/claro no html base
-  useEffect(() => {
-    const root = window.document.documentElement;
-    if (draft.installerUiTheme === 'light') {
-      root.classList.remove('dark');
-    } else {
-      root.classList.add('dark');
-    }
-  }, [draft.installerUiTheme]);
+  // O tema dark agora é fixo pelo index.html e Tailwind config.
 
   return (
     <Layout

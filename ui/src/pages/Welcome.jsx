@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import EagleLogo from '../components/EagleLogo';
 
-export default function Welcome({ draft, onChange }) {
+export default function Welcome({ draft }) {
   const [version, setVersion] = useState(null);
   const [detections, setDetections] = useState([]);
 
@@ -18,17 +18,6 @@ export default function Welcome({ draft, onChange }) {
   }, []);
 
   const hasKryonix = detections.some(d => d.is_kryonix);
-
-  const setTheme = (mode) => {
-    onChange({
-      draftPatch: {
-        installerUiTheme: mode,
-        desktopThemeMode: mode,
-      }
-    });
-  };
-
-  const currentMode = draft?.installerUiTheme || 'dark';
 
   return (
     <div className="flex flex-col items-center justify-center h-full max-w-4xl mx-auto w-full px-4 text-center animate-fade-in-up">
@@ -61,56 +50,7 @@ export default function Welcome({ draft, onChange }) {
         </div>
       )}
 
-      {/* Theme Selection */}
-      <div className="w-full max-w-2xl mb-12">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          {/* Light Mode Card */}
-          <button
-            type="button"
-            onClick={() => setTheme('light')}
-            className={`flex flex-col items-start p-6 rounded-2xl border transition-all duration-300 text-left ${
-              currentMode === 'light'
-                ? 'border-accent-blue bg-white dark:bg-bg-elevated shadow-panel ring-1 ring-accent-blue/20'
-                : 'border-slate-200/50 bg-white/50 dark:border-white/5 dark:bg-bg-surface/50 hover:bg-white dark:hover:bg-bg-surface'
-            }`}
-          >
-            <div className="w-full h-24 mb-5 rounded-lg bg-slate-50 border border-slate-200/50 flex flex-col p-2.5 gap-2 overflow-hidden">
-              <div className="h-3.5 w-full bg-white rounded shadow-sm border border-slate-100"></div>
-              <div className="flex gap-2 flex-1">
-                <div className="w-1/4 h-full bg-white rounded shadow-sm border border-slate-100"></div>
-                <div className="flex-1 h-full bg-white rounded shadow-sm border border-slate-100 p-1.5">
-                  <div className="w-1/3 h-1.5 bg-slate-200 rounded"></div>
-                </div>
-              </div>
-            </div>
-            <span className="text-sm font-bold text-slate-900 dark:text-text-primary mb-1">Light Mode</span>
-            <span className="text-xs text-slate-500 dark:text-text-muted font-medium">Contraste limpo para ambientes iluminados</span>
-          </button>
-
-          {/* Dark Mode Card */}
-          <button
-            type="button"
-            onClick={() => setTheme('dark')}
-            className={`flex flex-col items-start p-6 rounded-2xl border transition-all duration-300 text-left ${
-              currentMode === 'dark'
-                ? 'border-accent-blue bg-white dark:bg-bg-elevated shadow-panel ring-1 ring-accent-blue/20'
-                : 'border-slate-200/50 bg-white/50 dark:border-white/5 dark:bg-bg-surface/50 hover:bg-white dark:hover:bg-bg-surface'
-            }`}
-          >
-            <div className="w-full h-24 mb-5 rounded-lg bg-bg-surface border border-white/5 flex flex-col p-2.5 gap-2 overflow-hidden shadow-inner">
-              <div className="h-3.5 w-full bg-bg-elevated rounded border border-white/5"></div>
-              <div className="flex gap-2 flex-1">
-                <div className="w-1/4 h-full bg-bg-elevated rounded border border-white/5"></div>
-                <div className="flex-1 h-full bg-bg-glass backdrop-blur-md rounded border border-white/5 p-1.5 shadow-sm">
-                  <div className="w-1/3 h-1.5 bg-accent-blue/30 rounded"></div>
-                </div>
-              </div>
-            </div>
-            <span className="text-sm font-bold text-slate-900 dark:text-text-primary mb-1">Dark Mode</span>
-            <span className="text-xs text-slate-500 dark:text-text-muted font-medium">Estética profunda e confortável aos olhos</span>
-          </button>
-        </div>
-      </div>
+      {/* Tema agora é fixo: Kryonix Premium Installer Theme */}
 
       {version && (
         <div className="mt-auto text-[10px] text-slate-400 dark:text-slate-600 font-mono">

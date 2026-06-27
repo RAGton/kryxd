@@ -44,8 +44,6 @@ export const DRAFT_FIELD_NAMES = [
   'adminPasswordConfirm',
   'allowWeakPassword',
   'adminAuthorizedKeys',
-  'installerUiTheme',
-  'desktopThemeMode',
 ];
 
 export const UI_TRANSIENT_FIELD_NAMES = [
@@ -116,8 +114,6 @@ export const INITIAL_INSTALL_PLAN_DRAFT = {
   adminPasswordConfirm: '',
   allowWeakPassword: false,
   adminAuthorizedKeys: '',
-  installerUiTheme: 'dark',
-  desktopThemeMode: 'dark',
 };
 
 export const INITIAL_UI_TRANSIENT_STATE = {
