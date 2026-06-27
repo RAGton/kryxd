@@ -8,7 +8,7 @@ mod profiles;
 
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, State, ConnectInfo},
     http::StatusCode,
     response::{
         IntoResponse,
@@ -325,6 +325,8 @@ async fn main() {
         .route("/profile/apply", post(apply_profile_endpoint))
         // Debug — inspeção do target flake gerado em /mnt/etc/kryonixos
         .route("/debug/target", get(debug_target))
+        // CSRF Token
+        .route("/api/token", get(get_csrf_token))
         // Detection
         .route("/api/detection", get(detection_handler))
         // Disk Planner
@@ -378,7 +380,25 @@ async fn main() {
         "Kryonix Installer API → http://{}",
         listener.local_addr().unwrap()
     );
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await.unwrap();
+}
+
+async fn get_csrf_token(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<std::net::SocketAddr>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    if !addr.ip().is_loopback() {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponse {
+                error: "FORBIDDEN".into(),
+                details: Some("CSRF token can only be retrieved from localhost".into()),
+            })
+        ));
+    }
+    Ok(Json(serde_json::json!({
+        "token": state.installer_token
+    })))
 }
 
 async fn install_finalize_endpoint(
