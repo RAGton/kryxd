@@ -5,7 +5,7 @@ export default function EagleLogo({ className = "w-5 h-5" }) {
     <img 
       src={logo}
       alt="Kryonix Logo"
-      className={`${className} object-contain rounded-lg`} 
+      className={`${className} object-contain rounded-lg scale-150`} 
     />
   );
 }
