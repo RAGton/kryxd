@@ -13,6 +13,7 @@ import {
   validateSingleDiskLayout,
   validateSplitDiskLayout,
 } from '../utils/storagePlanner.js';
+import { parseSizeInput } from '../utils/layoutAssistant.js';
 
 const TABS_ID = ['automatic', 'manual', 'lvm', 'raid'];
 
