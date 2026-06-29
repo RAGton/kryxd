@@ -186,7 +186,7 @@ export const FEATURE_CATALOG = [
     storage: { requiresSrvData: false, estimatedDiskGb: 2 },
     hardware: { minRamGb: 4, gpuRecommended: false },
     risk: 'medium',
-    status: 'ready'
+    status: 'partial'
   },
 
   // AI & DATA (System level)
@@ -205,7 +205,7 @@ export const FEATURE_CATALOG = [
     storage: { requiresSrvData: true, estimatedDiskGb: 20 },
     hardware: { minRamGb: 8, gpuRecommended: true },
     risk: 'low',
-    status: 'ready'
+    status: 'partial'
   },
   {
     id: 'ai.open-webui',
@@ -222,7 +222,7 @@ export const FEATURE_CATALOG = [
     storage: { requiresSrvData: false, estimatedDiskGb: 2 },
     hardware: { minRamGb: 2, gpuRecommended: false },
     risk: 'low',
-    status: 'ready'
+    status: 'stub'
   },
   {
     id: 'ai.neo4j',
@@ -256,7 +256,7 @@ export const FEATURE_CATALOG = [
     storage: { requiresSrvData: true, estimatedDiskGb: 5 },
     hardware: { minRamGb: 4, gpuRecommended: false },
     risk: 'low',
-    status: 'ready'
+    status: 'stub'
   },
   {
     id: 'ai.kryonix-brain',

@@ -216,6 +216,11 @@ export function buildInstallPlanPayload(draftInput) {
     draft.profileId === 'server-ai' ||
     draft.profileId === 'full';
 
+  const confirmedFeatures = selectedFeatures
+    .map(featId => FEATURE_CATALOG.find(f => f.id === featId))
+    .filter(f => f?.status === 'partial')
+    .map(f => f.id);
+
   // Build raw payload then clean optional empty fields for schema compliance
   const rawPayload = {
     version: INSTALL_PLAN_VERSION,
@@ -251,6 +256,7 @@ export function buildInstallPlanPayload(draftInput) {
       mode: profileObj.mode,
     },
     features,
+    confirmedFeatures,
     storage: {
       layout: (diskProfile === 'raid' || diskProfile === 'manual' || diskProfile === 'lvm' || diskMode === 'one') ? 'btrfs-simple' : 'btrfs-split',
       target: selectedDisks[0] || '',

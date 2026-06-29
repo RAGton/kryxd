@@ -101,6 +101,9 @@ function buildKryonixInstallPlan(planPayload, secretsPayload = {}, mode = 'insta
     features: planPayload.features && typeof planPayload.features === 'object'
       ? planPayload.features
       : {},
+    confirmed_features: Array.isArray(planPayload.confirmedFeatures)
+      ? planPayload.confirmedFeatures
+      : [],
     target_remote_access: {
       enabled: Boolean(planPayload.targetRemoteAccess?.enabled),
     },
