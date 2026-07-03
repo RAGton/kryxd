@@ -15,7 +15,7 @@ export const installerApiMock = {
     });
   },
   
-  getNetworkStatus() { return Promise.resolve({ status: 'connected' }); },
+  getNetworkStatus() { return Promise.resolve({ connected: true, internet: true }); },
   
   applyNetwork(params) {
     return new Promise(resolve => setTimeout(() => resolve({ ok: true }), 1500));
@@ -53,7 +53,7 @@ export const installerApiMock = {
     return Promise.resolve([
       {
         name: 'nvme0n1',
-        path: '/dev/nvme0n1',
+        path: '/mockdev/nvme0n1',
         model: 'Mocked NVMe SSD',
         size: '500G',
         size_bytes: 500000000000,
@@ -63,7 +63,7 @@ export const installerApiMock = {
       },
       {
         name: 'sda',
-        path: '/dev/sda',
+        path: '/mockdev/sda',
         model: 'Mocked USB Flash Drive',
         size: '16G',
         size_bytes: 16000000000,
@@ -139,7 +139,7 @@ export const installerApiMock = {
     let step = 0;
     const steps = [
       { s: 'precheck', m: 'Validating hardware requirements...', p: 10 },
-      { s: 'partition', m: 'Mock: Formatting /dev/nvme0n1...', p: 30 },
+      { s: 'partition', m: 'Mock: Formatting /mockdev/nvme0n1...', p: 30 },
       { s: 'nixos-install', m: 'Mock: Extracting system closure...', p: 60 },
       { s: 'nixos-install', m: 'Mock: Generating hardware configuration...', p: 80 },
       { s: 'nixos-install', m: 'Mock: Installing bootloader...', p: 90 },
