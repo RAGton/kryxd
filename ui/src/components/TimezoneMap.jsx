@@ -257,7 +257,7 @@ export default function TimezoneMap({ locations = [], selectedLocation, value, o
                 ✈️
               </div>
               <div
-                className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-[220%] rounded-xl border border-white/10 bg-slate-900/90 px-3.5 py-1.5 text-xs font-bold text-white shadow-2xl backdrop-blur-md whitespace-nowrap"
+                className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-[220%] rounded-xl border border-white/10 bg-white/5 backdrop-blur-md px-3.5 py-1.5 text-xs font-bold text-white shadow-2xl backdrop-blur-md whitespace-nowrap"
                 style={{
                   left: `${(activeLocation.x / CALAMARES_MAP_WIDTH) * 100}%`,
                   top: `${(activeLocation.y / CALAMARES_MAP_HEIGHT) * 100}%`,
@@ -286,7 +286,7 @@ export default function TimezoneMap({ locations = [], selectedLocation, value, o
         ) : null}
 
         {(layerState.loading || layerState.error) ? (
-          <div className="pointer-events-none absolute bottom-4 right-4 rounded-2xl border border-white/10 bg-slate-950/88 px-3 py-2 text-xs text-slate-300 backdrop-blur-xl">
+          <div className="pointer-events-none absolute bottom-4 right-4 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md px-3 py-2 text-xs text-slate-300 backdrop-blur-xl">
             {layerState.loading ? t('timezone_map.loading_masks', { defaultValue: 'Carregando máscaras de timezone do Calamares…' }) : layerState.error}
           </div>
         ) : null}

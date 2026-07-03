@@ -54,12 +54,12 @@ export default function KxCombobox({
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex w-full items-center justify-between rounded-xl border px-4 py-2.5 text-left text-[13px] font-medium transition-all focus:outline-none focus:ring-2 focus:ring-accent-blue/50 ${
+        className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-[13px] font-medium transition-all focus:outline-none focus:ring-2 focus:ring-accent-blue/50 backdrop-blur-md ${
           disabled
-            ? 'cursor-not-allowed border-slate-200/50 bg-slate-50 text-slate-400 opacity-60 dark:border-white/5 dark:bg-white/[0.02] dark:text-slate-500'
+            ? 'cursor-not-allowed border-slate-200/50 bg-white/20 text-slate-400 opacity-60 dark:border-white/5 dark:bg-white/[0.02] dark:text-slate-500'
             : isOpen
-              ? 'border-accent-blue/40 bg-accent-blue/5 text-slate-900 dark:text-white shadow-sm'
-              : 'border-slate-200/50 bg-white/50 text-slate-800 hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-bg-elevated/30 dark:text-slate-200 dark:hover:border-white/20 dark:hover:bg-bg-elevated/50'
+              ? 'border-accent-blue/40 bg-accent-blue/10 text-slate-900 dark:text-white shadow-sm ring-1 ring-accent-blue/20'
+              : 'border-white/40 bg-white/30 text-slate-800 hover:border-white/60 hover:bg-white/40 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-white/20 dark:hover:bg-white/10 shadow-sm'
         }`}
       >
         <span className="truncate">
@@ -72,15 +72,16 @@ export default function KxCombobox({
 
       {/* Popover Dropdown */}
       {isOpen && (
-        <div className="absolute top-[calc(100%+4px)] z-50 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
-          <div className="p-2 border-b border-slate-100 dark:border-slate-700/50">
+        <div className="absolute top-[calc(100%+8px)] z-50 w-full overflow-hidden rounded-2xl border border-white/40 bg-white/80 shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-2xl dark:border-white/10 dark:bg-[#1a1b1e]/80">
+          <div className="p-2 border-b border-slate-200/50 dark:border-white/5">
             <input
+              ref={inputRef}
               type="text"
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={searchPlaceholder}
-              className="w-full rounded-lg bg-slate-100 px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-accent-blue/50 dark:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500"
+              className="w-full rounded-xl bg-white/50 px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-accent-blue/50 dark:bg-black/20 dark:text-slate-200 dark:placeholder-slate-500 border border-transparent focus:border-accent-blue/30 transition-all"
             />
           </div>
 
@@ -101,10 +102,10 @@ export default function KxCombobox({
                       setIsOpen(false);
                       setSearch('');
                     }}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${
+                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[13px] transition-all ${
                       isSelected
-                        ? 'bg-accent-blue/10 text-accent-blue dark:bg-accent-blue/20 dark:text-white font-bold'
-                        : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700/50'
+                        ? 'bg-accent-blue/10 text-accent-blue font-semibold dark:bg-accent-blue/20'
+                        : 'text-slate-700 hover:bg-black/5 dark:text-slate-300 dark:hover:bg-white/5 hover:backdrop-blur-md'
                     }`}
                   >
                     <div className="flex flex-col truncate">

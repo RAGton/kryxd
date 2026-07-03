@@ -43,7 +43,7 @@ export default function Layout({
                         ? 'bg-accent-blue text-white shadow-md ring-2 ring-accent-blue/30' 
                         : isDone 
                           ? 'bg-emerald-100 text-emerald-700 dark:bg-success/20 dark:text-success hover:bg-emerald-200 dark:hover:bg-success/30' 
-                          : 'bg-slate-200 text-slate-500 dark:bg-white/5 dark:text-text3'
+                          : 'bg-black/10 backdrop-blur-md text-slate-500 dark:bg-white/5 dark:text-text3'
                     }`}
                     onClick={() => canJump && onStepJump?.(targetIndex)}
                     disabled={!canJump || !onStepJump}

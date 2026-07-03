@@ -21,7 +21,7 @@ function Bar({ title, blocks }) {
   return (
     <div className="mb-3">
       <div className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{title}</div>
-      <div className="flex h-9 w-full overflow-hidden rounded-lg border border-slate-700/60 bg-slate-900/40">
+      <div className="flex h-9 w-full overflow-hidden rounded-lg border border-slate-700/60 bg-white/5 backdrop-blur-md">
         {blocks.length === 0 ? (
           <div className="flex w-full items-center justify-center text-xs text-slate-500">—</div>
         ) : (
@@ -88,7 +88,7 @@ export default function DiskVisualizer({ disk, onApply, onOpenManual }) {
   }
 
   return (
-    <section className="rounded-2xl border border-slate-700/50 bg-slate-900/30 p-5">
+    <section className="rounded-2xl border border-slate-700/50 bg-white/5 backdrop-blur-md p-5">
       <header className="mb-4 flex items-baseline justify-between gap-4">
         <div>
           <h3 className="text-base font-bold text-slate-100">{disk?.model || disk?.name || disk?.path || t('disk_visualizer.disk_default_name', { defaultValue: 'Disco' })}</h3>
@@ -135,7 +135,7 @@ export default function DiskVisualizer({ disk, onApply, onOpenManual }) {
 
       {pendingDestructive ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-md rounded-2xl border border-rose-400/40 bg-slate-900 p-6">
+          <div className="w-full max-w-md rounded-2xl border border-rose-400/40 bg-white/5 backdrop-blur-md p-6">
             <h4 className="text-lg font-bold text-rose-200">{t('disk_visualizer.confirm_destructive', { defaultValue: 'Confirmar operação destrutiva' })}</h4>
             <p className="mt-2 text-sm text-slate-300">
               {t('disk_visualizer.preset_will_erase_1', { defaultValue: 'O preset ' })}<strong>{PRESETS.find((p) => p.id === presetId)?.label}</strong>{t('disk_visualizer.preset_will_erase_2', { defaultValue: ' vai ' })}

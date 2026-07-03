@@ -154,7 +154,7 @@ export default function Install({ draft, uiState, validation, onChange }) {
   return (
     <div className="flex h-full min-h-0 flex-col gap-6">
       {/* HEADER FULL-WIDTH OPERACIONAL */}
-      <section className="shrink-0 rounded-2xl border border-white/10 bg-slate-950/60 p-6 shadow-panel backdrop-blur-md">
+      <section className="shrink-0 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-6 shadow-panel backdrop-blur-md">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-accent-blue">

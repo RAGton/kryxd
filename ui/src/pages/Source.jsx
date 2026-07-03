@@ -224,14 +224,14 @@ export default function Source({ wizard, uiState, onChange }) {
               {wizard.githubAuthStatus === 'idle' || !wizard.githubAuthStatus ? (
                 <button 
                   onClick={handleStartDeviceFlow}
-                  className="w-full bg-slate-800 text-white rounded-lg px-4 py-3 text-sm font-bold hover:bg-slate-700 transition-colors flex items-center justify-center gap-2"
+                  className="w-full bg-white/5 backdrop-blur-md text-white rounded-lg px-4 py-3 text-sm font-bold hover:bg-white/10 backdrop-blur-md transition-colors flex items-center justify-center gap-2"
                 >
                   {t('source.createRepo.connectGithub')}
                 </button>
               ) : wizard.githubAuthStatus === 'starting' ? (
                 <div className="p-4 text-center text-sm text-slate-500">{t('source.timeline.githubAuth')}...</div>
               ) : wizard.githubAuthStatus === 'waiting_for_user' ? (
-                <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl text-center">
+                <div className="bg-black/5 backdrop-blur-md dark:bg-white/5 backdrop-blur-md p-4 rounded-xl text-center">
                   <p className="text-sm text-slate-600 dark:text-slate-300 mb-2">{t('source.createRepo.waiting')}</p>
                   <div className="text-3xl font-mono font-bold tracking-widest text-slate-900 dark:text-white mb-4">
                     {wizard.githubUserCode}
@@ -280,7 +280,7 @@ export default function Source({ wizard, uiState, onChange }) {
           type="button"
           className={`p-6 rounded-2xl border-2 transition-all backdrop-blur-sm ${
             wizard.sourceKind === 'template'
-              ? 'border-slate-500 bg-slate-500/10 dark:bg-slate-500/20 shadow-lg'
+              ? 'border-slate-500 bg-black/5 backdrop-blur-md0/10 dark:bg-black/5 backdrop-blur-md0/20 shadow-lg'
               : 'border-slate-200 dark:border-white/5 bg-white/40 dark:bg-bg-elevated/20 hover:border-slate-300 dark:hover:border-white/20'
           }`}
           onClick={() => onChange({ sourceKind: 'template' })}
@@ -291,7 +291,7 @@ export default function Source({ wizard, uiState, onChange }) {
           <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">
             {t('source.template.description')}
           </p>
-          <div className="text-xs font-mono bg-slate-100 dark:bg-bg-elevated/50 p-2 rounded text-slate-500 border border-slate-200 dark:border-white/5 truncate">
+          <div className="text-xs font-mono bg-black/5 backdrop-blur-md dark:bg-bg-elevated/50 p-2 rounded text-slate-500 border border-slate-200 dark:border-white/5 truncate">
             {wizard.templateRepoUrl}
           </div>
         </button>

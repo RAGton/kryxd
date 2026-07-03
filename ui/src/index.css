@@ -677,7 +677,7 @@ textarea:focus-visible {
 
 @layer components {
   .glass-panel {
-    @apply rounded-[28px] border border-white/10 bg-slate-950/45 shadow-glass backdrop-blur-2xl;
+    @apply rounded-[28px] border border-white/10 bg-white/5 shadow-glass backdrop-blur-2xl;
   }
 
   .section-panel {
@@ -686,7 +686,7 @@ textarea:focus-visible {
 
   /* btn-primary Tailwind permanece intacto para as páginas internas */
   .btn-primary {
-    @apply px-6 py-3 rounded-lg font-bold transition-all focus:ring-2 focus:ring-accent-blue bg-accent-blue text-white hover:bg-accent-blue disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 disabled:opacity-80;
+    @apply px-6 py-3 rounded-lg font-bold transition-all focus:ring-2 focus:ring-accent-blue bg-accent-blue text-white hover:bg-accent-blue disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-slate-400 disabled:opacity-80;
   }
 
   .btn-secondary {
@@ -698,7 +698,7 @@ textarea:focus-visible {
   }
 
   .input-shell {
-    @apply w-full rounded-xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition focus:border-accent-blue focus:ring-2 focus:ring-accent-blue;
+    @apply w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition focus:border-accent-blue focus:ring-2 focus:ring-accent-blue;
   }
 
   .label-text {

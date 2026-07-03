@@ -68,7 +68,7 @@ export default function Users({ wizard, onChange, validation }) {
         <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
           <input
             type="checkbox"
-            className="mt-1 h-5 w-5 rounded border-white/20 bg-slate-950 text-accent-500"
+            className="mt-1 h-5 w-5 rounded border-white/20 bg-white/5 backdrop-blur-md text-accent-500"
             checked={Boolean(wizard.allowWeakPassword)}
             onChange={(event) => onChange({ allowWeakPassword: event.target.checked })}
           />
@@ -87,7 +87,7 @@ export default function Users({ wizard, onChange, validation }) {
           <p className="mt-1 text-sm text-slate-400">{t('users.ssh.desc')}</p>
         </div>
 
-        <div className="flex-1 flex flex-col min-h-0 border border-white/10 rounded-2xl overflow-hidden bg-slate-950/60 transition-all duration-300">
+        <div className="flex-1 flex flex-col min-h-0 border border-white/10 rounded-2xl overflow-hidden bg-white/5 backdrop-blur-md transition-all duration-300">
           <button
             type="button"
             className="flex items-center justify-between w-full p-4 hover:bg-white/5 transition-colors"

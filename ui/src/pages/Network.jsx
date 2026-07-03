@@ -298,7 +298,7 @@ export default function Network({ wizard, onChange, validation }) {
 
 
         {/* Toggle Mode */}
-        <div className="mb-6 inline-flex bg-slate-200/50 dark:bg-bg-surface/50 p-1.5 rounded-xl border border-slate-200/50 dark:border-white/5 shadow-inner">
+        <div className="mb-6 inline-flex bg-black/10 backdrop-blur-md dark:bg-bg-surface/50 p-1.5 rounded-xl border border-slate-200/50 dark:border-white/5 shadow-inner">
           <button
             type="button"
             onClick={() => onChange({ mgmtMode: 'dhcp' })}
@@ -492,7 +492,7 @@ export default function Network({ wizard, onChange, validation }) {
               <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold ${
                 wizard.netConnected ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' :
                 wizard.netOffline ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' :
-                'bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-400'
+                'bg-black/5 backdrop-blur-md text-slate-600 dark:bg-white/5 dark:text-slate-400'
               }`}>
                 <span className={`w-2 h-2 rounded-full ${wizard.netConnected ? 'bg-emerald-500' : wizard.netOffline ? 'bg-amber-500' : 'bg-slate-400'}`}></span>
                 {wizard.netConnected ? t('network.status_connected', { defaultValue: 'Conectado (Online)' }) : wizard.netOffline ? t('network.status_offline_active', { defaultValue: 'Modo Offline Ativo' }) : t('network.status_disconnected', { defaultValue: 'Desconectado' })}
@@ -516,7 +516,7 @@ export default function Network({ wizard, onChange, validation }) {
                     <select className="kx-select flex-1 p-2 text-xs" value={selectedWifiIface} onChange={(e) => setSelectedWifiIface(e.target.value)}>
                       {wifiIfaces.map(i => <option key={i.name} value={i.name}>{i.name}</option>)}
                     </select>
-                    <button type="button" className="px-3 py-2 bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-lg text-xs font-medium hover:bg-slate-200 dark:hover:bg-white/10 transition-colors" onClick={scanWifi} disabled={wifiScanning || !selectedWifiIface}>
+                    <button type="button" className="px-3 py-2 bg-black/5 backdrop-blur-md dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-lg text-xs font-medium hover:bg-black/10 backdrop-blur-md dark:hover:bg-white/10 transition-colors" onClick={scanWifi} disabled={wifiScanning || !selectedWifiIface}>
                       {wifiScanning ? t('network.scanning', { defaultValue: 'Buscando…' }) : t('network.scan', { defaultValue: 'Buscar' })}
                     </button>
                   </div>
@@ -547,7 +547,7 @@ export default function Network({ wizard, onChange, validation }) {
             {/* Continuar Offline */}
             {!wizard.netConnected && (
               <div className="mt-4 pt-4 border-t border-slate-200/50 dark:border-white/5">
-                <button type="button" onClick={continueOffline} className={`w-full py-2 rounded-lg text-xs font-bold transition-colors ${wizard.netOffline ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/5 dark:text-slate-400 dark:hover:bg-white/10'}`}>
+                <button type="button" onClick={continueOffline} className={`w-full py-2 rounded-lg text-xs font-bold transition-colors ${wizard.netOffline ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' : 'bg-black/5 backdrop-blur-md text-slate-600 hover:bg-black/10 backdrop-blur-md dark:bg-white/5 dark:text-slate-400 dark:hover:bg-white/10'}`}>
                   {wizard.netOffline ? 'Modo Offline Ativo' : t('network.continue_offline', { defaultValue: 'Continuar sem internet (Offline)' })}
                 </button>
                 {wizard.netOffline && <p className="text-[10px] text-amber-600 dark:text-amber-400/80 mt-2 leading-relaxed">{t('network.offline_warning', { defaultValue: 'Nenhum pacote será baixado. A instalação usará apenas os recursos nativos presentes na mídia local.' })}</p>}
@@ -588,14 +588,14 @@ export default function Network({ wizard, onChange, validation }) {
             </div>
 
             <details className="group border-t border-slate-200/50 dark:border-white/5" onToggle={(e) => setShowWanAdvanced(e.currentTarget.open)} open={showWanAdvanced}>
-              <summary className="flex items-center justify-between gap-4 p-4 cursor-pointer list-none select-none hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-50/50 dark:bg-black/10">
+              <summary className="flex items-center justify-between gap-4 p-4 cursor-pointer list-none select-none hover:bg-black/5 backdrop-blur-md dark:hover:bg-white/5 transition-colors text-sm font-bold text-slate-700 dark:text-slate-300 bg-black/5 backdrop-blur-md dark:bg-black/10">
                 {t('network.configure_advanced_wan', { defaultValue: 'Configurar WAN avançado' })}
                 <svg className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </summary>
 
-              <div className="p-4 space-y-4 animate-fade-in bg-slate-50/30 dark:bg-black/5">
+              <div className="p-4 space-y-4 animate-fade-in bg-black/5 backdrop-blur-md dark:bg-black/5">
                 <div>
                   <label className="kx-field-label" htmlFor="wanInterface">{t('network.wan_interface', { defaultValue: 'Interface WAN' })}</label>
                   <select id="wanInterface" className="kx-select p-2.5 text-sm" value={wizard.wanInterface} onChange={(event) => handleWanInterfaceChange(event.target.value)} disabled={netApplyBusy}>
@@ -611,7 +611,7 @@ export default function Network({ wizard, onChange, validation }) {
 
                 {wanEnabled && (
                   <div className="pt-2">
-                    <div className="inline-flex w-full bg-slate-200/50 dark:bg-bg-surface/50 p-1 rounded-lg border border-slate-200/50 dark:border-white/5 mb-4">
+                    <div className="inline-flex w-full bg-black/10 backdrop-blur-md dark:bg-bg-surface/50 p-1 rounded-lg border border-slate-200/50 dark:border-white/5 mb-4">
                       <button type="button" className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${wizard.wanMode === 'dhcp' ? 'bg-white dark:bg-bg-elevated text-accent-blue shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`} onClick={() => onChange({ wanMode: 'dhcp' })} disabled={netApplyBusy}>{t('network.dhcp', { defaultValue: 'DHCP' })}</button>
                       <button type="button" className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${wizard.wanMode === 'static' ? 'bg-white dark:bg-bg-elevated text-accent-blue shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`} onClick={() => onChange({ wanMode: 'static' })} disabled={netApplyBusy}>{t('network.static_ip', { defaultValue: 'IP Estático' })}</button>
                       <button type="button" className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${wizard.wanMode === 'pppoe' ? 'bg-white dark:bg-bg-elevated text-accent-blue shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`} onClick={() => onChange({ wanMode: 'pppoe' })} disabled={netApplyBusy}>{t('network.pppoe', { defaultValue: 'PPPoE' })}</button>
@@ -651,7 +651,7 @@ export default function Network({ wizard, onChange, validation }) {
                           <label className="kx-field-label" htmlFor="pppoePassword">{t('network.pppoe_password', { defaultValue: 'Senha PPPoE' })}</label>
                           <div className="flex gap-2">
                             <input id="pppoePassword" type={showPppoePassword ? 'text' : 'password'} className="kx-input flex-1 p-2.5 text-sm" value={wizard.pppoePassword || ''} onChange={(event) => onChange({ pppoePassword: event.target.value })} />
-                            <button type="button" className="px-3 py-2 bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 transition-colors text-xs font-medium" onClick={() => setShowPppoePassword(!showPppoePassword)}>
+                            <button type="button" className="px-3 py-2 bg-black/5 backdrop-blur-md dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-lg hover:bg-black/10 backdrop-blur-md dark:hover:bg-white/10 transition-colors text-xs font-medium" onClick={() => setShowPppoePassword(!showPppoePassword)}>
                               {showPppoePassword ? t('network.hide', { defaultValue: 'Ocultar' }) : t('network.show', { defaultValue: 'Mostrar' })}
                             </button>
                           </div>
@@ -660,7 +660,7 @@ export default function Network({ wizard, onChange, validation }) {
                     )}
 
                     <div className="mt-5">
-                      <label className="flex items-start gap-3 bg-slate-100/50 dark:bg-slate-950/40 p-3 rounded-lg border border-slate-200/50 dark:border-white/5 cursor-pointer">
+                      <label className="flex items-start gap-3 bg-black/5 backdrop-blur-md dark:bg-white/5 backdrop-blur-md p-3 rounded-lg border border-slate-200/50 dark:border-white/5 cursor-pointer">
                         <input type="checkbox" className="mt-0.5 h-4 w-4 rounded border-slate-300 text-accent-blue focus:ring-accent-blue" checked={Boolean(wizard.wanIdentified)} onChange={(event) => onChange({ wanIdentified: event.target.checked })} disabled={netApplyBusy} />
                         <span className="text-xs text-slate-700 dark:text-slate-300">{t('network.confirm_wan', { defaultValue: 'Confirmei a interface WAN selecionada.' })}</span>
                       </label>
@@ -678,19 +678,19 @@ export default function Network({ wizard, onChange, validation }) {
           <div className="bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-2xl p-5 shadow-sm">
             <ul className="space-y-3 text-sm">
               <li className="flex items-center gap-3">
-                <span className={`w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold ${wizard.netConnected || wizard.netOffline ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-slate-500'}`}>✓</span>
+                <span className={`w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold ${wizard.netConnected || wizard.netOffline ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-black/10 backdrop-blur-md text-slate-500 dark:bg-white/10 dark:text-slate-500'}`}>✓</span>
                 <span className={wizard.netConnected || wizard.netOffline ? 'text-slate-900 dark:text-slate-200 font-medium' : 'text-slate-500'}>{t('network.connectivity_resolved', { defaultValue: 'Conectividade resolvida' })}</span>
               </li>
               <li className="flex items-center gap-3">
-                <span className={`w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold ${wizard.hostName ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-slate-500'}`}>✓</span>
+                <span className={`w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold ${wizard.hostName ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-black/10 backdrop-blur-md text-slate-500 dark:bg-white/10 dark:text-slate-500'}`}>✓</span>
                 <span className={wizard.hostName ? 'text-slate-900 dark:text-slate-200 font-medium' : 'text-slate-500'}>{t('network.hostname_configured', { defaultValue: 'Hostname configurado' })}</span>
               </li>
               <li className="flex items-center gap-3">
-                <span className={`w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold ${wizard.mgmtInterface ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-slate-500'}`}>✓</span>
+                <span className={`w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold ${wizard.mgmtInterface ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-black/10 backdrop-blur-md text-slate-500 dark:bg-white/10 dark:text-slate-500'}`}>✓</span>
                 <span className={wizard.mgmtInterface ? 'text-slate-900 dark:text-slate-200 font-medium' : 'text-slate-500'}>{t('network.lan_interface_selected', { defaultValue: 'Interface LAN selecionada' })}</span>
               </li>
               <li className="flex items-center gap-3">
-                <span className={`w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold ${wizard.lanIdentified ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-slate-500'}`}>✓</span>
+                <span className={`w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold ${wizard.lanIdentified ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-black/10 backdrop-blur-md text-slate-500 dark:bg-white/10 dark:text-slate-500'}`}>✓</span>
                 <span className={wizard.lanIdentified ? 'text-slate-900 dark:text-slate-200 font-medium' : 'text-slate-500'}>{t('network.physical_network_confirmed', { defaultValue: 'Rede física confirmada' })}</span>
               </li>
             </ul>

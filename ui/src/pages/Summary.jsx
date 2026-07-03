@@ -257,7 +257,7 @@ export default function Summary({ wizard, uiState, onChange, validation }) {
 
       <section className="flex flex-col min-h-0 bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-2xl shadow-sm p-6 overflow-y-auto custom-scrollbar">
         <div>
-          <div className="rounded-xl border border-slate-200/50 dark:border-white/10 bg-slate-50 dark:bg-slate-950/60 p-4">
+          <div className="rounded-xl border border-slate-200/50 dark:border-white/10 bg-black/5 backdrop-blur-md dark:bg-white/5 backdrop-blur-md p-4">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-text-muted">{t('summary.checklist', { defaultValue: 'Checklist crítico' })}</div>
             <ul className="mt-3 space-y-2 text-[13px] font-medium text-slate-600 dark:text-text-secondary">
               <li>• {t('summary.eula_accepted', { defaultValue: 'EULA aceito:' })} {uiState.eulaAccepted ? t('summary.yes', { defaultValue: 'sim' }) : t('summary.no', { defaultValue: 'não' })}</li>

@@ -20,7 +20,7 @@ export default function MachineProfile({ wizard, onChange }) {
   const srvDataStatus = (profile) => {
     if (profile.enableSrvData) return { label: t('machine_profile.srv_required', { defaultValue: 'Obrigatório' }), color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/30' };
     if (profile.srvDataRecommended) return { label: t('machine_profile.srv_recommended', { defaultValue: 'Recomendado' }), color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/30' };
-    return { label: t('machine_profile.srv_not_enabled', { defaultValue: 'Não ativado' }), color: 'text-slate-500', bg: 'bg-slate-500/10', border: 'border-slate-500/30' };
+    return { label: t('machine_profile.srv_not_enabled', { defaultValue: 'Não ativado' }), color: 'text-slate-500', bg: 'bg-black/5 backdrop-blur-md0/10', border: 'border-slate-500/30' };
   };
 
   const modeLabel = (mode) => mode === 'desktop' ? t('machine_profile.mode_desktop', { defaultValue: 'Desktop' }) : t('machine_profile.mode_server', { defaultValue: 'Server' });

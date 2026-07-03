@@ -63,7 +63,7 @@ function PartitionBar({ partitions, totalBytes }) {
   if (!partitions || partitions.length === 0) {
     return (
       <div className="partition-bar mt-3 border border-white/5 bg-black/20 rounded h-2 overflow-hidden flex">
-        <div className="bg-slate-600/30 flex-1" />
+        <div className="bg-white/10 backdrop-blur-md flex-1" />
       </div>
     );
   }
@@ -89,7 +89,7 @@ function PartitionBar({ partitions, totalBytes }) {
         })}
         {free > 0 && (
           <div
-            className="partition-seg bg-slate-600/30"
+            className="partition-seg bg-white/10 backdrop-blur-md"
             style={{ width: `${(free / total) * 100}%` }}
             title={`${t('partitioning.manual.freeSpace')} — ${formatBytes(free)}`}
           />
@@ -111,7 +111,7 @@ function PartitionBar({ partitions, totalBytes }) {
         ))}
         {free > 0 && (
           <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-slate-600/30" />
+            <div className="w-2 h-2 rounded-full bg-white/10 backdrop-blur-md" />
             <span>{t('partitioning.manual.freeSpace')}</span>
           </div>
         )}

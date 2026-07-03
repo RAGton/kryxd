@@ -160,7 +160,7 @@ export default function Welcome({ wizard, onChange }) {
       )}
 
       {/* Localization Selectors */}
-      <div className="w-full max-w-md flex flex-col mx-auto bg-white/40 dark:bg-bg-elevated/20 border border-slate-200/50 dark:border-white/5 rounded-3xl p-6 shadow-sm backdrop-blur-xl">
+      <div className="w-full max-w-md flex flex-col mx-auto bg-white/20 dark:bg-white/5 border border-white/40 dark:border-white/10 rounded-3xl p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-2xl ring-1 ring-black/5 dark:ring-white/5">
         <div className="flex flex-col gap-5 text-left">
           <KxCombobox
             label={t('welcome.country').replace(/^[1-3]\.\s*/, '')}
@@ -198,7 +198,7 @@ export default function Welcome({ wizard, onChange }) {
             </div>
             <button
               type="button"
-              className="btn-secondary whitespace-nowrap text-xs px-4 py-2 bg-white dark:bg-white/5 hover:bg-slate-50 dark:hover:bg-white/10 border-slate-200 dark:border-white/10"
+              className="btn-secondary whitespace-nowrap text-xs px-4 py-2 bg-white/30 dark:bg-white/10 hover:bg-white/50 dark:hover:bg-white/20 border border-white/40 dark:border-white/10 shadow-sm backdrop-blur-md transition-all text-slate-800 dark:text-slate-200"
               onClick={applySuggestions}
               disabled={!selectedPreset}
             >
