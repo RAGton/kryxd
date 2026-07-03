@@ -305,7 +305,7 @@ export default function Network({ wizard, onChange, validation }) {
             disabled={netApplyBusy}
             className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 ${
               isDhcp
-                ? 'bg-white dark:bg-bg-elevated text-accent-blue shadow-panel ring-1 ring-slate-200 dark:ring-white/10'
+                ? 'bg-white dark:bg-white/5 backdrop-blur-md text-accent-blue shadow-panel ring-1 ring-slate-200 dark:ring-white/10'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             }`}
           >
@@ -317,7 +317,7 @@ export default function Network({ wizard, onChange, validation }) {
             disabled={netApplyBusy}
             className={`px-8 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 ${
               !isDhcp
-                ? 'bg-white dark:bg-bg-elevated text-accent-blue shadow-panel ring-1 ring-slate-200 dark:ring-white/10'
+                ? 'bg-white dark:bg-white/5 backdrop-blur-md text-accent-blue shadow-panel ring-1 ring-slate-200 dark:ring-white/10'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             }`}
           >
@@ -326,7 +326,7 @@ export default function Network({ wizard, onChange, validation }) {
         </div>
 
         {/* Main Form */}
-        <div className="bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-2xl p-6 shadow-sm">
+        <div className="bg-white/5 backdrop-blur-md dark:bg-white/5 border border-slate-200/50 dark:border-white/5 rounded-2xl p-6 shadow-sm">
           <div className="grid gap-6">
 
             {/* Linha 1: Interface & Porta */}
@@ -449,7 +449,7 @@ export default function Network({ wizard, onChange, validation }) {
         )}
 
         {/* Confirmação e Ação Principal */}
-        <div className="mt-8 bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+        <div className="mt-8 bg-white/5 backdrop-blur-md dark:bg-white/5 border border-slate-200/50 dark:border-white/5 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <label className="flex items-start gap-3 cursor-pointer flex-1">
             <input
               type="checkbox"
@@ -487,7 +487,7 @@ export default function Network({ wizard, onChange, validation }) {
         {/* Status Live */}
         <div className="mb-8">
           <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 px-1">{t('network.connection_status', { defaultValue: 'Status da Conexão' })}</h3>
-          <div className="bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-2xl p-5 shadow-sm">
+          <div className="bg-white/5 backdrop-blur-md dark:bg-white/5 border border-slate-200/50 dark:border-white/5 rounded-2xl p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold ${
                 wizard.netConnected ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' :
@@ -559,7 +559,7 @@ export default function Network({ wizard, onChange, validation }) {
         {/* Resumo da Configuração */}
         <div className="mb-8">
           <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 px-1">{t('network.config_summary', { defaultValue: 'Resumo de Configuração' })}</h3>
-          <div className="bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-2xl p-5 shadow-sm">
+          <div className="bg-white/5 backdrop-blur-md dark:bg-white/5 border border-slate-200/50 dark:border-white/5 rounded-2xl p-5 shadow-sm">
             <div className="flex flex-col gap-1">
               <SummaryRow label={t('network.total_interfaces', { defaultValue: 'Total de Interfaces' })} value={loading ? '...' : String(interfaces.length)} />
               <SummaryRow label={t('network.selected_mode', { defaultValue: 'Modo Selecionado' })} value={isDhcp ? 'DHCP' : t('network.manual', { defaultValue: 'Manual' })} />
@@ -573,7 +573,7 @@ export default function Network({ wizard, onChange, validation }) {
         {/* Advanced Settings (WAN) no modo contextual */}
         <div className="mb-8">
           <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 px-1">{t('network.wan_internet', { defaultValue: 'WAN / Internet' })}</h3>
-          <div className="bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-white/5 backdrop-blur-md dark:bg-white/5 border border-slate-200/50 dark:border-white/5 rounded-2xl shadow-sm overflow-hidden">
             <div className="p-5 flex flex-col gap-3">
               <div className="flex justify-between items-center text-sm">
                 <span className="font-medium text-slate-700 dark:text-slate-300">{t('network_page.status')}</span>
@@ -612,9 +612,9 @@ export default function Network({ wizard, onChange, validation }) {
                 {wanEnabled && (
                   <div className="pt-2">
                     <div className="inline-flex w-full bg-black/10 backdrop-blur-md dark:bg-bg-surface/50 p-1 rounded-lg border border-slate-200/50 dark:border-white/5 mb-4">
-                      <button type="button" className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${wizard.wanMode === 'dhcp' ? 'bg-white dark:bg-bg-elevated text-accent-blue shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`} onClick={() => onChange({ wanMode: 'dhcp' })} disabled={netApplyBusy}>{t('network.dhcp', { defaultValue: 'DHCP' })}</button>
-                      <button type="button" className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${wizard.wanMode === 'static' ? 'bg-white dark:bg-bg-elevated text-accent-blue shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`} onClick={() => onChange({ wanMode: 'static' })} disabled={netApplyBusy}>{t('network.static_ip', { defaultValue: 'IP Estático' })}</button>
-                      <button type="button" className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${wizard.wanMode === 'pppoe' ? 'bg-white dark:bg-bg-elevated text-accent-blue shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`} onClick={() => onChange({ wanMode: 'pppoe' })} disabled={netApplyBusy}>{t('network.pppoe', { defaultValue: 'PPPoE' })}</button>
+                      <button type="button" className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${wizard.wanMode === 'dhcp' ? 'bg-white dark:bg-white/5 backdrop-blur-md text-accent-blue shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`} onClick={() => onChange({ wanMode: 'dhcp' })} disabled={netApplyBusy}>{t('network.dhcp', { defaultValue: 'DHCP' })}</button>
+                      <button type="button" className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${wizard.wanMode === 'static' ? 'bg-white dark:bg-white/5 backdrop-blur-md text-accent-blue shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`} onClick={() => onChange({ wanMode: 'static' })} disabled={netApplyBusy}>{t('network.static_ip', { defaultValue: 'IP Estático' })}</button>
+                      <button type="button" className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${wizard.wanMode === 'pppoe' ? 'bg-white dark:bg-white/5 backdrop-blur-md text-accent-blue shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`} onClick={() => onChange({ wanMode: 'pppoe' })} disabled={netApplyBusy}>{t('network.pppoe', { defaultValue: 'PPPoE' })}</button>
                     </div>
 
                     {wizard.wanMode === 'static' && (
@@ -675,7 +675,7 @@ export default function Network({ wizard, onChange, validation }) {
         {/* Checklist e Avisos */}
         <div>
           <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 px-1">{t('network.advance_requirements', { defaultValue: 'Requisitos de Avanço' })}</h3>
-          <div className="bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-2xl p-5 shadow-sm">
+          <div className="bg-white/5 backdrop-blur-md dark:bg-white/5 border border-slate-200/50 dark:border-white/5 rounded-2xl p-5 shadow-sm">
             <ul className="space-y-3 text-sm">
               <li className="flex items-center gap-3">
                 <span className={`w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold ${wizard.netConnected || wizard.netOffline ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-black/10 backdrop-blur-md text-slate-500 dark:bg-white/10 dark:text-slate-500'}`}>✓</span>

@@ -44,7 +44,7 @@ export default function ErrorDiagnosisPanel({ errorPayload, onDismiss }) {
 
       <div className="p-6 space-y-4">
         {action && (
-          <div className="bg-bg-elevated rounded-lg p-4 border border-border">
+          <div className="bg-black/5 backdrop-blur-md rounded-lg p-4 border border-border">
             <h4 className="text-xs font-bold uppercase tracking-widest text-primary mb-1">{t('error_diagnosis.recommended_action', { defaultValue: 'Ação Recomendada' })}</h4>
             <p className="text-sm text-text">{action}</p>
           </div>

@@ -317,8 +317,14 @@ async fn main() {
         .route("/repos", get(auth::list_repos))
         .route("/clone", post(auth::clone_repo))
         // Install orchestration
-        .route("/api/source/github/prepare", post(source::prepare_github_source))
-        .route("/api/source/github/create-from-template", post(source::create_from_template))
+        .route(
+            "/api/source/github/prepare",
+            post(source::prepare_github_source),
+        )
+        .route(
+            "/api/source/github/create-from-template",
+            post(source::create_from_template),
+        )
         .route("/plan", post(plan))
         .route("/dry-run", post(dry_run))
         .route("/install", post(install))
@@ -918,6 +924,7 @@ fn validate_plan(plan: &InstallPlan) -> DryRunResult {
         let feature_id = format!("{}.{}", domain, name);
         // TODO: Futuramente consumir do docs/FEATURE_REGISTRY.md do core
         match feature_id.as_str() {
+            // ── Supported ─────────────────────────────────────────────
             "remote.openssh"
             | "network.openssh"
             | "system.impermanence"
@@ -931,12 +938,58 @@ fn validate_plan(plan: &InstallPlan) -> DryRunResult {
             | "gaming.gamemode"
             | "development.rust"
             | "development.docker"
-            | "observability.prometheus" => FeatureStatus::Supported,
+            | "observability.prometheus"
+            // Frontend catalog: desktop
+            | "desktop.audio"
+            | "desktop.bluetooth"
+            | "desktop.printing"
+            | "desktop.kde-shortcuts"
+            | "desktop.kvantum-theme"
+            | "desktop.lock-screen-theme"
+            // Frontend catalog: remote
+            | "remote.tailscale"
+            | "remote.vnc"
+            | "remote.web-installer"
+            // Frontend catalog: security
+            | "security.firewall"
+            | "security.qemu-guest"
+            // Frontend catalog: storage
+            | "storage.srv-data"
+            | "storage.ai-models"
+            // Frontend catalog: dev
+            | "dev.rust"
+            | "dev.python"
+            | "dev.nix"
+            | "dev.jupyter"
+            // Frontend catalog: editor
+            | "editor.vscode-insiders"
+            | "editor.antigravity"
+            // Frontend catalog: mcp
+            | "mcp.filesystem"
+            | "mcp.github"
+            | "mcp.neo4j"
+            | "mcp.ollama"
+            // Frontend catalog: observability
+            | "observability.grafana"
+            // Frontend catalog: shell/terminal/obsidian
+            | "shell.zsh"
+            | "terminal.warp"
+            | "obsidian.vault"
+            // Frontend catalog: virtualization
+            | "virtualization.podman"
+            // Frontend catalog: ai (non-partial, non-stub)
+            | "ai.claude"
+            | "ai.gemini"
+            | "ai.neo4j"
+            | "ai.kryonix-brain" => FeatureStatus::Supported,
 
-            "ai.local_llm" | "ai.ollama" | "virtualization.vms" => {
+            // ── PartialRequiresConfirmation ────────────────────────────
+            "ai.local_llm" | "ai.ollama" | "virtualization.vms"
+            | "virtualization.libvirt" => {
                 FeatureStatus::PartialRequiresConfirmation
             }
 
+            // ── BlockedStub ───────────────────────────────────────────
             "ai.lightrag"
             | "ai.open-webui"
             | "ai.openWebui"
@@ -945,6 +998,7 @@ fn validate_plan(plan: &InstallPlan) -> DryRunResult {
             | "ai.brain.client"
             | "ai.brain.server" => FeatureStatus::BlockedStub,
 
+            // ── BlockedLegacy ─────────────────────────────────────────
             "network.legacy_bridge" | "system.legacy_boot" | "remoteDesktop" => {
                 FeatureStatus::BlockedLegacy
             }
@@ -1457,8 +1511,8 @@ mod tests {
                 "authorized_keys": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI test-key"]
             },
             "features": {
-                "system": { "ai.ollama": true },
-                "remote": { "remote.openssh": true }
+                "ai": { "ollama": true },
+                "remote": { "openssh": true }
             },
             "target_remote_access": { "enabled": true },
             // camelCase: exatamente como a UI envia via buildKryonixInstallPlan
@@ -1488,7 +1542,7 @@ mod tests {
         assert_eq!(plan.network.prefix_length, 24);
         assert_eq!(plan.network.http_port, 8080);
         assert_eq!(
-            plan.features.get("system").and_then(|s| s.get("ai.ollama")),
+            plan.features.get("ai").and_then(|s| s.get("ollama")),
             Some(&serde_json::Value::Bool(true))
         );
     }

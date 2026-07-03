@@ -260,7 +260,7 @@ export default function Timezone({ wizard, onChange, validation }) {
                   className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
                     wizard.timeZone === tz
                       ? 'bg-accent-blue/10 border-accent-blue/30 text-accent-blue'
-                      : 'bg-white/50 border-slate-200/50 text-slate-600 hover:border-slate-300 dark:bg-white/5 dark:border-white/10 dark:text-slate-300 dark:hover:border-white/20'
+                      : 'bg-white/5 backdrop-blur-md border-slate-200/50 text-slate-600 hover:border-slate-300 dark:bg-white/5 dark:border-white/10 dark:text-slate-300 dark:hover:border-white/20'
                   }`}
                   onClick={() => applyLocation(tzLoc)}
                 >

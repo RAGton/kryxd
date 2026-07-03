@@ -154,7 +154,7 @@ export default function Welcome({ wizard, onChange }) {
             <div className="text-sm font-bold text-accent-blue mb-1">
               {t('welcome.infrastructureDetected')}
             </div>
-            <p className="text-sm text-slate-600 dark:text-text-secondary leading-relaxed" dangerouslySetInnerHTML={{ __html: t('welcome.infrastructureDetectedDesc', { hostname: `<span class="font-mono bg-white dark:bg-bg-elevated px-1.5 py-0.5 rounded text-xs border border-slate-200 dark:border-white/10">${detections[0].hostname}</span>` }) }} />
+            <p className="text-sm text-slate-600 dark:text-text-secondary leading-relaxed" dangerouslySetInnerHTML={{ __html: t('welcome.infrastructureDetectedDesc', { hostname: `<span class="font-mono bg-white dark:bg-white/5 backdrop-blur-md px-1.5 py-0.5 rounded text-xs border border-slate-200 dark:border-white/10">${detections[0].hostname}</span>` }) }} />
           </div>
         </div>
       )}
@@ -198,7 +198,7 @@ export default function Welcome({ wizard, onChange }) {
             </div>
             <button
               type="button"
-              className="btn-secondary whitespace-nowrap text-xs px-4 py-2 bg-white/30 dark:bg-white/10 hover:bg-white/50 dark:hover:bg-white/20 border border-white/40 dark:border-white/10 shadow-sm backdrop-blur-md transition-all text-slate-800 dark:text-slate-200"
+              className="btn-secondary whitespace-nowrap text-xs px-4 py-2 bg-white/30 dark:bg-white/10 hover:bg-white/5 backdrop-blur-md dark:hover:bg-white/20 border border-white/40 dark:border-white/10 shadow-sm backdrop-blur-md transition-all text-slate-800 dark:text-slate-200"
               onClick={applySuggestions}
               disabled={!selectedPreset}
             >

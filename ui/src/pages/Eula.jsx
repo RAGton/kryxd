@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 function HwCard({ icon, label, value, sub }) {
   return (
-    <div className="bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-xl p-3 flex flex-col gap-1 shadow-sm transition-all hover:bg-white/80 dark:hover:bg-bg-elevated/50">
+    <div className="bg-white/5 dark:bg-black/20 backdrop-blur-md border border-slate-200/50 dark:border-white/5 rounded-xl p-3 flex flex-col gap-1 shadow-sm transition-all hover:bg-white/10 dark:hover:bg-black/10">
       <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-text-muted">
         {icon} <span>{label}</span>
       </div>
@@ -104,7 +104,7 @@ export default function Eula({ uiState, onChange, validation }) {
           <HwCard icon="◇" label="GPU"   value={gpuVal}   sub={gpuSub} />
         </div>
 
-        <div className="bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-xl px-4 py-2 shadow-sm flex flex-col">
+        <div className="bg-white/5 dark:bg-black/20 backdrop-blur-md border border-slate-200/50 dark:border-white/5 rounded-xl px-4 py-2 shadow-sm flex flex-col">
           <StatusRow
             icon="⬛"
             label="Boot mode"
@@ -133,7 +133,7 @@ export default function Eula({ uiState, onChange, validation }) {
       </div>
 
       {/* ── Coluna direita: termos + aceite ── */}
-      <div className="flex-[1.5] flex flex-col min-w-0 bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-2xl p-6 shadow-sm relative overflow-hidden animate-fade-in-up">
+      <div className="flex-[1.5] flex flex-col min-w-0 bg-white/5 dark:bg-black/20 backdrop-blur-md border border-slate-200/50 dark:border-white/5 rounded-2xl p-6 shadow-sm relative overflow-hidden animate-fade-in-up">
 
         <div className="shrink-0 mb-6">
           <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-text-primary">{t('eula.termsTitle', { defaultValue: 'Termos de Operação' })}</h2>
@@ -168,8 +168,8 @@ export default function Eula({ uiState, onChange, validation }) {
         <div className="shrink-0 pt-6 border-t border-slate-200/50 dark:border-white/5 mt-auto">
           <label className={`flex items-start gap-4 px-5 py-4 rounded-2xl border cursor-pointer transition-colors ${
             uiState.eulaAccepted
-              ? 'bg-[rgba(24,38,63,0.98)] border-[rgba(59,130,246,0.55)] ring-1 ring-[rgba(59,130,246,0.18)] shadow-inner'
-              : 'bg-[rgba(21,32,52,0.92)] border-[rgba(59,130,246,0.22)] hover:bg-[rgba(28,41,67,0.96)]'
+              ? 'bg-accent-blue/10 backdrop-blur-md border-[rgba(59,130,246,0.55)] ring-1 ring-[rgba(59,130,246,0.18)] shadow-inner'
+              : 'bg-black/10 backdrop-blur-md border-[rgba(59,130,246,0.22)] hover:bg-white/5'
           }`}>
             <input
               type="checkbox"

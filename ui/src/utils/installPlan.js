@@ -192,11 +192,15 @@ export function buildInstallPlanPayload(draftInput) {
   for (const featId of selectedFeatures) {
     const feat = FEATURE_CATALOG.find(f => f.id === featId);
     if (feat) {
-      if (features[feat.level]) {
-        features[feat.level][featId] = true;
-      }
+      // Backend constructs feature_id = "{domain}.{key}" via classify_feature.
+      // The key must be the SHORT name (part after the domain dot), not the full ID.
+      // Features are stored ONLY under their domain bucket — not also under level —
+      // to avoid the backend iterating the same feature twice with conflicting domains
+      // (e.g. "system.ollama" → Unknown vs "ai.ollama" → Partial).
+      const dotIdx = featId.indexOf('.');
+      const shortKey = dotIdx >= 0 ? featId.slice(dotIdx + 1) : featId;
       if (features[feat.domain]) {
-        features[feat.domain][featId] = true;
+        features[feat.domain][shortKey] = true;
       }
     }
   }
@@ -206,12 +210,12 @@ export function buildInstallPlanPayload(draftInput) {
   // storage.srv-data explicito, e perfis ai-local/full.
   // Profile "server" exige selecao manual de storage.srv-data (nao auto-ativa).
   const enableSrvData =
-    features.system['storage.srv-data'] === true ||
-    features.system['ai.ollama'] === true ||
-    features.system['ai.kryonix-brain'] === true ||
-    features.system['ai.neo4j'] === true ||
-    features.system['ai.lightrag'] === true ||
-    features.system['ai.open-webui'] === true ||
+    features.storage['srv-data'] === true ||
+    features.ai['ollama'] === true ||
+    features.ai['kryonix-brain'] === true ||
+    features.ai['neo4j'] === true ||
+    features.ai['lightrag'] === true ||
+    features.ai['open-webui'] === true ||
     draft.profileId === 'ai-local' ||
     draft.profileId === 'server-ai' ||
     draft.profileId === 'full';
@@ -262,7 +266,7 @@ export function buildInstallPlanPayload(draftInput) {
       target: selectedDisks[0] || '',
       enableSrvData,
       srvDataMode: enableSrvData ? 'btrfs-subvolume' : 'disabled',
-      enableAiModels: features.system['storage.ai-models'] === true,
+      enableAiModels: features.storage['ai-models'] === true,
     },
     security: {
       allowWeakPassword: Boolean(draft.allowWeakPassword),

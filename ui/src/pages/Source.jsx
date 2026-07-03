@@ -123,7 +123,7 @@ export default function Source({ wizard, uiState, onChange }) {
           className={`p-6 rounded-2xl border-2 transition-all backdrop-blur-sm ${
             wizard.sourceKind === 'offline-defaults'
               ? 'border-accent-blue bg-accent-blue/10 dark:bg-accent-blue/20 shadow-lg shadow-accent-blue/10'
-              : 'border-slate-200 dark:border-white/5 bg-white/40 dark:bg-bg-elevated/20 hover:border-slate-300 dark:hover:border-white/20'
+              : 'border-slate-200 dark:border-white/5 bg-white/5 backdrop-blur-md dark:bg-white/5 hover:border-slate-300 dark:hover:border-white/20'
           }`}
           onClick={() => onChange({ sourceKind: 'offline-defaults' })}
         >
@@ -141,7 +141,7 @@ export default function Source({ wizard, uiState, onChange }) {
           className={`p-6 rounded-2xl border-2 transition-all backdrop-blur-sm ${
             wizard.sourceKind === 'github-user-repo'
               ? 'border-accent-blue bg-accent-blue/10 dark:bg-accent-blue/20 shadow-lg shadow-accent-blue/10'
-              : 'border-slate-200 dark:border-white/5 bg-white/40 dark:bg-bg-elevated/20 hover:border-slate-300 dark:hover:border-white/20'
+              : 'border-slate-200 dark:border-white/5 bg-white/5 backdrop-blur-md dark:bg-white/5 hover:border-slate-300 dark:hover:border-white/20'
           }`}
           onClick={() => {
             if (wizard.sourceKind !== 'github-user-repo') {
@@ -168,7 +168,7 @@ export default function Source({ wizard, uiState, onChange }) {
                 placeholder={t('source.userRepo.placeholder')}
                 value={wizard.sourceRepoUrl}
                 onChange={e => onChange({ sourceRepoUrl: e.target.value, sourceValidated: false, githubSourceStatus: null })}
-                className="w-full bg-white dark:bg-bg-elevated border border-slate-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-accent-blue transition-colors"
+                className="w-full bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-accent-blue transition-colors"
                 disabled={uiState.githubSourceStatus === 'cloning'}
               />
               <div className="flex gap-2">
@@ -177,7 +177,7 @@ export default function Source({ wizard, uiState, onChange }) {
                   placeholder={t('source.userRepo.branch')}
                   value={wizard.sourceBranch}
                   onChange={e => onChange({ sourceBranch: e.target.value, sourceValidated: false, githubSourceStatus: null })}
-                  className="w-1/3 bg-white dark:bg-bg-elevated border border-slate-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-accent-blue transition-colors"
+                  className="w-1/3 bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-accent-blue transition-colors"
                   disabled={uiState.githubSourceStatus === 'cloning'}
                 />
                 <button 
@@ -198,7 +198,7 @@ export default function Source({ wizard, uiState, onChange }) {
           className={`p-6 rounded-2xl border-2 transition-all backdrop-blur-sm ${
             wizard.sourceKind === 'github-create-from-template'
               ? 'border-accent-blue bg-accent-blue/10 dark:bg-accent-blue/20 shadow-lg shadow-accent-blue/10'
-              : 'border-slate-200 dark:border-white/5 bg-white/40 dark:bg-bg-elevated/20 hover:border-slate-300 dark:hover:border-white/20'
+              : 'border-slate-200 dark:border-white/5 bg-white/5 backdrop-blur-md dark:bg-white/5 hover:border-slate-300 dark:hover:border-white/20'
           }`}
           onClick={() => {
             if (wizard.sourceKind !== 'github-create-from-template') {
@@ -247,7 +247,7 @@ export default function Source({ wizard, uiState, onChange }) {
                     placeholder={t('source.createRepo.repoName')}
                     value={wizard.createRepoName}
                     onChange={e => onChange({ createRepoName: e.target.value, sourceValidated: false, githubSourceStatus: null })}
-                    className="w-full bg-white dark:bg-bg-elevated border border-slate-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-accent-blue transition-colors"
+                    className="w-full bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-accent-blue transition-colors"
                     disabled={uiState.githubSourceStatus === 'creating_repo' || uiState.githubSourceStatus === 'cloning'}
                   />
                   <div className="flex gap-4 items-center">
@@ -281,7 +281,7 @@ export default function Source({ wizard, uiState, onChange }) {
           className={`p-6 rounded-2xl border-2 transition-all backdrop-blur-sm ${
             wizard.sourceKind === 'template'
               ? 'border-slate-500 bg-black/5 backdrop-blur-md0/10 dark:bg-black/5 backdrop-blur-md0/20 shadow-lg'
-              : 'border-slate-200 dark:border-white/5 bg-white/40 dark:bg-bg-elevated/20 hover:border-slate-300 dark:hover:border-white/20'
+              : 'border-slate-200 dark:border-white/5 bg-white/5 backdrop-blur-md dark:bg-white/5 hover:border-slate-300 dark:hover:border-white/20'
           }`}
           onClick={() => onChange({ sourceKind: 'template' })}
         >
@@ -291,7 +291,7 @@ export default function Source({ wizard, uiState, onChange }) {
           <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">
             {t('source.template.description')}
           </p>
-          <div className="text-xs font-mono bg-black/5 backdrop-blur-md dark:bg-bg-elevated/50 p-2 rounded text-slate-500 border border-slate-200 dark:border-white/5 truncate">
+          <div className="text-xs font-mono bg-black/5 backdrop-blur-md dark:bg-white/5 p-2 rounded text-slate-500 border border-slate-200 dark:border-white/5 truncate">
             {wizard.templateRepoUrl}
           </div>
         </button>
@@ -299,7 +299,7 @@ export default function Source({ wizard, uiState, onChange }) {
 
       {/* GitHub Source Status Panel for User Repo */}
       {wizard.sourceKind === 'github-user-repo' && uiState.githubSourceStatus && (
-        <div className="w-full max-w-2xl mx-auto bg-white/60 dark:bg-bg-elevated/40 border border-slate-200/50 dark:border-white/10 rounded-2xl p-6 shadow-sm text-left mb-8">
+        <div className="w-full max-w-2xl mx-auto bg-white/10 backdrop-blur-md dark:bg-white/5 border border-slate-200/50 dark:border-white/10 rounded-2xl p-6 shadow-sm text-left mb-8">
           <h4 className="text-sm font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-6">
             {t('source.timelineTitle')}
           </h4>
@@ -339,7 +339,7 @@ export default function Source({ wizard, uiState, onChange }) {
 
       {/* GitHub Source Status Panel for Create Repo */}
       {wizard.sourceKind === 'github-create-from-template' && (uiState.githubSourceStatus || wizard.githubAuthStatus === 'error') && (
-        <div className="w-full max-w-2xl mx-auto bg-white/60 dark:bg-bg-elevated/40 border border-slate-200/50 dark:border-white/10 rounded-2xl p-6 shadow-sm text-left mb-8">
+        <div className="w-full max-w-2xl mx-auto bg-white/10 backdrop-blur-md dark:bg-white/5 border border-slate-200/50 dark:border-white/10 rounded-2xl p-6 shadow-sm text-left mb-8">
           <h4 className="text-sm font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-6">
             {t('source.timelineTitle')}
           </h4>

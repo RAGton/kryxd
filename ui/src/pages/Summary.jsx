@@ -175,7 +175,7 @@ export default function Summary({ wizard, uiState, onChange, validation }) {
 
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-xl p-4 shadow-sm transition-all hover:bg-white/80 dark:hover:bg-bg-elevated/50">
+          <div className="bg-white/5 backdrop-blur-md dark:bg-white/5 border border-slate-200/50 dark:border-white/5 rounded-xl p-4 shadow-sm transition-all hover:bg-white/80 dark:hover:bg-black/5 backdrop-blur-md/50">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-text-muted">{t('summary.install_host', { defaultValue: 'Instalação & Host' })}</div>
             <div className="mt-2 text-sm font-semibold text-slate-900 dark:text-text-primary">{t('summary.hostname', { defaultValue: 'Hostname:' })} {wizard.hostName || t('summary.pending', { defaultValue: 'pendente' })}</div>
             <div className="mt-1 text-[13px] text-slate-600 dark:text-text-secondary">{t('summary.source', { defaultValue: 'Fonte:' })} {formatSourceKind(wizard.sourceKind)}</div>
@@ -184,13 +184,13 @@ export default function Summary({ wizard, uiState, onChange, validation }) {
               {t('summary.profile', { defaultValue: 'Perfil:' })} {profileObj ? profileObj.name : t('summary.none', { defaultValue: 'Nenhum' })}
             </div>
           </div>
-          <div className="bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-xl p-4 shadow-sm transition-all hover:bg-white/80 dark:hover:bg-bg-elevated/50">
+          <div className="bg-white/5 backdrop-blur-md dark:bg-white/5 border border-slate-200/50 dark:border-white/5 rounded-xl p-4 shadow-sm transition-all hover:bg-white/80 dark:hover:bg-black/5 backdrop-blur-md/50">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-text-muted">{t('summary.network')}</div>
             <div className="mt-2 text-sm font-semibold text-slate-900 dark:text-text-primary">{t('summary.wan', { defaultValue: 'WAN:' })} {wizard.wanInterface ? `${wizard.wanInterface} • ${t('summary.mode', { defaultValue: 'modo' })} ${wizard.wanMode}` : t('summary.optional_disabled', { defaultValue: 'opcional / desabilitada' })}</div>
             <div className="mt-1 text-[13px] text-slate-600 dark:text-text-secondary">{t('summary.lan_pxe', { defaultValue: 'LAN/PXE:' })} {wizard.mgmtInterface || t('summary.no_interface', { defaultValue: 'sem interface' })}</div>
             <div className="mt-1 text-[13px] text-slate-500 dark:text-text-muted">{networkSummary}</div>
           </div>
-          <div className="bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-xl p-4 shadow-sm transition-all hover:bg-white/80 dark:hover:bg-bg-elevated/50">
+          <div className="bg-white/5 backdrop-blur-md dark:bg-white/5 border border-slate-200/50 dark:border-white/5 rounded-xl p-4 shadow-sm transition-all hover:bg-white/80 dark:hover:bg-black/5 backdrop-blur-md/50">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-text-muted">{t('summary.disks', { defaultValue: 'Discos' })}</div>
             <div className="mt-2 text-sm font-semibold text-slate-900 dark:text-text-primary">{t('summary.layout', { defaultValue: 'Layout:' })} {layoutLabel}</div>
             <div className="mt-1 text-[13px] text-slate-600 dark:text-text-secondary">{t('summary.system', { defaultValue: 'Sistema:' })} {wizard.sysDisk || '—'}</div>
@@ -202,7 +202,7 @@ export default function Summary({ wizard, uiState, onChange, validation }) {
                   : t('summary.internal_subvol', { defaultValue: 'Dados: subvol interno no mesmo BTRFS (sem disco dedicado)' })}
             </div>
           </div>
-          <div className="bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-xl p-4 shadow-sm transition-all hover:bg-white/80 dark:hover:bg-bg-elevated/50">
+          <div className="bg-white/5 backdrop-blur-md dark:bg-white/5 border border-slate-200/50 dark:border-white/5 rounded-xl p-4 shadow-sm transition-all hover:bg-white/80 dark:hover:bg-black/5 backdrop-blur-md/50">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-text-muted">{t('summary.admin', { defaultValue: 'Admin' })}</div>
             <div className="mt-2 text-sm font-semibold text-slate-900 dark:text-text-primary">{wizard.adminFullName || wizard.adminUser} ({wizard.adminUser})</div>
             <div className="mt-1 text-[13px] text-slate-600 dark:text-text-secondary">{wizard.adminEmail}</div>
@@ -225,7 +225,7 @@ export default function Summary({ wizard, uiState, onChange, validation }) {
 
         {/* Features separadas */}
         {systemFeatures.length > 0 && (
-          <div className="mt-4 bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-xl p-4 shadow-sm">
+          <div className="mt-4 bg-white/5 backdrop-blur-md dark:bg-white/5 border border-slate-200/50 dark:border-white/5 rounded-xl p-4 shadow-sm">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-text-muted">{t('summary.system_features', { defaultValue: 'Features de Sistema' })}</div>
             <div className="mt-2 flex flex-wrap gap-2">
               {systemFeatures.map(f => (
@@ -237,7 +237,7 @@ export default function Summary({ wizard, uiState, onChange, validation }) {
           </div>
         )}
         {homeFeatures.length > 0 && (
-          <div className="mt-4 bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-xl p-4 shadow-sm">
+          <div className="mt-4 bg-white/5 backdrop-blur-md dark:bg-white/5 border border-slate-200/50 dark:border-white/5 rounded-xl p-4 shadow-sm">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-text-muted">{t('summary.home_features', { defaultValue: 'Features Home Manager' })}</div>
             <div className="mt-2 flex flex-wrap gap-2">
               {homeFeatures.map(f => (
@@ -255,7 +255,7 @@ export default function Summary({ wizard, uiState, onChange, validation }) {
         </div>
       </section>
 
-      <section className="flex flex-col min-h-0 bg-white/50 dark:bg-bg-elevated/30 border border-slate-200/50 dark:border-white/5 rounded-2xl shadow-sm p-6 overflow-y-auto custom-scrollbar">
+      <section className="flex flex-col min-h-0 bg-white/5 backdrop-blur-md dark:bg-white/5 border border-slate-200/50 dark:border-white/5 rounded-2xl shadow-sm p-6 overflow-y-auto custom-scrollbar">
         <div>
           <div className="rounded-xl border border-slate-200/50 dark:border-white/10 bg-black/5 backdrop-blur-md dark:bg-white/5 backdrop-blur-md p-4">
             <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-text-muted">{t('summary.checklist', { defaultValue: 'Checklist crítico' })}</div>

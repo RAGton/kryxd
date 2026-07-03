@@ -14,7 +14,7 @@ export default function AdvancedLogsDrawer({ logs, autoScroll = true, className 
     <div className={`bg-bg-glass backdrop-blur-xl border border-border rounded-xl shadow-glass flex flex-col overflow-hidden transition-all duration-300 ${expanded ? 'h-96' : 'h-14'} ${className}`}>
       <button 
         onClick={() => setExpanded(!expanded)}
-        className="h-14 px-6 flex items-center justify-between w-full hover:bg-bg-elevated/50 transition-colors"
+        className="h-14 px-6 flex items-center justify-between w-full hover:bg-black/5 backdrop-blur-md/50 transition-colors"
       >
         <div className="flex items-center gap-3">
           <svg className={`w-5 h-5 text-primary transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">

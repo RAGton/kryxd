@@ -532,9 +532,9 @@ test('contract: buildInstallPlanPayload preserva fields de contract e exclui sen
 
   const plan = buildInstallPlanPayload(draft);
 
-  // Features agrupadas e preservadas
-  assert.ok(plan.features.system['ai.ollama'], 'Feature de IA deve estar presente');
-  assert.ok(plan.features.remote['remote.openssh'], 'Feature de openssh deve estar presente');
+  // Features agrupadas sob domain com short keys (backend espera domain.shortKey)
+  assert.ok(plan.features.ai['ollama'], 'Feature de IA deve estar presente sob domain ai');
+  assert.ok(plan.features.remote['openssh'], 'Feature de openssh deve estar presente sob domain remote');
 
   // authorizedKeys processado e preservado
   assert.equal(plan.admin.authorizedKeys.length, 2, 'Deve ter processado 2 chaves SSH');

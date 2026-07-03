@@ -59,7 +59,7 @@ export default function KxCombobox({
             ? 'cursor-not-allowed border-slate-200/50 bg-white/20 text-slate-400 opacity-60 dark:border-white/5 dark:bg-white/[0.02] dark:text-slate-500'
             : isOpen
               ? 'border-accent-blue/40 bg-accent-blue/10 text-slate-900 dark:text-white shadow-sm ring-1 ring-accent-blue/20'
-              : 'border-white/40 bg-white/30 text-slate-800 hover:border-white/60 hover:bg-white/40 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-white/20 dark:hover:bg-white/10 shadow-sm'
+              : 'border-white/40 bg-white/30 text-slate-800 hover:border-white/60 hover:bg-white/5 backdrop-blur-md dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-white/20 dark:hover:bg-white/10 shadow-sm'
         }`}
       >
         <span className="truncate">
@@ -81,7 +81,7 @@ export default function KxCombobox({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={searchPlaceholder}
-              className="w-full rounded-xl bg-white/50 px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-accent-blue/50 dark:bg-black/20 dark:text-slate-200 dark:placeholder-slate-500 border border-transparent focus:border-accent-blue/30 transition-all"
+              className="w-full rounded-xl bg-white/5 backdrop-blur-md px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-accent-blue/50 dark:bg-black/20 dark:text-slate-200 dark:placeholder-slate-500 border border-transparent focus:border-accent-blue/30 transition-all"
             />
           </div>
 

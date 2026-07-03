@@ -3,9 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 use crate::AppState;
-use std::sync::Arc;
 use axum::extract::State;
-
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub struct PrepareSourceRequest {
@@ -39,14 +38,18 @@ pub struct SourceInfo {
     pub validated: bool,
 }
 
-pub async fn prepare_github_source(
-    Json(req): Json<PrepareSourceRequest>,
-) -> impl IntoResponse {
+pub async fn prepare_github_source(Json(req): Json<PrepareSourceRequest>) -> impl IntoResponse {
     // 1. Security Check: Validate Github URL and branch to prevent shell injection
-    let is_safe_repo = req.repo.starts_with("https://github.com/") 
-        && req.repo.chars().all(|c| c.is_ascii_alphanumeric() || c == '/' || c == '-' || c == '_' || c == '.');
+    let is_safe_repo = req.repo.starts_with("https://github.com/")
+        && req
+            .repo
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '/' || c == '-' || c == '_' || c == '.');
     let is_safe_branch = !req.branch.is_empty()
-        && req.branch.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.');
+        && req
+            .branch
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.');
 
     if !is_safe_repo || !is_safe_branch {
         return (
@@ -75,23 +78,25 @@ pub async fn prepare_github_source(
 
     // Ensure parent directories exist
     if let Some(parent) = path.parent()
-        && let Err(e) = tokio::fs::create_dir_all(parent).await {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(PrepareSourceResponse {
-                    ok: false,
-                    source: None,
-                    code: Some("SOURCE_GITHUB_FS_ERROR".into()),
-                    message: Some("Não foi possível criar o diretório temporário.".into()),
-                    details: Some(serde_json::json!({
-                        "path": parent.to_string_lossy(),
-                        "error": e.to_string(),
-                        "stage": "fs_prepare"
-                    })),
-                    recoverable: Some(true),
-                })
-            ).into_response();
-        }
+        && let Err(e) = tokio::fs::create_dir_all(parent).await
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(PrepareSourceResponse {
+                ok: false,
+                source: None,
+                code: Some("SOURCE_GITHUB_FS_ERROR".into()),
+                message: Some("Não foi possível criar o diretório temporário.".into()),
+                details: Some(serde_json::json!({
+                    "path": parent.to_string_lossy(),
+                    "error": e.to_string(),
+                    "stage": "fs_prepare"
+                })),
+                recoverable: Some(true),
+            }),
+        )
+            .into_response();
+    }
 
     // 3. Git Clone (Safe, without shell interpolation)
     let output = match tokio::process::Command::new("git")
@@ -120,8 +125,9 @@ pub async fn prepare_github_source(
                         "stage": "git_clone_spawn"
                     })),
                     recoverable: Some(true),
-                })
-            ).into_response();
+                }),
+            )
+                .into_response();
         }
     };
 
@@ -139,8 +145,9 @@ pub async fn prepare_github_source(
                     "stage": "git_clone"
                 })),
                 recoverable: Some(true),
-            })
-        ).into_response();
+            }),
+        )
+            .into_response();
     }
 
     // 4. Validate flake.nix
@@ -158,8 +165,9 @@ pub async fn prepare_github_source(
                     "stage": "flake_check"
                 })),
                 recoverable: Some(true),
-            })
-        ).into_response();
+            }),
+        )
+            .into_response();
     }
 
     // Success response
@@ -179,8 +187,9 @@ pub async fn prepare_github_source(
             message: None,
             details: None,
             recoverable: None,
-        })
-    ).into_response()
+        }),
+    )
+        .into_response()
 }
 
 #[derive(Deserialize)]
@@ -227,7 +236,10 @@ pub async fn create_from_template(
     };
 
     // 1. Validate templateRepo URL and extract owner/repo
-    let template_url = req.template_repo.strip_suffix(".git").unwrap_or(&req.template_repo);
+    let template_url = req
+        .template_repo
+        .strip_suffix(".git")
+        .unwrap_or(&req.template_repo);
     let template_path = match template_url.strip_prefix("https://github.com/") {
         Some(p) => p,
         None => {
@@ -262,7 +274,10 @@ pub async fn create_from_template(
 
     // 2. Validate repo_name
     let is_safe_repo_name = !req.repo_name.is_empty()
-        && req.repo_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.');
+        && req
+            .repo_name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.');
     if !is_safe_repo_name {
         return (
             StatusCode::BAD_REQUEST,
@@ -277,8 +292,11 @@ pub async fn create_from_template(
     }
 
     // 3. Call GitHub API to generate from template
-    let generate_url = format!("https://api.github.com/repos/{}/{}/generate", template_owner, template_repo_name);
-    
+    let generate_url = format!(
+        "https://api.github.com/repos/{}/{}/generate",
+        template_owner, template_repo_name
+    );
+
     let resp = match state
         .http_client
         .post(&generate_url)
@@ -354,7 +372,7 @@ pub async fn create_from_template(
 
     // GitHub repo generation is asynchronous sometimes, but the clone URL is returned immediately.
     // We may need to retry cloning if it's not immediately available, but for now we attempt to clone.
-    
+
     // 5. Clone the new repository
     let clone_path = "/run/kryonix-installer/sources/kryonixos";
     let path = Path::new(clone_path);
@@ -388,7 +406,7 @@ pub async fn create_from_template(
             .env("HOME", "/nonexistent")
             .output()
             .await;
-            
+
         if let Ok(out) = output {
             if out.status.success() {
                 clone_success = true;
@@ -446,6 +464,7 @@ pub async fn create_from_template(
             })),
             error: None,
             details: None,
-        })
-    ).into_response()
+        }),
+    )
+        .into_response()
 }
