@@ -1,772 +1,183 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Kryonix Install Plan",
+  "$id": "https://kryonix.org/schemas/install-plan-v2.schema.json",
+  "title": "Kryonix Install Plan v2",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "version",
-    "source",
-    "profile",
-    "features",
+    "isThinkServer",
+    "repository",
     "storage",
-    "security",
-    "targetRemoteAccess",
-    "disk",
-    "network",
-    "locale",
-    "admin"
+    "features"
   ],
   "properties": {
     "version": {
       "type": "integer",
-      "const": 1
+      "const": 2
     },
-    "source": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "kind"
-      ],
-      "properties": {
-        "kind": {
-          "type": "string",
-          "enum": [
-            "offline-defaults",
-            "github-user-repo",
-            "github-create-from-template",
-            "template"
-          ]
-        },
-        "repo": {
-          "type": "string"
-        },
-        "branch": {
-          "type": "string"
-        },
-        "clonePath": {
-          "type": "string"
-        },
-        "targetPath": {
-          "type": "string"
-        },
-        "validated": {
-          "type": "boolean"
-        },
-        "templateRepo": {
-          "type": "string"
-        },
-        "created": {
-          "type": "boolean"
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "kind": {
-                "const": "offline-defaults"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "kind",
-              "validated"
-            ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "kind": {
-                "const": "github-user-repo"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "kind",
-              "repo",
-              "branch",
-              "clonePath",
-              "targetPath",
-              "validated"
-            ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "kind": {
-                "const": "github-create-from-template"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "kind",
-              "templateRepo",
-              "repo",
-              "branch",
-              "clonePath",
-              "targetPath",
-              "validated",
-              "created"
-            ]
-          }
-        }
-      ]
+    "isThinkServer": {
+      "type": "boolean"
     },
-    "profile": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "name",
-        "mode"
-      ],
-      "properties": {
-        "id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "name": {
-          "type": "string",
-          "minLength": 1
-        },
-        "mode": {
-          "type": "string",
-          "enum": [
-            "desktop",
-            "server"
-          ]
-        }
-      }
-    },
-    "features": {
-      "type": "object"
-    },
-    "confirmedFeatures": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
+    "repository": {
+      "$ref": "#/$defs/repositoryPlan"
     },
     "storage": {
+      "$ref": "#/$defs/storagePlan"
+    },
+    "features": {
+      "$ref": "#/$defs/features"
+    }
+  },
+  "$defs": {
+    "repositoryPlan": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "enableSrvData",
-        "srvDataMode"
+        "coreUrl",
+        "upstreamUrl",
+        "downstreamUrl",
+        "branch"
       ],
       "properties": {
-        "layout": {
-          "type": "string"
+        "coreUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://",
+          "minLength": 9
         },
-        "target": {
-          "type": "string"
+        "upstreamUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://",
+          "minLength": 9
         },
-        "enableSrvData": {
-          "type": "boolean"
+        "downstreamUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://",
+          "minLength": 9
         },
-        "srvDataMode": {
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "mountPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "filesystem",
+        "encryption"
+      ],
+      "properties": {
+        "filesystem": {
           "type": "string",
           "enum": [
-            "disabled",
-            "btrfs-subvolume"
+            "btrfs",
+            "zfs",
+            "ext4",
+            "xfs"
           ]
         },
-        "enableAiModels": {
-          "type": "boolean"
-        }
-      }
-    },
-    "security": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "allowWeakPassword"
-      ],
-      "properties": {
-        "allowWeakPassword": {
-          "type": "boolean"
-        }
-      }
-    },
-    "targetRemoteAccess": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "enabled"
-      ],
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "port": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 65535
-        }
-      }
-    },
-    "disk": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "mode",
-        "profile",
-        "sysDisk"
-      ],
-      "properties": {
-        "mode": {
+        "encryption": {
           "type": "string",
           "enum": [
-            "one",
-            "two"
+            "none",
+            "luks2"
           ]
-        },
-        "profile": {
+        }
+      }
+    },
+    "storagePlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topology",
+        "systemDisks",
+        "dataDisks",
+        "manualPartitions"
+      ],
+      "properties": {
+        "topology": {
           "type": "string",
           "enum": [
             "single",
+            "split",
             "raid",
-            "manual",
-            "lvm"
+            "manual"
           ]
         },
-        "selectedDisks": {
+        "systemDisks": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^/dev/.+"
           },
-          "uniqueItems": true,
-          "minItems": 0
+          "uniqueItems": true
         },
-        "raidLevel": {
-          "type": "string",
-          "enum": [
-            "raid0",
-            "raid1",
-            "raid5",
-            "raid10"
+        "dataDisks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^/dev/.+"
+          },
+          "uniqueItems": true
+        },
+        "root": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/mountPlan"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
-        "luksEnabled": {
-          "type": "boolean"
+        "data": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/mountPlan"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
-        "sysDisk": {
-          "type": "string",
-          "pattern": "^/dev/.+"
-        },
-        "dataDisk": {
+        "raidLevel": {
           "type": [
             "string",
             "null"
-          ],
-          "pattern": "^/dev/.+"
-        },
-        "rootFs": {
-          "type": "string",
-          "enum": [
-            "btrfs",
-            "ext4",
-            "xfs"
-          ]
-        },
-        "dataFs": {
-          "type": "string",
-          "enum": [
-            "btrfs",
-            "ext4",
-            "xfs"
           ]
         },
         "manualPartitions": {
           "type": "array",
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "device",
-              "fstype",
-              "sizeBytes",
-              "sizeInput",
-              "usage",
-              "format"
-            ],
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "device": {
-                "type": "string",
-                "pattern": "^/dev/(sd[a-z]|vd[a-z]|nvme[0-9]+n[0-9]+)$"
-              },
-              "sizeBytes": {
-                "type": "number",
-                "minimum": 0
-              },
-              "sizeInput": {
-                "type": "string"
-              },
-              "usage": {
-                "enum": [
-                  "efi",
-                  "root",
-                  "home",
-                  "swap",
-                  "data",
-                  "custom"
-                ]
-              },
-              "fstype": {
-                "enum": [
-                  "fat32",
-                  "btrfs",
-                  "ext4",
-                  "xfs",
-                  "swap",
-                  "vfat"
-                ]
-              },
-              "mountpoint": {
-                "type": "string"
-              },
-              "label": {
-                "type": "string"
-              },
-              "partLabel": {
-                "type": "string"
-              },
-              "flags": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "size": {
-                "type": "string"
-              },
-              "format": {
-                "type": "boolean"
-              }
-            }
-          }
-        }
-      }
-    },
-    "network": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "hostname",
-        "interface",
-        "serverIp",
-        "prefixLength",
-        "gateway",
-        "dns",
-        "httpPort",
-        "wan"
-      ],
-      "properties": {
-        "hostname": {
-          "type": "string",
-          "minLength": 1
-        },
-        "interface": {
-          "type": "string",
-          "minLength": 1
-        },
-        "serverIp": {
-          "type": "string",
-          "format": "ipv4"
-        },
-        "prefixLength": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 32
-        },
-        "gateway": {
-          "type": "string",
-          "format": "ipv4"
-        },
-        "dns": {
-          "type": "array",
-          "items": {
             "type": "string",
-            "format": "ipv4"
+            "minLength": 1
           },
-          "minItems": 1,
-          "uniqueItems": true
-        },
-        "httpPort": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 65535
-        },
-        "mode": {
-          "type": "string",
-          "enum": [
-            "dhcp",
-            "static"
-          ]
-        },
-        "wan": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "interface",
-            "mode"
-          ],
-          "properties": {
-            "interface": {
-              "type": "string"
-            },
-            "mode": {
-              "type": "string",
-              "enum": [
-                "dhcp",
-                "static",
-                "pppoe"
-              ]
-            },
-            "address": {
-              "type": "string",
-              "format": "ipv4"
-            },
-            "prefixLength": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 32
-            },
-            "gateway": {
-              "type": "string",
-              "format": "ipv4"
-            },
-            "dns": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "format": "ipv4"
-              },
-              "minItems": 0,
-              "uniqueItems": true
-            },
-            "pppoeUser": {
-              "type": "string"
-            }
-          },
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "mode": {
-                    "const": "static"
-                  }
-                },
-                "required": [
-                  "mode"
-                ]
-              },
-              "then": {
-                "required": [
-                  "address",
-                  "prefixLength",
-                  "gateway",
-                  "dns"
-                ],
-                "properties": {
-                  "dns": {
-                    "minItems": 1
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "mode": {
-                    "const": "pppoe"
-                  }
-                },
-                "required": [
-                  "mode"
-                ]
-              },
-              "then": {
-                "required": [
-                  "pppoeUser"
-                ]
-              }
-            }
-          ]
-        }
-      }
-    },
-    "locale": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "country",
-        "timezone",
-        "locale",
-        "keymap"
-      ],
-      "properties": {
-        "country": {
-          "type": "string",
-          "pattern": "^[A-Z]{2}$"
-        },
-        "timezone": {
-          "type": "string",
-          "minLength": 1
-        },
-        "locale": {
-          "type": "string",
-          "minLength": 1
-        },
-        "keymap": {
-          "type": "string",
-          "minLength": 1
-        }
-      }
-    },
-    "admin": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "user",
-        "uid",
-        "email"
-      ],
-      "properties": {
-        "user": {
-          "type": "string",
-          "minLength": 1
-        },
-        "uid": {
-          "type": "integer",
-          "minimum": 1000
-        },
-        "email": {
-          "type": "string",
-          "format": "email"
-        },
-        "fullName": {
-          "type": "string"
-        },
-        "authorizedKeys": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "minItems": 0,
           "uniqueItems": true
         }
       }
-    }
-  },
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "disk": {
-            "properties": {
-              "profile": {
-                "const": "raid"
-              }
-            },
-            "required": [
-              "profile"
-            ]
-          }
-        },
-        "required": [
-          "disk"
-        ]
-      },
-      "then": {
-        "properties": {
-          "disk": {
-            "required": [
-              "selectedDisks",
-              "raidLevel",
-              "rootFs",
-              "dataFs"
-            ],
-            "properties": {
-              "rootFs": {
-                "const": "btrfs"
-              },
-              "dataFs": {
-                "const": "btrfs"
-              }
-            },
-            "allOf": [
-              {
-                "if": {
-                  "properties": {
-                    "raidLevel": {
-                      "const": "raid0"
-                    }
-                  },
-                  "required": [
-                    "raidLevel"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "selectedDisks": {
-                      "minItems": 2
-                    }
-                  }
-                }
-              },
-              {
-                "if": {
-                  "properties": {
-                    "raidLevel": {
-                      "const": "raid1"
-                    }
-                  },
-                  "required": [
-                    "raidLevel"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "selectedDisks": {
-                      "minItems": 2
-                    }
-                  }
-                }
-              },
-              {
-                "if": {
-                  "properties": {
-                    "raidLevel": {
-                      "const": "raid5"
-                    }
-                  },
-                  "required": [
-                    "raidLevel"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "selectedDisks": {
-                      "minItems": 3
-                    }
-                  }
-                }
-              },
-              {
-                "if": {
-                  "properties": {
-                    "raidLevel": {
-                      "const": "raid10"
-                    }
-                  },
-                  "required": [
-                    "raidLevel"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "selectedDisks": {
-                      "minItems": 4
-                    }
-                  }
-                }
-              }
-            ]
-          }
+    },
+    "featureSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[A-Za-z0-9][A-Za-z0-9_-]*$": {
+          "type": "boolean"
         }
       }
     },
-    {
-      "if": {
-        "properties": {
-          "disk": {
-            "properties": {
-              "mode": {
-                "const": "one"
-              },
-              "profile": {
-                "not": {
-                  "const": "raid"
-                }
-              }
-            },
-            "required": [
-              "mode",
-              "profile"
-            ]
-          }
-        },
-        "required": [
-          "disk"
-        ]
-      },
-      "then": {
-        "properties": {
-          "disk": {
-            "required": [
-              "selectedDisks"
-            ],
-            "properties": {
-              "selectedDisks": {
-                "minItems": 1,
-                "maxItems": 1
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "disk": {
-            "properties": {
-              "mode": {
-                "const": "two"
-              },
-              "profile": {
-                "not": {
-                  "const": "raid"
-                }
-              }
-            },
-            "required": [
-              "mode",
-              "profile"
-            ]
-          }
-        },
-        "required": [
-          "disk"
-        ]
-      },
-      "then": {
-        "properties": {
-          "disk": {
-            "required": [
-              "selectedDisks",
-              "dataDisk",
-              "rootFs",
-              "dataFs"
-            ],
-            "properties": {
-              "selectedDisks": {
-                "minItems": 2,
-                "maxItems": 2
-              }
-            }
-          }
+    "features": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[A-Za-z0-9][A-Za-z0-9_-]*$": {
+          "$ref": "#/$defs/featureSelection"
         }
       }
     }
-  ]
+  }
 }

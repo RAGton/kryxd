@@ -1,6 +1,7 @@
 mod auth;
 mod detection;
 mod disk;
+pub mod domain;
 mod executor;
 mod network;
 use network::apply_network;
