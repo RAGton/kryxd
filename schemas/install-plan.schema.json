@@ -90,6 +90,22 @@
         }
       }
     },
+    "zfsStoragePlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "userRefquota"
+      ],
+      "properties": {
+        "userRefquota": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*(K|M|G|T|P)(i?B)?$",
+          "examples": [
+            "100G"
+          ]
+        }
+      }
+    },
     "storagePlan": {
       "type": "object",
       "additionalProperties": false,
@@ -158,8 +174,72 @@
             "minLength": 1
           },
           "uniqueItems": true
+        },
+        "zfs": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/zfsStoragePlan"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "required": [
+                  "root"
+                ],
+                "properties": {
+                  "root": {
+                    "type": "object",
+                    "required": [
+                      "filesystem"
+                    ],
+                    "properties": {
+                      "filesystem": {
+                        "const": "zfs"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "required": [
+                  "data"
+                ],
+                "properties": {
+                  "data": {
+                    "type": "object",
+                    "required": [
+                      "filesystem"
+                    ],
+                    "properties": {
+                      "filesystem": {
+                        "const": "zfs"
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "required": [
+              "zfs"
+            ],
+            "properties": {
+              "zfs": {
+                "$ref": "#/$defs/zfsStoragePlan"
+              }
+            }
+          }
+        }
+      ]
     },
     "featureSelection": {
       "type": "object",

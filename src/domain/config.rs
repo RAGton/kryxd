@@ -50,9 +50,17 @@ pub struct RepositoryPlan {
     pub branch: String,
 }
 
-/// Seleção física e lógica de armazenamento do instalador.
+/// Opções obrigatórias quando qualquer volume usa ZFS.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ZfsStoragePlan {
+    /// Limite referenciado aplicado ao dataset persistente de usuários.
+    pub user_refquota: String,
+}
+
+/// Seleção física e lógica de armazenamento do instalador.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", try_from = "StoragePlanWire")]
 pub struct StoragePlan {
     pub topology: Topology,
     pub system_disks: Vec<String>,
@@ -61,6 +69,88 @@ pub struct StoragePlan {
     pub data: Option<MountPlan>,
     pub raid_level: Option<String>,
     pub manual_partitions: Vec<String>,
+    pub zfs: Option<ZfsStoragePlan>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct StoragePlanWire {
+    topology: Topology,
+    system_disks: Vec<String>,
+    data_disks: Vec<String>,
+    root: Option<MountPlan>,
+    data: Option<MountPlan>,
+    raid_level: Option<String>,
+    manual_partitions: Vec<String>,
+    zfs: Option<ZfsStoragePlan>,
+}
+
+impl TryFrom<StoragePlanWire> for StoragePlan {
+    type Error = String;
+
+    fn try_from(value: StoragePlanWire) -> Result<Self, Self::Error> {
+        let uses_zfs = value
+            .root
+            .as_ref()
+            .is_some_and(|mount| mount.filesystem == FileSystem::Zfs)
+            || value
+                .data
+                .as_ref()
+                .is_some_and(|mount| mount.filesystem == FileSystem::Zfs);
+
+        match (&value.zfs, uses_zfs) {
+            (None, true) => {
+                return Err("storage.zfs is required when a filesystem uses ZFS".to_string());
+            }
+            (Some(_), false) => {
+                return Err("storage.zfs is only valid when root or data uses ZFS".to_string());
+            }
+            (Some(zfs), true) if !valid_zfs_refquota(&zfs.user_refquota) => {
+                return Err(
+                    "storage.zfs.userRefquota must use a positive ZFS size such as 100G"
+                        .to_string(),
+                );
+            }
+            _ => {}
+        }
+
+        Ok(Self {
+            topology: value.topology,
+            system_disks: value.system_disks,
+            data_disks: value.data_disks,
+            root: value.root,
+            data: value.data,
+            raid_level: value.raid_level,
+            manual_partitions: value.manual_partitions,
+            zfs: value.zfs,
+        })
+    }
+}
+
+fn valid_zfs_refquota(value: &str) -> bool {
+    let digit_count = value.bytes().take_while(u8::is_ascii_digit).count();
+    let (number, suffix) = value.split_at(digit_count);
+
+    !number.is_empty()
+        && !number.starts_with('0')
+        && number.bytes().all(|byte| byte.is_ascii_digit())
+        && matches!(
+            suffix,
+            "K" | "M"
+                | "G"
+                | "T"
+                | "P"
+                | "KB"
+                | "MB"
+                | "GB"
+                | "TB"
+                | "PB"
+                | "KiB"
+                | "MiB"
+                | "GiB"
+                | "TiB"
+                | "PiB"
+        )
 }
 
 /// Plano de instalação v2, livre de senhas e outros segredos.
@@ -113,7 +203,10 @@ mod tests {
                 },
                 "data": null,
                 "raidLevel": null,
-                "manualPartitions": []
+                "manualPartitions": [],
+                "zfs": {
+                    "userRefquota": "100G"
+                }
             },
             "features": {
                 "server": {
@@ -137,6 +230,16 @@ mod tests {
         );
         assert_eq!(plan.repository.branch, "main");
         assert!(plan.features["server"]["containers"]);
+    }
+
+    #[test]
+    fn serializes_storage_fields_as_camel_case() {
+        let plan: InstallPlanV2 = serde_json::from_value(valid_plan_json()).unwrap();
+        let serialized = serde_json::to_value(plan).unwrap();
+
+        assert_eq!(serialized["storage"]["systemDisks"][0], "/dev/nvme0n1");
+        assert_eq!(serialized["storage"]["zfs"]["userRefquota"], "100G");
+        assert!(serialized["storage"].get("system_disks").is_none());
     }
 
     #[test]
@@ -172,5 +275,23 @@ mod tests {
             .remove("downstreamUrl");
         let error = serde_json::from_value::<InstallPlanV2>(value).unwrap_err();
         assert!(error.to_string().contains("downstreamUrl"));
+    }
+
+    #[test]
+    fn requires_zfs_options_for_zfs_storage() {
+        let mut value = valid_plan_json();
+        value["storage"].as_object_mut().unwrap().remove("zfs");
+
+        let error = serde_json::from_value::<InstallPlanV2>(value).unwrap_err();
+        assert!(error.to_string().contains("storage.zfs is required"));
+    }
+
+    #[test]
+    fn rejects_invalid_zfs_refquota() {
+        let mut value = valid_plan_json();
+        value["storage"]["zfs"]["userRefquota"] = serde_json::json!("unlimited");
+
+        let error = serde_json::from_value::<InstallPlanV2>(value).unwrap_err();
+        assert!(error.to_string().contains("userRefquota"));
     }
 }

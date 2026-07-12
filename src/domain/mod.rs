@@ -5,5 +5,6 @@ pub mod secrets;
 
 pub use config::{
     Encryption, FileSystem, InstallPlanV2, MountPlan, RepositoryPlan, StoragePlan, Topology,
+    ZfsStoragePlan,
 };
 pub use secrets::InstallSecretsV2;
