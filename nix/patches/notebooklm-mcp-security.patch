@@ -1,0 +1,23 @@
+--- a/src/browser-auth.ts
++++ b/src/browser-auth.ts
+@@ -270,3 +270,2 @@
+       '--remote-debugging-port=9222',
+-      '--remote-allow-origins=*',
+     ],
+@@ -327,3 +326,3 @@
+     fs.mkdirSync(path.dirname(authPath), { recursive: true });
+-    fs.writeFileSync(authPath, JSON.stringify(authData, null, 2));
++    fs.writeFileSync(authPath, JSON.stringify(authData, null, 2), { mode: 0o600 });
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -115,2 +115,5 @@
+     let tools = [
+@@ -190,2 +193,8 @@
+     ];
++    
++    if (process.env.NOTEBOOKLM_ALLOWED_TOOLS) {
++      const allowed = process.env.NOTEBOOKLM_ALLOWED_TOOLS.split(',');
++      tools = tools.filter(t => allowed.includes(t.name));
++    }
++    
+     return { tools };

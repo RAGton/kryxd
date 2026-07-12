@@ -6,10 +6,9 @@
 buildNpmPackage {
   pname = "kryonix-installer-ui-web";
   version = "0.1.0";
-
   src = lib.cleanSource ../ui;
 
-  npmDepsHash = "sha256-sUEtL5G0JMBVcaDwk7YTI5VaaGBsziQ9FuMuXN14BUw=";
+  npmDepsHash = "sha256-MkS6/njMPBh9Ltf9zzEY6qOu2TC7uILFKzpeH+Wk99Q=";
 
   npmBuildScript = "build";
 

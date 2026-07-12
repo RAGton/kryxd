@@ -639,19 +639,84 @@ async fn plan(Json(req): Json<PlanRequest>) -> Json<InstallPlan> {
 
 // ── POST /dry-run ─────────────────────────────────────────────────────────────
 
-fn hash_password_if_needed(plan: &mut InstallPlan) {
-    if let Some(pwd) = plan.user.hashed_password.as_deref()
-        && !pwd.is_empty()
-        && !pwd.starts_with('$')
-        && let Ok(output) = std::process::Command::new("mkpasswd")
-            .arg("-m")
-            .arg("yescrypt")
-            .arg(pwd)
-            .output()
-        && output.status.success()
-    {
-        plan.user.hashed_password =
-            Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+fn hash_password_if_needed(plan: &mut InstallPlan) -> Result<(), ApiError> {
+    hash_password_with_command(plan, "mkpasswd")
+}
+
+fn hash_password_with_command(plan: &mut InstallPlan, cmd_path: &str) -> Result<(), ApiError> {
+    if let Some(pwd) = plan.user.hashed_password.as_deref() {
+        if !pwd.is_empty() && !pwd.starts_with('$') {
+            use axum::http::StatusCode;
+            use std::io::Write;
+            use std::process::{Command, Stdio};
+
+            let mut child = Command::new(cmd_path)
+                .arg("-m")
+                .arg("yescrypt")
+                .arg("--stdin")
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .map_err(|e| {
+                    eprintln!("ERROR: Falha ao iniciar {} (não está no PATH?): {}", cmd_path, e);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        axum::Json(crate::ErrorResponse {
+                            error: format!("Falha ao gerar hash de senha: comando {} indisponível no ambiente da ISO.", cmd_path),
+                            details: Some(e.to_string()),
+                        })
+                    )
+                })?;
+
+            if let Some(mut stdin) = child.stdin.take() {
+                let _ = stdin.write_all(pwd.as_bytes());
+                let _ = stdin.write_all(b"\n");
+            }
+
+            match child.wait_with_output() {
+                Ok(output) => {
+                    if output.status.success() {
+                        plan.user.hashed_password =
+                            Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+                        Ok(())
+                    } else {
+                        eprintln!(
+                            "ERROR: {} retornou falha: {}",
+                            cmd_path,
+                            String::from_utf8_lossy(&output.stderr).trim()
+                        );
+                        Err((
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            axum::Json(crate::ErrorResponse {
+                                error: format!(
+                                    "Falha ao gerar hash de senha: o comando {} retornou erro.",
+                                    cmd_path
+                                ),
+                                details: None,
+                            }),
+                        ))
+                    }
+                }
+                Err(e) => {
+                    eprintln!("ERROR: Falha ao aguardar {}: {}", cmd_path, e);
+                    Err((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        axum::Json(crate::ErrorResponse {
+                            error: format!(
+                                "Falha ao gerar hash de senha: erro na execução do {}.",
+                                cmd_path
+                            ),
+                            details: Some(e.to_string()),
+                        }),
+                    ))
+                }
+            }
+        } else {
+            Ok(())
+        }
+    } else {
+        Ok(())
     }
 }
 
@@ -709,7 +774,9 @@ async fn dry_run(
             .into_response();
     }
 
-    hash_password_if_needed(&mut plan);
+    if let Err(e) = hash_password_if_needed(&mut plan) {
+        return e.into_response();
+    }
     let mut result = validate_plan(&plan);
 
     if result.ok {
@@ -785,8 +852,17 @@ fn validate_plan(plan: &InstallPlan) -> DryRunResult {
             ok = false;
         }
 
-        // Check for duplicate mountpoints
+        // Check for duplicate mountpoints and size limits
         let mut mnts = std::collections::HashSet::new();
+        let mut total_absolute_bytes: u64 = 0;
+        let mut percentage_partitions = 0;
+
+        let disk_size_bytes = if let Ok(info) = crate::disk::inspect_disk(&plan.disk.target) {
+            info.size_bytes
+        } else {
+            0
+        };
+
         for p in &parts {
             if !mnts.insert(&p.mountpoint) {
                 checks.push(Check::fail(format!(
@@ -795,6 +871,61 @@ fn validate_plan(plan: &InstallPlan) -> DryRunResult {
                 )));
                 ok = false;
             }
+
+            let size_str = p.size.trim().to_uppercase();
+            if size_str == "0"
+                || size_str == "0B"
+                || size_str == "0G"
+                || size_str == "0M"
+                || size_str == "0%"
+            {
+                checks.push(Check::fail(format!(
+                    "A partição {} não pode ter tamanho 0 B",
+                    p.mountpoint
+                )));
+                ok = false;
+            } else if size_str.ends_with("%") {
+                percentage_partitions += 1;
+            } else {
+                let multiplier = if size_str.ends_with("G") || size_str.ends_with("GB") {
+                    1024 * 1024 * 1024
+                } else if size_str.ends_with("M") || size_str.ends_with("MB") {
+                    1024 * 1024
+                } else if size_str.ends_with("K") || size_str.ends_with("KB") {
+                    1024
+                } else {
+                    1
+                };
+
+                let num_str = size_str.trim_end_matches(|c: char| !c.is_ascii_digit());
+                if let Ok(bytes) = num_str.parse::<u64>() {
+                    let bytes = bytes * multiplier;
+                    total_absolute_bytes += bytes;
+
+                    if disk_size_bytes > 0 && bytes > disk_size_bytes {
+                        checks.push(Check::fail(format!(
+                            "A partição {} ({} bytes) é maior que o disco alvo",
+                            p.mountpoint, bytes
+                        )));
+                        ok = false;
+                    }
+                }
+            }
+        }
+
+        if disk_size_bytes > 0 && total_absolute_bytes > disk_size_bytes {
+            checks.push(Check::fail(format!(
+                "Sobreposição de partições: a soma dos tamanhos ({} bytes) excede o tamanho do disco ({} bytes)",
+                total_absolute_bytes, disk_size_bytes
+            )));
+            ok = false;
+        }
+
+        if percentage_partitions > 1 {
+            checks.push(Check::fail(
+                "Sobreposição de partições: apenas uma partição pode usar tamanho percentual (ex: 100%)".to_string()
+            ));
+            ok = false;
         }
     } else if plan.disk.profile == "raid" {
         let level = plan.disk.raid_level.as_deref().unwrap_or("raid1");
@@ -1164,7 +1295,9 @@ async fn install(
             .into_response();
     }
 
-    hash_password_if_needed(&mut plan);
+    if let Err(e) = hash_password_if_needed(&mut plan) {
+        return e.into_response();
+    }
 
     // dry-run mode → only validate, never touch disks
     if plan.disk.mode == "dry-run" {
@@ -1385,6 +1518,64 @@ mod tests {
             network: Default::default(),
             target_remote_access: Default::default(),
         }
+    }
+
+    #[test]
+    fn test_zero_bytes_partition() {
+        let mut plan = make_plan("/dev/vda", "host", "user");
+        plan.disk.profile = "manual".to_string();
+        plan.disk.manual_partitions = Some(vec![
+            crate::PartitionSpec {
+                device: "/dev/vda".to_string(),
+                mountpoint: "/".to_string(),
+                fstype: "btrfs".to_string(),
+                size: "0B".to_string(),
+                format: true,
+            },
+            crate::PartitionSpec {
+                device: "/dev/vda".to_string(),
+                mountpoint: "/boot/efi".to_string(),
+                fstype: "vfat".to_string(),
+                size: "512M".to_string(),
+                format: true,
+            },
+        ]);
+        let res = validate_plan(&plan);
+        assert!(!res.ok);
+        assert!(
+            res.checks
+                .iter()
+                .any(|c| !c.ok && c.message.contains("tamanho 0 B"))
+        );
+    }
+
+    #[test]
+    fn test_multiple_percentage_partitions() {
+        let mut plan = make_plan("/dev/vda", "host", "user");
+        plan.disk.profile = "manual".to_string();
+        plan.disk.manual_partitions = Some(vec![
+            crate::PartitionSpec {
+                device: "/dev/vda".to_string(),
+                mountpoint: "/".to_string(),
+                fstype: "btrfs".to_string(),
+                size: "100%".to_string(),
+                format: true,
+            },
+            crate::PartitionSpec {
+                device: "/dev/vda".to_string(),
+                mountpoint: "/boot/efi".to_string(),
+                fstype: "vfat".to_string(),
+                size: "100%".to_string(),
+                format: true,
+            },
+        ]);
+        let res = validate_plan(&plan);
+        assert!(!res.ok);
+        assert!(res.checks.iter().any(|c| {
+            !c.ok
+                && c.message
+                    .contains("apenas uma partição pode usar tamanho percentual")
+        }));
     }
 
     #[test]
@@ -1911,5 +2102,23 @@ mod tests {
         assert!(!status.running, "running must be false after error");
         assert_eq!(status.exit_code, Some(1));
         assert_eq!(status.current_phase.as_deref(), Some("error"));
+    }
+
+    #[test]
+    fn test_hash_password_with_invalid_command() {
+        let mut plan = make_plan("/dev/sda", "kryonix", "rocha");
+        plan.user.hashed_password = Some("my_plain_password".into());
+
+        let result = hash_password_with_command(&mut plan, "comando_inexistente_123");
+
+        assert!(result.is_err(), "Deve retornar erro estruturado, não panic");
+        if let Err((status, json)) = result {
+            assert_eq!(status, axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+            assert!(
+                json.0
+                    .error
+                    .contains("comando comando_inexistente_123 indisponível")
+            );
+        }
     }
 }

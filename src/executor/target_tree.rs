@@ -462,9 +462,10 @@ async fn write_generated_modules(plan: &InstallPlan) -> Result<(), String> {
     Ok(())
 }
 
-async fn write_hardware_generated(_plan: &InstallPlan) -> Result<(), String> {
+pub async fn write_hardware_generated(_plan: &InstallPlan) -> Result<(), String> {
     let hw_output = Command::new("nixos-generate-config")
         .args(["--root", "/mnt", "--show-hardware-config"])
+
         .output()
         .await
         .map_err(|e| format!("Falha ao executar nixos-generate-config: {e}"))?;
@@ -495,6 +496,11 @@ async fn write_storage_generated(_plan: &InstallPlan) -> Result<(), String> {
   system.activationScripts.kryonix-disko-snapshot = lib.mkAfter ''
     : # placeholder; layout aplicado pelo executor antes do nixos-install
   '';
+
+  # Dummy para satisfazer o `nix eval` (fase precheck) antes do particionamento.
+  # Será sobrescrito pelo hardware.generated.nix real gerado após o disko.
+  fileSystems."/" = lib.mkDefault {{ device = "/dev/dummy"; fsType = "ext4"; }};
+
   # Snapshot bruto do config gerado:
   #
 {snapshot}

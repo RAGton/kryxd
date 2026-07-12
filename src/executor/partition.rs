@@ -21,6 +21,11 @@ pub async fn run_disko(
         percent: 10,
     });
 
+    let valid_modes = ["disko", "mount", "format", "create", "zap_create_mount"];
+    if !valid_modes.contains(&plan.disk.mode.as_str()) {
+        return Err(format!("Modo disko inválido: {}", plan.disk.mode));
+    }
+
     let result = tokio::process::Command::new("disko")
         .args(["--mode", &plan.disk.mode, config_path])
         .output()
@@ -50,6 +55,11 @@ pub async fn run_disko_dry_run(plan: &InstallPlan) -> Result<(), String> {
     tokio::fs::write(config_path, config)
         .await
         .map_err(|e| format!("Falha ao escrever config disko: {e}"))?;
+
+    let valid_modes = ["disko", "mount", "format", "create", "zap_create_mount"];
+    if !valid_modes.contains(&plan.disk.mode.as_str()) {
+        return Err(format!("Modo disko inválido: {}", plan.disk.mode));
+    }
 
     let result = tokio::process::Command::new("disko")
         .args(["--mode", &plan.disk.mode, "--dry-run", config_path])
