@@ -4,6 +4,7 @@ mod disk;
 pub mod domain;
 mod executor;
 mod network;
+pub mod services;
 use network::apply_network;
 mod profiles;
 mod source;
