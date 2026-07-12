@@ -465,7 +465,6 @@ async fn write_generated_modules(plan: &InstallPlan) -> Result<(), String> {
 pub async fn write_hardware_generated(_plan: &InstallPlan) -> Result<(), String> {
     let hw_output = Command::new("nixos-generate-config")
         .args(["--root", "/mnt", "--show-hardware-config"])
-
         .output()
         .await
         .map_err(|e| format!("Falha ao executar nixos-generate-config: {e}"))?;

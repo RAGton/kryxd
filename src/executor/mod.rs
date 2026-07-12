@@ -79,7 +79,7 @@ pub async fn run_installation(
     // explicitamente em target_tree::pre_lock_target() para imobilizar o
     // tree antes do nixos-install. Sem este lock pré-existente, nixos-install
     // escreveria um durante a avaliação e provocaria "NAR hash mismatch".
-    
+
     // IMPORTANTE: Como particionamos o disco agora, precisamos regenerar o
     // hardware.generated.nix para que o nixos-generate-config detecte os UUIDs
     // reais das partições criadas (em vez do dummy que passamos no nix eval).
