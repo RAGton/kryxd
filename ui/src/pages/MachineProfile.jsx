@@ -41,7 +41,7 @@ export default function MachineProfile({ wizard, onChange }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {PROFILE_CATALOG.map((profile) => {
+        {PROFILE_CATALOG.filter(p => !wizard.isThinkServer || p.mode === 'server').map((profile) => {
           const isActive = wizard.profileId === profile.id;
           const srv = srvDataStatus(profile);
           const stats = getFeatureStats(profile.id);

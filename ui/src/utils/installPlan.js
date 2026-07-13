@@ -142,6 +142,7 @@ export function buildInstallPlanPayload(draftInput) {
   const requestedDiskMode = sanitizeString(draft.diskMode) === 'two' ? 'two' : 'one';
   const sysDisk = sanitizeString(draft.sysDisk);
   const dataDiskCandidate = sanitizeString(draft.dataDisk);
+  const isThinkServer = Boolean(draft.isThinkServer);
   
   // Para RAID, os discos vêm do raidPlan se disponível
   const raidMembers = storageMode === 'raid' && draft.raidPlan?.devices ? draft.raidPlan.devices : uniqueStrings(draft.selectedDisks);
@@ -227,7 +228,7 @@ export function buildInstallPlanPayload(draftInput) {
 
   // Build raw payload then clean optional empty fields for schema compliance
   const rawPayload = {
-    version: INSTALL_PLAN_VERSION,
+    version: 2,
     source: draft.sourceKind === 'github-user-repo' ? {
       kind: 'github-user-repo',
       repo: draft.sourceRepoUrl,
@@ -262,8 +263,10 @@ export function buildInstallPlanPayload(draftInput) {
     features,
     confirmedFeatures,
     storage: {
-      layout: (diskProfile === 'raid' || diskProfile === 'manual' || diskProfile === 'lvm' || diskMode === 'one') ? 'btrfs-simple' : 'btrfs-split',
-      target: selectedDisks[0] || '',
+      topology: isThinkServer ? 'single' : (diskProfile === 'two' || diskMode === 'two' ? 'split' : diskProfile),
+      filesystem: isThinkServer ? 'zfs' : (sanitizeString(draft.rootFs) || 'btrfs'),
+      target_disks: selectedDisks,
+      boot_disk: sysDisk,
       enableSrvData,
       srvDataMode: enableSrvData ? 'btrfs-subvolume' : 'disabled',
       enableAiModels: features.storage['ai-models'] === true,
@@ -274,24 +277,6 @@ export function buildInstallPlanPayload(draftInput) {
     targetRemoteAccess: {
       enabled: Boolean(draft.targetRemoteAccessEnabled),
       port: 8080,
-    },
-    disk: {
-      mode: diskMode,
-      profile: (diskProfile === 'raid' || diskProfile === 'manual' || diskProfile === 'lvm') ? diskProfile : 'single',
-      selectedDisks,
-      raidLevel: diskProfile === 'raid' ? sanitizeString(draft.raidPlan?.level || draft.raidLevel) || 'raid1' : undefined,
-      luksEnabled: Boolean(draft.luksEnabled),
-      sysDisk,
-      dataDisk: diskMode === 'two' && diskProfile !== 'raid' && diskProfile !== 'manual' && diskProfile !== 'lvm' ? dataDisk : undefined,
-      manualPartitions: diskProfile === 'manual' ? (draft.manualPartitions || []) : undefined,
-      rootFs: (diskProfile === 'raid' || diskProfile === 'manual' || diskProfile === 'lvm' || diskMode === 'one')
-        ? 'btrfs'
-        : sanitizeString(draft.rootFs) || 'btrfs',
-      dataFs: (diskProfile === 'raid' || diskProfile === 'manual' || diskProfile === 'lvm')
-        ? 'btrfs'
-        : diskMode === 'two'
-          ? sanitizeString(draft.dataFs) || 'btrfs'
-          : 'btrfs',
     },
     network: {
       hostname: sanitizeString(draft.hostName),
@@ -360,7 +345,7 @@ export function validateInstallPlanPayload(payload) {
 export function getInstallPlanCompatibilityIssues(payload) {
   const issues = [];
 
-  if (payload?.disk?.profile === 'raid' && payload?.disk?.rootFs !== 'btrfs') {
+  if (payload?.storage?.topology === 'raid' && payload?.storage?.filesystem !== 'btrfs') {
     issues.push('No modo RAID, o filesystem raiz suportado pelo backend atual é btrfs.');
   }
 
@@ -552,43 +537,44 @@ export function validateStep(stepId, draftInput, uiInput = {}) {
       if (!isValidHostname(draft.hostName)) addFieldError(result, 'hostName', 'Hostname inválido para um servidor Linux.');
       return result;
     case 'disks': {
-      const selectedDisks = payload.disk.selectedDisks;
+      const selectedDisks = payload.storage.target_disks;
       const rawSelection = Array.isArray(draft.selectedDisks) ? draft.selectedDisks : [];
       const uniqueSelection = uniqueStrings(rawSelection);
       if (uniqueSelection.length !== rawSelection.length) addFieldError(result, 'selectedDisks', 'A selecao contem discos duplicados.');
       if (selectedDisks.length === 0) addFieldError(result, 'selectedDisks', 'Selecione pelo menos 1 disco físico.');
-      if (!payload.disk.sysDisk) addFieldError(result, 'sysDisk', 'Escolha o disco do sistema.');
-      if (payload.disk.sysDisk && selectedDisks.length > 0 && !selectedDisks.includes(payload.disk.sysDisk)) {
+      if (!payload.storage.boot_disk) addFieldError(result, 'sysDisk', 'Escolha o disco do sistema.');
+      if (payload.storage.boot_disk && selectedDisks.length > 0 && !selectedDisks.includes(payload.storage.boot_disk)) {
         addFieldError(result, 'sysDisk', 'O disco do sistema precisa fazer parte da selecao atual.');
       }
 
-      if (payload.disk.profile === 'raid') {
+      if (payload.storage.topology === 'raid') {
         // Bloqueio do RAID porque é um preview (ainda não suportado integralmente no backend)
         addBlockingIssue(result, 'Este modo ainda requer suporte do executor backend para instalação real.');
 
         const minByLevel = { raid0: 2, raid1: 2, raid5: 3, raid10: 4 };
-        const minRequired = minByLevel[payload.disk.raidLevel] || 2;
+        const raidLevel = draft.raidPlan?.level || draft.raidLevel;
+        const minRequired = minByLevel[raidLevel] || 2;
         if (selectedDisks.length < minRequired) {
-          addFieldError(result, 'selectedDisks', `${String(payload.disk.raidLevel || 'RAID').toUpperCase()} exige pelo menos ${minRequired} discos físicos.`);
+          addFieldError(result, 'selectedDisks', `${String(raidLevel || 'RAID').toUpperCase()} exige pelo menos ${minRequired} discos físicos.`);
         }
-        if (payload.disk.raidLevel === 'raid10' && selectedDisks.length % 2 !== 0) {
+        if (raidLevel === 'raid10' && selectedDisks.length % 2 !== 0) {
           addFieldError(result, 'selectedDisks', 'RAID 10 exige quantidade par de discos.');
         }
-      } else if (payload.disk.profile === 'manual') {
+      } else if (payload.storage.topology === 'manual') {
         addBlockingIssue(result, 'Este modo ainda requer suporte do executor backend para instalação real.');
         
-        const manual = payload.disk.manualPartitions || [];
+        const manual = draft.manualPartitions || [];
         const hasRoot = manual.some(p => p.mountpoint === '/');
         const hasEfi = manual.some(p => p.mountpoint === '/boot/efi' || p.mountpoint === '/efi');
         if (!hasRoot) addBlockingIssue(result, 'Partição raiz (/) é obrigatória no modo manual.');
         if (!hasEfi) addBlockingIssue(result, 'Partição EFI (/boot/efi ou /efi) é obrigatória.');
-      } else if (payload.disk.profile === 'lvm') {
+      } else if (payload.storage.topology === 'lvm') {
         addBlockingIssue(result, 'Este modo ainda requer suporte do executor backend para instalação real.');
         
         if (!draft.lvmPlan?.vgName) addFieldError(result, 'lvmPlan.vgName', 'Informe o nome do Volume Group.');
         const lvs = draft.lvmPlan?.logicalVolumes || [];
         if (!lvs.some(lv => lv.mountpoint === '/')) addBlockingIssue(result, 'Volume Lógico raiz (/) é obrigatório.');
-      } else if (payload.disk.mode === 'two') {
+      } else if (payload.storage.topology === 'split') {
         if (selectedDisks.length !== 2) {
           addFieldError(result, 'selectedDisks', 'O layout split exige exatamente 2 discos distintos.');
         }
@@ -596,12 +582,12 @@ export function validateStep(stepId, draftInput, uiInput = {}) {
         addFieldError(result, 'selectedDisks', 'O layout single disk exige exatamente 1 disco.');
       }
 
-      if (payload.disk.mode === 'two' && payload.disk.profile !== 'raid') {
-        if (!payload.disk.dataDisk) addFieldError(result, 'dataDisk', 'Escolha o disco de dados.');
-        if (payload.disk.dataDisk && payload.disk.dataDisk === payload.disk.sysDisk) {
+      if (payload.storage.topology === 'split') {
+        if (!draft.dataDisk) addFieldError(result, 'dataDisk', 'Escolha o disco de dados.');
+        if (draft.dataDisk && draft.dataDisk === draft.sysDisk) {
           addFieldError(result, 'dataDisk', 'Disco de dados não pode ser igual ao disco do sistema.');
         }
-      } else if (payload.disk.profile !== 'raid' && payload.disk.dataDisk) {
+      } else if (payload.storage.topology !== 'raid' && draft.dataDisk) {
         addFieldError(result, 'dataDisk', 'Single disk não usa disk.dataDisk.');
       }
 

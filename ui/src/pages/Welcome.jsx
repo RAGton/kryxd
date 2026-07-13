@@ -211,6 +211,22 @@ export default function Welcome({ wizard, onChange }) {
         </div>
       </div>
 
+      {/* Think Server Toggle */}
+      <div className="w-full max-w-md mx-auto mt-4 bg-white/20 dark:bg-white/5 border border-accent-blue/30 dark:border-accent-blue/20 rounded-2xl p-4 shadow-sm backdrop-blur-2xl ring-1 ring-black/5 dark:ring-white/5 flex items-center justify-between cursor-pointer hover:bg-white/30 dark:hover:bg-white/10 transition-colors" onClick={() => onChange({ isThinkServer: !wizard.isThinkServer })}>
+        <div className="flex flex-col text-left">
+          <span className="text-sm font-bold text-slate-900 dark:text-white">Instalar como Kryonix Think Server</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400 mt-1">Configuração otimizada para servidores (Headless, ZFS)</span>
+        </div>
+        <div className="ml-4 flex-shrink-0">
+          <input 
+            type="checkbox" 
+            className="w-5 h-5 accent-accent-blue cursor-pointer"
+            checked={Boolean(wizard.isThinkServer)}
+            readOnly
+          />
+        </div>
+      </div>
+
       {version && (
         <div className="mt-12 text-[10px] text-slate-400 dark:text-slate-600 font-mono text-center">
           {version.KRYONIX_PRETTY_NAME} | {version.KRYONIX_REV?.substring(0, 8)} | {version.KRYONIX_BUILD_TIME}

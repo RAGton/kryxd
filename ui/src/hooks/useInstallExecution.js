@@ -155,14 +155,15 @@ export function useInstallExecution({ draft, uiState }) {
         streamConnected: false,
       }));
 
-      await installerApi.savePlan(planPayload, secretsPayload);
+      const digest = await installerApi.postPlan(planPayload);
 
       setExecutionState((previous) => ({
         ...previous,
         planSubmitted: true,
       }));
 
-      await installerApi.startInstall(true);
+      await installerApi.putSecrets(digest, secretsPayload);
+      await installerApi.postInstall(digest);
 
       setExecutionState((previous) => applyExecutionStatus(previous, {
         ...previous.status,

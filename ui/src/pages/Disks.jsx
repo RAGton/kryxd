@@ -269,7 +269,7 @@ function TabAutomatico({ wizard, eligibleDisks, partitions, onChange, onReload, 
                 <span className="text-[10px] font-bold text-white">EFI</span>
               </div>
               <div className="flex-1 bg-accent-blue/80 flex items-center justify-center relative overflow-hidden">
-                <span className="text-[11px] font-bold text-white z-10">ROOT BTRFS (~100%)</span>
+                <span className="text-[11px] font-bold text-white z-10">ROOT {wizard.isThinkServer ? 'ZFS' : 'BTRFS'} (~100%)</span>
               </div>
             </div>
           </div>
@@ -291,7 +291,16 @@ function TabAutomatico({ wizard, eligibleDisks, partitions, onChange, onReload, 
                 </tr>
                 <tr className="hover:bg-white/[0.02]">
                   <td className="px-4 py-3 font-mono text-accent-blue">/</td>
-                  <td className="px-4 py-3">BTRFS</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      {wizard.isThinkServer ? 'ZFS' : 'BTRFS'}
+                      {wizard.isThinkServer && (
+                        <span className="bg-accent-blue/20 text-accent-blue border border-accent-blue/30 px-2 py-0.5 rounded text-[9px] font-bold tracking-wider">
+                          Recomendado para Kryonix Think Server
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3">~100%</td>
                 </tr>
               </tbody>

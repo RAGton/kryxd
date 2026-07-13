@@ -64,52 +64,7 @@ async function requestJson(path, options = {}) {
   return body;
 }
 
-// Maps frontend planPayload + mode → backend InstallPlan type.
-//
-// SECURITY: A senha do administrador NUNCA entra neste payload.
-// Ela trafega exclusivamente via buildInstallSecretsPayload (canal separado).
-// Este payload contém apenas campos não-secretos.
-function buildKryonixInstallPlan(planPayload, secretsPayload = {}, mode = 'install') {
-  const layout = (planPayload.disk?.rootFs === 'btrfs') ? 'btrfs-simple' : 'lvm-simple';
-
-  return {
-    version: 1,
-    hostname: planPayload.network?.hostname || 'kryonix',
-    timezone: planPayload.locale?.timezone || 'America/Cuiaba',
-    locale: planPayload.locale?.locale || 'pt_BR.UTF-8',
-    keyboard: planPayload.locale?.keymap || 'br-abnt2',
-    disk: {
-      mode,
-      target: planPayload.disk?.sysDisk || '',
-      layout,
-      boot_mode: 'uefi',
-      profile: planPayload.disk?.profile || 'single',
-      selectedDisks: planPayload.disk?.selectedDisks || [],
-      raidLevel: planPayload.disk?.raidLevel,
-      manualPartitions: planPayload.disk?.manualPartitions,
-    },
-    user: {
-      name: planPayload.admin?.user || 'admin',
-      admin: true,
-      uid: planPayload.admin?.uid ?? 1000,
-      email: planPayload.admin?.email || '',
-      authorized_keys: Array.isArray(planPayload.admin?.authorizedKeys)
-        ? planPayload.admin.authorizedKeys
-        : [],
-      hashedPassword: secretsPayload.adminPassword || '',
-    },
-    features: planPayload.features && typeof planPayload.features === 'object'
-      ? planPayload.features
-      : {},
-    confirmed_features: Array.isArray(planPayload.confirmedFeatures)
-      ? planPayload.confirmedFeatures
-      : [],
-    target_remote_access: {
-      enabled: Boolean(planPayload.targetRemoteAccess?.enabled),
-    },
-    network: planPayload.network || {},
-  };
-}
+// Removed buildKryonixInstallPlan as the UI now natively outputs InstallPlanV2
 
 import { installerApiMock } from './installerApiMock.js';
 
@@ -226,49 +181,57 @@ const realInstallerApi = {
     });
   },
 
-  // Validate the plan via backend dry-run before committing to install.
-  // Throws InstallerApiError if any check fails so the hook surfaces the error.
-  async savePlan(planPayload, secretsPayload) {
-    const kryonixPlan = buildKryonixInstallPlan(planPayload, secretsPayload, 'dry-run');
-    window.__kryonix_install_plan = kryonixPlan;
-
-    const result = await requestJson('/dry-run', {
+  // Submits the plan and receives the plan digest
+  async postPlan(planPayload) {
+    const result = await requestJson('/api/v2/plan', {
       method: 'POST',
       headers: { 
         'content-type': 'application/json',
         'X-Kryonix-Installer-Token': sessionStorage.getItem('installer_token') || '',
       },
-      body: JSON.stringify(kryonixPlan),
+      body: JSON.stringify(planPayload),
     });
 
-    if (result && !result.ok) {
+    if (result && !result.ok && result.checks) {
       const failedCheck = result.checks?.find(c => !c.ok);
       throw new InstallerApiError(
         failedCheck?.message || 'Validação do plano falhou no backend.',
         { status: 422, body: result },
       );
     }
+    
+    return result.planDigest || result.digest || result;
   },
 
-  // POST /install with disk.mode="install". Backend runs safety checks first.
-  // Returns 202 + { job_id } on success, throws 403 if safety checks fail.
-  startInstall(_confirmWipe) {
-    const kryonixPlan = window.__kryonix_install_plan
-      ? { ...window.__kryonix_install_plan, disk: { ...window.__kryonix_install_plan.disk, mode: 'install' } }
-      : null;
+  // Submits the secrets associated with a plan digest
+  async putSecrets(digest, secretsPayload) {
+    return requestJson('/api/v2/secrets', {
+      method: 'PUT',
+      headers: {
+        'content-type': 'application/json',
+        'X-Kryonix-Installer-Token': sessionStorage.getItem('installer_token') || '',
+      },
+      body: JSON.stringify({
+        planDigest: digest,
+        ...secretsPayload
+      }),
+    });
+  },
 
-    if (!kryonixPlan) {
-      return Promise.reject(new InstallerApiError('Plano não encontrado. Execute savePlan primeiro.'));
+  // Starts the installation execution using the plan digest
+  postInstall(digest) {
+    if (!digest) {
+      return Promise.reject(new InstallerApiError('Plano digest não encontrado. Execute postPlan primeiro.'));
     }
 
     window.__kryonix_running = true;
-    return requestJson('/install', {
+    return requestJson('/api/v2/install', {
       method: 'POST',
       headers: { 
         'content-type': 'application/json',
         'X-Kryonix-Installer-Token': sessionStorage.getItem('installer_token') || '',
       },
-      body: JSON.stringify(kryonixPlan),
+      body: JSON.stringify({ planDigest: digest }),
     });
   },
 
