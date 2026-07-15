@@ -1,0 +1,26 @@
+//! Superfície HTTP v2 do instalador.
+
+pub mod install;
+pub mod system;
+pub mod virt;
+
+use std::sync::Arc;
+
+use axum::{
+    Router,
+    routing::{post, put},
+};
+
+use crate::AppState;
+
+/// Constrói as rotas v2 sem substituir os adaptadores legados.
+pub fn router() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/plan", post(install::post_plan))
+        .route("/secrets", put(install::put_secrets))
+        .route("/dry-run", post(install::post_preflight))
+        .route("/preflight", post(install::post_preflight))
+        .route("/install", post(install::post_install))
+        .nest("/virt", virt::router())
+        .merge(system::router())
+}
