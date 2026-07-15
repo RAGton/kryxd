@@ -1,8 +1,20 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Server, HardDrive, Settings } from 'lucide-react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Server, HardDrive, Cpu, Settings } from 'lucide-react';
 
 export default function DashboardLayout({ role }) {
   const isCore = role === 'Core' || role === 'ThinkServer';
+  const location = useLocation();
+
+  const getPageTitle = () => {
+    switch (location.pathname) {
+      case '/': return 'Dashboard Overview';
+      case '/fleet': return 'Fleet Management';
+      case '/storage': return 'ZFS Cotas';
+      case '/virt': return 'Incus Virtualization';
+      case '/local-settings': return 'Local Settings';
+      default: return 'Kryonix Control Plane';
+    }
+  };
 
   return (
     <div className="flex h-screen bg-bg-elevated text-text-primary font-sans">
@@ -31,6 +43,9 @@ export default function DashboardLayout({ role }) {
               <NavLink to="/storage" className={({isActive}) => `flex items-center gap-3 p-3 rounded-lg transition-colors ${isActive ? 'bg-kryonix-blue text-white shadow-[0_0_10px_rgba(59,130,246,0.3)]' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
                 <HardDrive size={20} /> Storage
               </NavLink>
+              <NavLink to="/virt" className={({isActive}) => `flex items-center gap-3 p-3 rounded-lg transition-colors ${isActive ? 'bg-kryonix-blue text-white shadow-[0_0_10px_rgba(59,130,246,0.3)]' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                <Cpu size={20} /> Virtualization
+              </NavLink>
             </>
           )}
           
@@ -47,7 +62,7 @@ export default function DashboardLayout({ role }) {
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
         <header className="h-16 border-b border-border-subtle bg-bg-surface flex items-center px-8 shadow-sm z-0">
-          <h1 className="text-xl font-semibold text-text-primary">Dashboard</h1>
+          <h1 className="text-xl font-semibold text-text-primary">{getPageTitle()}</h1>
         </header>
         <div className="flex-1 p-8 overflow-auto bg-bg-light">
           <div className="animate-fade-in-up h-full">

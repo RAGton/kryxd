@@ -142,6 +142,14 @@ impl PasswordHash {
     pub(crate) fn expose_secret(&self) -> &str {
         self.0.expose_secret()
     }
+
+    /// Reconstrói o tipo protegido a partir de um hash efêmero já validado.
+    ///
+    /// A string recebida é movida para `SecretString`, evitando uma cópia
+    /// adicional do material sensível em memória.
+    pub(crate) fn from_persisted(output: String) -> Result<Self, SecurityError> {
+        Self::from_command_output(output)
+    }
 }
 
 /// Adaptador responsável por gerar hashes yescrypt com `mkpasswd`.

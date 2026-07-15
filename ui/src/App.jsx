@@ -5,6 +5,7 @@ import DashboardLayout from './layouts/DashboardLayout.jsx';
 import Dashboard from './pages/kcp/Dashboard.jsx';
 import Fleet from './pages/kcp/Fleet.jsx';
 import Storage from './pages/kcp/Storage.jsx';
+import Virt from './pages/kcp/Virt.jsx';
 import LocalSettings from './pages/kcp/LocalSettings.jsx';
 
 export default function App() {
@@ -52,6 +53,7 @@ export default function App() {
               <Route index element={<Dashboard />} />
               <Route path="fleet" element={<Fleet />} />
               <Route path="storage" element={<Storage />} />
+              <Route path="virt" element={<Virt />} />
               <Route path="local-settings" element={<LocalSettings />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </>

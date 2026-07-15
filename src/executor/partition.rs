@@ -84,6 +84,7 @@ fn generate_disko_config(plan: &InstallPlan) -> String {
 
     match plan.disk.layout.as_str() {
         "lvm-simple" => generate_lvm_simple(&plan.disk.target, &plan.disk.boot_mode),
+        "zfs-simple" => generate_zfs_simple(&plan.disk.target, &plan.disk.boot_mode),
         _ => generate_btrfs_simple(&plan.disk.target, &plan.disk.boot_mode),
     }
 }
@@ -270,6 +271,64 @@ fn generate_lvm_simple(target: &str, boot_mode: &str) -> String {
     )
 }
 
+fn generate_zfs_simple(target: &str, boot_mode: &str) -> String {
+    let efi_part = if boot_mode == "uefi" {
+        r#"
+        esp = {
+          size = "512M";
+          type = "EF00";
+          content = { type = "filesystem"; format = "vfat"; mountpoint = "/boot"; };
+        };"#
+    } else {
+        ""
+    };
+
+    format!(
+        r#"{{
+  disko.devices.disk.main = {{
+    type = "disk";
+    device = "{target}";
+    content = {{
+      type = "gpt";
+      partitions = {{{efi_part}
+        root = {{
+          size = "100%";
+          content = {{
+            type = "zfs";
+            pool = "zroot";
+          }};
+        }};
+      }};
+    }};
+  }};
+  disko.devices.zpool.zroot = {{
+    type = "zpool";
+    rootFsOptions = {{
+      compression = "lz4";
+      "com.sun:auto-snapshot" = "false";
+    }};
+    mountpoint = "/";
+    datasets = {{
+      home = {{
+        type = "zfs_fs";
+        mountpoint = "/home";
+      }};
+      nix = {{
+        type = "zfs_fs";
+        mountpoint = "/nix";
+        options.atime = "off";
+      }};
+      var = {{
+        type = "zfs_fs";
+        mountpoint = "/var";
+      }};
+    }};
+  }};
+}}
+"#
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -294,6 +353,15 @@ mod tests {
     fn test_btrfs_bios_no_efi_partition() {
         let cfg = generate_btrfs_simple("/dev/vdb", "bios");
         assert!(!cfg.contains("EF00"));
+    }
+
+    #[test]
+    fn test_zfs_config_contains_target() {
+        let cfg = generate_zfs_simple("/dev/vdb", "uefi");
+        assert!(cfg.contains("/dev/vdb"));
+        assert!(cfg.contains("EF00"));
+        assert!(cfg.contains("zpool"));
+        assert!(cfg.contains("zroot"));
     }
 
     fn manual_plan(parts: Vec<crate::PartitionSpec>) -> InstallPlan {

@@ -24,10 +24,23 @@ pub enum DiskMedium {
     Unknown,
 }
 
+/// Identidade física retornada pelo kernel para detectar aliases e multipath.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiskIdentity {
+    /// Número major:minor do dispositivo nesta sessão.
+    pub major_minor: String,
+    /// World Wide Name, quando o hardware o expõe.
+    pub wwn: Option<String>,
+    /// Número de série, usado como fallback quando WWN não está disponível.
+    pub serial: Option<String>,
+}
+
 /// Metadados não destrutivos coletados para um disco selecionado.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidatedDisk {
-    /// Caminho persistido no plano, por exemplo `/dev/nvme0n1`.
+    /// Caminho solicitado no plano, que pode ser um alias em `/dev/disk/by-id`.
+    pub requested_path: String,
+    /// Caminho resolvido retornado pelo `lsblk`, por exemplo `/dev/nvme0n1`.
     pub path: String,
     /// Capacidade total em bytes.
     pub size_bytes: u64,
@@ -35,6 +48,8 @@ pub struct ValidatedDisk {
     pub medium: DiskMedium,
     /// Transporte informado pelo kernel, quando disponível.
     pub transport: Option<String>,
+    /// Identidade usada para impedir que split use o mesmo disco por aliases.
+    pub identity: DiskIdentity,
     /// Indica se `blkid -p` encontrou uma assinatura existente.
     pub has_existing_signature: bool,
 }
@@ -51,6 +66,8 @@ pub struct DiskValidationReport {
 pub enum PartitionerError {
     /// O contrato é estruturalmente inválido.
     InvalidPlan(String),
+    /// O contrato é válido, mas a capability ainda não possui implementação.
+    CapabilityNotImplemented(String),
     /// O plano usa uma capacidade ainda não implementada com segurança.
     UnsupportedStorageCapability(String),
     /// Um utilitário de inspeção não pôde ser iniciado.
@@ -75,6 +92,12 @@ impl fmt::Display for PartitionerError {
         match self {
             Self::InvalidPlan(detail) => {
                 write!(formatter, "plano de armazenamento inválido: {detail}")
+            }
+            Self::CapabilityNotImplemented(detail) => {
+                write!(
+                    formatter,
+                    "capability de armazenamento não implementada: {detail}"
+                )
             }
             Self::UnsupportedStorageCapability(detail) => {
                 write!(
@@ -137,7 +160,7 @@ impl DiskValidator {
                 "-b",
                 "-d",
                 "-o",
-                "PATH,TYPE,SIZE,RM,RO,ROTA,TRAN",
+                "PATH,TYPE,SIZE,RM,RO,ROTA,TRAN,SERIAL,WWN,MAJ:MIN",
                 "--",
                 path,
             ])
@@ -171,10 +194,12 @@ impl DiskValidator {
         self.ensure_eligible(&disk)?;
 
         Ok(ValidatedDisk {
+            requested_path: path.to_string(),
             path: disk.path.clone(),
             size_bytes: disk.size_bytes,
             medium: disk.medium,
             transport: disk.transport,
+            identity: disk.identity,
             has_existing_signature: probe_signature(&disk.path)?,
         })
     }
@@ -190,6 +215,10 @@ impl DiskValidator {
         let mut disks = Vec::with_capacity(paths.len());
         for path in paths {
             disks.push(self.inspect_disk(path)?);
+        }
+
+        if plan.storage.topology == Topology::Split {
+            ensure_distinct_physical_disks(&disks[0], &disks[1])?;
         }
 
         Ok(DiskValidationReport { disks })
@@ -284,6 +313,12 @@ struct LsblkDisk {
     rota: Value,
     #[serde(default)]
     tran: Value,
+    #[serde(default)]
+    serial: Value,
+    #[serde(default)]
+    wwn: Value,
+    #[serde(rename = "maj:min")]
+    major_minor: Value,
 }
 
 #[derive(Debug)]
@@ -295,6 +330,7 @@ struct ParsedDisk {
     read_only: bool,
     medium: DiskMedium,
     transport: Option<String>,
+    identity: DiskIdentity,
 }
 
 fn parse_lsblk_disk(raw: LsblkDisk) -> Result<ParsedDisk, PartitionerError> {
@@ -316,6 +352,21 @@ fn parse_lsblk_disk(raw: LsblkDisk) -> Result<ParsedDisk, PartitionerError> {
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned);
+    let major_minor = raw
+        .major_minor
+        .as_str()
+        .map(str::trim)
+        .filter(|value| valid_major_minor(value))
+        .ok_or_else(|| PartitionerError::InvalidCommandOutput {
+            command: "lsblk",
+            detail: format!("MAJ:MIN ausente ou inválido para {}", raw.path),
+        })?
+        .to_string();
+    let identity = DiskIdentity {
+        major_minor,
+        wwn: normalized_optional_string(&raw.wwn),
+        serial: normalized_optional_string(&raw.serial),
+    };
 
     Ok(ParsedDisk {
         path: raw.path,
@@ -325,7 +376,58 @@ fn parse_lsblk_disk(raw: LsblkDisk) -> Result<ParsedDisk, PartitionerError> {
         read_only,
         medium,
         transport,
+        identity,
     })
+}
+
+fn normalized_optional_string(value: &Value) -> Option<String> {
+    value
+        .as_str()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_ascii_lowercase())
+}
+
+fn valid_major_minor(value: &str) -> bool {
+    let mut parts = value.split(':');
+    matches!(
+        (parts.next(), parts.next(), parts.next()),
+        (Some(major), Some(minor), None)
+            if !major.is_empty()
+                && !minor.is_empty()
+                && major.bytes().all(|byte| byte.is_ascii_digit())
+                && minor.bytes().all(|byte| byte.is_ascii_digit())
+    )
+}
+
+fn ensure_distinct_physical_disks(
+    system: &ValidatedDisk,
+    data: &ValidatedDisk,
+) -> Result<(), PartitionerError> {
+    let same_node = system.identity.major_minor == data.identity.major_minor;
+    let same_resolved_path = system.path == data.path;
+    let same_wwn = matches!(
+        (&system.identity.wwn, &data.identity.wwn),
+        (Some(system_wwn), Some(data_wwn)) if system_wwn == data_wwn
+    );
+    let strong_wwn_distinguishes = matches!(
+        (&system.identity.wwn, &data.identity.wwn),
+        (Some(system_wwn), Some(data_wwn)) if system_wwn != data_wwn
+    );
+    let same_serial = !strong_wwn_distinguishes
+        && matches!(
+            (&system.identity.serial, &data.identity.serial),
+            (Some(system_serial), Some(data_serial)) if system_serial == data_serial
+        );
+
+    if same_node || same_resolved_path || same_wwn || same_serial {
+        return Err(PartitionerError::InvalidPlan(format!(
+            "topologia split exige discos físicos distintos; systemDisk={} e dataDisk={} resolvem para a mesma identidade",
+            system.requested_path, data.requested_path
+        )));
+    }
+
+    Ok(())
 }
 
 fn value_to_u64(value: &Value) -> Option<u64> {
@@ -441,6 +543,24 @@ fn validate_storage_contract(plan: &InstallPlanV2) -> Result<(), PartitionerErro
     } else if plan.storage.zfs.is_some() {
         return Err(PartitionerError::InvalidPlan(
             "storage.zfs só pode ser definido quando um volume usa ZFS".into(),
+        ));
+    }
+
+    let uses_btrfs_data = plan
+        .storage
+        .data
+        .as_ref()
+        .is_some_and(|data| data.filesystem == FileSystem::Btrfs);
+    if uses_btrfs_data {
+        let btrfs = plan.storage.btrfs.as_ref().ok_or_else(|| {
+            PartitionerError::InvalidPlan(
+                "storage.btrfs é obrigatório quando o volume de dados usa BTRFS".into(),
+            )
+        })?;
+        validate_refquota(&btrfs.user_qgroup_limit)?;
+    } else if plan.storage.btrfs.is_some() {
+        return Err(PartitionerError::InvalidPlan(
+            "storage.btrfs só pode ser definido quando o volume de dados usa BTRFS".into(),
         ));
     }
 
@@ -574,7 +694,7 @@ fn render_single(plan: &InstallPlanV2) -> Result<String, PartitionerError> {
     let disk = &plan.storage.system_disks[0];
     let root = plan.storage.root.as_ref().expect("contrato validado");
     let partition = match root.filesystem {
-        FileSystem::Btrfs => btrfs_partition("/", true),
+        FileSystem::Btrfs => btrfs_partition("/", true, None),
         FileSystem::Ext4 => filesystem_partition("ext4", "/"),
         FileSystem::Xfs => filesystem_partition("xfs", "/"),
         FileSystem::Zfs => zfs_partition(),
@@ -617,13 +737,20 @@ fn render_split(plan: &InstallPlanV2) -> Result<String, PartitionerError> {
     let data = plan.storage.data.as_ref().expect("contrato validado");
 
     let root_partition = match root.filesystem {
-        FileSystem::Btrfs => btrfs_partition("/", true),
+        FileSystem::Btrfs => btrfs_partition("/", true, None),
         FileSystem::Ext4 => filesystem_partition("ext4", "/"),
         FileSystem::Xfs => filesystem_partition("xfs", "/"),
         FileSystem::Zfs => unreachable!("root ZFS split foi rejeitado pelo contrato"),
     };
     let data_partition = match data.filesystem {
-        FileSystem::Btrfs => btrfs_partition("/srv/data", false),
+        FileSystem::Btrfs => btrfs_partition(
+            "/srv/data",
+            false,
+            plan.storage
+                .btrfs
+                .as_ref()
+                .map(|btrfs| btrfs.user_qgroup_limit.as_str()),
+        ),
         FileSystem::Ext4 => filesystem_partition("ext4", "/srv/data"),
         FileSystem::Xfs => filesystem_partition("xfs", "/srv/data"),
         FileSystem::Zfs => zfs_partition(),
@@ -697,7 +824,7 @@ fn filesystem_partition(format: &str, mountpoint: &str) -> String {
     )
 }
 
-fn btrfs_partition(mountpoint: &str, root_layout: bool) -> String {
+fn btrfs_partition(mountpoint: &str, root_layout: bool, quota: Option<&str>) -> String {
     let subvolumes = if root_layout {
         r#""@root" = { mountpoint = "/"; };
 "@home" = { mountpoint = "/home"; };
@@ -713,11 +840,32 @@ fn btrfs_partition(mountpoint: &str, root_layout: bool) -> String {
 "@srv-data/storage" = {{ mountpoint = "{mountpoint}/storage"; }};"#
         )
     };
+    let quota_hook = quota
+        .map(|limit| {
+            r#"postCreateHook = ''
+  quota_mount="$(mktemp -d)"
+  quota_mounted=0
+  cleanup_quota_mount() {
+    if [ "$quota_mounted" -eq 1 ]; then
+      umount "$quota_mount"
+    fi
+    rmdir "$quota_mount"
+  }
+  trap cleanup_quota_mount EXIT
+  mount -o subvol=/ "$device" "$quota_mount"
+  quota_mounted=1
+  btrfs quota enable "$quota_mount" 2>/dev/null || true
+  btrfs qgroup limit "__QUOTA__" "$quota_mount/@srv-data/home"
+'';"#
+                .replace("__QUOTA__", limit)
+        })
+        .unwrap_or_default();
 
     format!(
         r#"content = {{
   type = "btrfs";
   extraArgs = [ "-f" ];
+{quota_hook}
   subvolumes = {{
 {subvolumes}
   }};
@@ -835,6 +983,9 @@ mod tests {
             ro: Value::from(false),
             rota: Value::from(true),
             tran: Value::from("sata"),
+            serial: Value::Null,
+            wwn: Value::Null,
+            major_minor: Value::from("252:0"),
         })
         .expect("ROTA=1 deve ser válido");
         let solid_state = parse_lsblk_disk(LsblkDisk {
@@ -845,6 +996,9 @@ mod tests {
             ro: Value::from(false),
             rota: Value::from(false),
             tran: Value::from("nvme"),
+            serial: Value::Null,
+            wwn: Value::Null,
+            major_minor: Value::from("259:0"),
         })
         .expect("ROTA=0 deve ser válido");
 
@@ -867,5 +1021,89 @@ mod tests {
         assert!(validate_device_path("/dev/loop0").is_err());
         assert!(validate_device_path("/dev/../etc/passwd").is_err());
         assert!(validate_device_path("/dev/vda\"; abort").is_err());
+    }
+
+    fn validated_disk(
+        requested_path: &str,
+        path: &str,
+        major_minor: &str,
+        wwn: Option<&str>,
+        serial: Option<&str>,
+    ) -> ValidatedDisk {
+        ValidatedDisk {
+            requested_path: requested_path.into(),
+            path: path.into(),
+            size_bytes: DEFAULT_MIN_DISK_SIZE_BYTES,
+            medium: DiskMedium::SolidState,
+            transport: None,
+            identity: DiskIdentity {
+                major_minor: major_minor.into(),
+                wwn: wwn.map(str::to_string),
+                serial: serial.map(str::to_string),
+            },
+            has_existing_signature: false,
+        }
+    }
+
+    #[test]
+    fn split_rejects_aliases_with_the_same_major_minor() {
+        let system = validated_disk("/dev/vda", "/dev/vda", "252:0", None, None);
+        let data = validated_disk(
+            "/dev/disk/by-id/virtio-system",
+            "/dev/vda",
+            "252:0",
+            None,
+            None,
+        );
+
+        assert!(ensure_distinct_physical_disks(&system, &data).is_err());
+    }
+
+    #[test]
+    fn split_rejects_matching_wwn_but_trusts_distinct_wwns_over_serial() {
+        let system = validated_disk(
+            "/dev/sda",
+            "/dev/sda",
+            "8:0",
+            Some("wwn-a"),
+            Some("generic-serial"),
+        );
+        let same_wwn = validated_disk(
+            "/dev/sdb",
+            "/dev/sdb",
+            "8:16",
+            Some("wwn-a"),
+            Some("other-serial"),
+        );
+        let distinct_wwn = validated_disk(
+            "/dev/sdc",
+            "/dev/sdc",
+            "8:32",
+            Some("wwn-c"),
+            Some("generic-serial"),
+        );
+
+        assert!(ensure_distinct_physical_disks(&system, &same_wwn).is_err());
+        assert!(ensure_distinct_physical_disks(&system, &distinct_wwn).is_ok());
+    }
+
+    #[test]
+    fn split_rejects_matching_serial_when_wwn_is_unavailable() {
+        let system = validated_disk(
+            "/dev/vda",
+            "/dev/vda",
+            "252:0",
+            None,
+            Some("virtio-duplicate"),
+        );
+        let data = validated_disk(
+            "/dev/vdb",
+            "/dev/vdb",
+            "252:16",
+            None,
+            Some("virtio-duplicate"),
+        );
+
+        assert!(ensure_distinct_physical_disks(&system, &data).is_err());
     }
 }
