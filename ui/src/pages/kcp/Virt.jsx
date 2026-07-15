@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Cpu, Plus, Play, Square, Box } from 'lucide-react';
 import { getVirtNodes } from '../../lib/api.js';
+import VirtWizard from '../../components/VirtWizard.jsx';
 
 export default function Virt() {
   const [instances, setInstances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
 
-  useEffect(() => {
+  const fetchInstances = () => {
     getVirtNodes()
       .then(data => {
         setInstances(Array.isArray(data) ? data : []);
@@ -18,6 +20,10 @@ export default function Virt() {
         setError(true);
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchInstances();
   }, []);
 
   return (
@@ -27,7 +33,10 @@ export default function Virt() {
           <Cpu size={24} className="text-kryonix-blue" />
           <h2 className="text-lg font-semibold">Motor de Virtualização Incus</h2>
         </div>
-        <button className="bg-kryonix-blue hover:bg-blue-600 text-white flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm">
+        <button 
+          onClick={() => setShowWizard(true)}
+          className="bg-kryonix-blue hover:bg-blue-600 text-white flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+        >
           <Plus size={18} /> Nova Instância
         </button>
       </div>
@@ -87,6 +96,17 @@ export default function Virt() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {showWizard && (
+        <VirtWizard 
+          onClose={() => setShowWizard(false)} 
+          onSuccess={() => {
+            setShowWizard(false);
+            setLoading(true);
+            fetchInstances();
+          }} 
+        />
       )}
     </div>
   );
