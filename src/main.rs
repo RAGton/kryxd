@@ -1,3 +1,4 @@
+pub mod api;
 mod auth;
 mod detection;
 mod disk;
@@ -43,6 +44,8 @@ pub struct AppState {
     pub http_client: reqwest::Client,
     /// Token for destructive API calls
     pub installer_token: String,
+    /// Casos de uso e stores isolados da API v2.
+    pub install_service: Arc<api::install::InstallService>,
 }
 
 // ── Common error type ─────────────────────────────────────────────────────────
@@ -295,6 +298,7 @@ async fn main() {
         auth: auth::new_auth_state(),
         http_client,
         installer_token,
+        install_service: Arc::new(api::install::InstallService::default()),
     });
 
     let ui_dir = std::env::var("KRYONIX_INSTALLER_UI_DIR")
@@ -332,6 +336,8 @@ async fn main() {
         .route("/install", post(install))
         .route("/install/status", get(install_status))
         .route("/install/progress", get(install_progress))
+        .nest("/api/v1", api::v1::router())
+        .nest("/api/v2", api::router())
         // Profiles
         .route("/profile/apply", post(apply_profile_endpoint))
         // Debug — inspeção do target flake gerado em /mnt/etc/kryonixos

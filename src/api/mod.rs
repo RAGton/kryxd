@@ -3,6 +3,7 @@
 pub mod install;
 pub mod system;
 pub mod virt;
+pub mod v1;
 
 use std::sync::Arc;
 
