@@ -4,6 +4,8 @@ export default {
   theme: {
     extend: {
       colors: {
+        'kryonix-dark': '#0f172a',
+        'kryonix-blue': '#3b82f6',
         'bg': 'var(--kx-bg)',
         'bg-elevated': 'var(--kx-surface)',
         'bg-surface': 'var(--kx-surface-elevated)',

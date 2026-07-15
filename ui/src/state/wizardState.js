@@ -54,6 +54,7 @@ export const DRAFT_FIELD_NAMES = [
   'storageMode',
   'lvmPlan',
   'raidPlan',
+  'isThinkServer',
 ];
 
 export const UI_TRANSIENT_FIELD_NAMES = [
@@ -159,6 +160,7 @@ export const INITIAL_INSTALL_PLAN_DRAFT = {
     filesystem: 'btrfs',
     mountpoint: '/',
   },
+  isThinkServer: false,
 };
 
 export const INITIAL_UI_TRANSIENT_STATE = {
