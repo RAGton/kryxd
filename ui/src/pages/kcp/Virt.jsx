@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Cpu, Plus, Play, Square, Box } from 'lucide-react';
+import { Cpu, Plus, Play, Square, Box, Terminal } from 'lucide-react';
 import { getVirtNodes } from '../../lib/api.js';
 import VirtWizard from '../../components/VirtWizard.jsx';
+import KcpTerminal from '../../components/kcp/console/KcpTerminal.jsx';
 
 export default function Virt() {
   const [instances, setInstances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
+  const [consoleInstance, setConsoleInstance] = useState(null);
 
   const fetchInstances = () => {
     getVirtNodes()
@@ -25,6 +27,14 @@ export default function Virt() {
   useEffect(() => {
     fetchInstances();
   }, []);
+
+  const openConsole = (instanceName) => {
+    setConsoleInstance(instanceName);
+  };
+
+  const closeConsole = () => {
+    setConsoleInstance(null);
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -80,6 +90,14 @@ export default function Virt() {
                     <td className="p-4 text-text-muted">{inst.type || 'container'}</td>
                     <td className="p-4 font-mono text-text-muted">{inst.ipv4 || '-'}</td>
                     <td className="p-4 flex gap-2 justify-end">
+                      <button 
+                        onClick={() => openConsole(inst.name)}
+                        className="p-1.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 transition-colors" 
+                        title="Abrir Console"
+                        disabled={!isRunning}
+                      >
+                        <Terminal size={16} />
+                      </button>
                       {isRunning ? (
                         <button className="p-1.5 rounded bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 transition-colors" title="Parar">
                           <Square size={16} />
@@ -98,9 +116,21 @@ export default function Virt() {
         </div>
       )}
 
+      {/* Console Modal Overlay */}
+      {consoleInstance && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="bg-bg-elevated border border-border-subtle shadow-panel rounded-xl w-[900px] h-[600px] flex flex-col">
+            <KcpTerminal 
+              instanceName={consoleInstance} 
+              onClose={closeConsole} 
+            />
+          </div>
+        </div>
+      )}
+
       {showWizard && (
         <VirtWizard 
-          onClose={() => setShowWizard(false)} 
+          onClose={() => setShowWizard(false)}
           onSuccess={() => {
             setShowWizard(false);
             setLoading(true);
