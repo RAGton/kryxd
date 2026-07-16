@@ -10,6 +10,12 @@ export async function getStorageQuotasi() {
   return res.json();
 }
 
+export async function getStoragePools() {
+  const res = await fetch('/api/v2/storage/pools');
+  if (!res.ok) throw new Error('Failed to fetch storage pools');
+  return res.json();
+}
+
 export async function getVirtNodes() {
   const res = await fetch('/api/v2/virt/nodes');
   if (!res.ok) throw new Error('Failed to fetch virt nodes');

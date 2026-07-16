@@ -2,6 +2,7 @@
 
 pub mod console;
 pub mod install;
+pub mod storage;
 pub mod system;
 pub mod virt;
 pub mod v1;
@@ -25,5 +26,6 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/install", post(install::post_install))
         .nest("/virt", virt::router())
         .nest("/console", console::router())
+        .nest("/storage", storage::router())
         .merge(system::router())
 }
