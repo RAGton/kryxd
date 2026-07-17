@@ -454,7 +454,7 @@ mod tests {
                 .expect("relógio do sistema deve estar após o Unix epoch")
                 .as_nanos();
             let path = std::env::temp_dir().join(format!(
-                "kryonix-installer-security-{label}-{}-{unique}",
+                "kryxd-security-{label}-{}-{unique}",
                 std::process::id()
             ));
             fs::create_dir(&path).expect("deve criar raiz temporária exclusiva");

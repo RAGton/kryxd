@@ -88,7 +88,7 @@ export const INITIAL_INSTALL_PLAN_DRAFT = {
   sourceRepoUrl: '',
   sourceBranch: 'main',
   templateRepoUrl: 'https://github.com/RAGton/Kryonixos.git',
-  sourceClonePath: '/run/kryonix-installer/sources/kryonixos',
+  sourceClonePath: '/run/kryxd/sources/kryonixos',
   sourceTargetPath: '/etc/kryonixos',
   sourceValidated: false,
   sourceStatus: "idle",

@@ -68,7 +68,7 @@ pub async fn prepare_github_source(Json(req): Json<PrepareSourceRequest>) -> imp
             })
         ).into_response();
     }
-    let clone_path = "/run/kryonix-installer/sources/kryonixos";
+    let clone_path = "/run/kryxd/sources/kryonixos";
 
     // 2. Prepare directory
     let path = Path::new(clone_path);
@@ -302,7 +302,7 @@ pub async fn create_from_template(
         .post(&generate_url)
         .header("Authorization", format!("Bearer {token}"))
         .header("Accept", "application/vnd.github+json")
-        .header("User-Agent", "kryonix-installer/0.1")
+        .header("User-Agent", "kryxd/0.1")
         .json(&serde_json::json!({
             "owner": "", // let github default to the authenticated user
             "name": req.repo_name,
@@ -374,7 +374,7 @@ pub async fn create_from_template(
     // We may need to retry cloning if it's not immediately available, but for now we attempt to clone.
 
     // 5. Clone the new repository
-    let clone_path = "/run/kryonix-installer/sources/kryonixos";
+    let clone_path = "/run/kryxd/sources/kryonixos";
     let path = Path::new(clone_path);
     if path.exists() {
         let _ = tokio::fs::remove_dir_all(path).await;

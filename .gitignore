@@ -17,3 +17,9 @@ result-*
 .vscode/
 *.swp
 .DS_Store
+
+# Lixo gerado
+graphify-out/
+test_hash
+*.md.tmp
+pr-body.md

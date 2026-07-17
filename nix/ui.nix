@@ -4,11 +4,11 @@
 }:
 
 buildNpmPackage {
-  pname = "kryonix-installer-ui-web";
+  pname = "kryxd-ui";
   version = "0.1.0";
   src = lib.cleanSource ../ui;
 
-  npmDepsHash = "sha256-MkS6/njMPBh9Ltf9zzEY6qOu2TC7uILFKzpeH+Wk99Q=";
+  npmDepsHash = "sha256-e36ZFfsQoVphL5hzVdzrfxO78bUsV24KC/2VzPuSg9w=";
 
   npmBuildScript = "build";
 
@@ -20,8 +20,8 @@ buildNpmPackage {
   '';
 
   meta = with lib; {
-    description = "Kryonix Installer web UI (Vite + React)";
-    homepage = "https://github.com/RAGton/kryonix-installer";
+    description = "Kryonix Daemon web UI (Vite + React)";
+    homepage = "https://github.com/RAGton/kryxd";
     license = licenses.unfree;
   };
 }

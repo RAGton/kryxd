@@ -1,6 +1,6 @@
-# RAGOS Installer UI
+# NODE Installer UI
 
-Este repositório contém a interface moderna do instalador do RAGOS.
+Este repositório contém a interface moderna do instalador do NODE.
 
 Ao contrário do placeholder inicial, o diretório já reúne uma aplicação funcional dividida em duas camadas:
 
@@ -11,7 +11,7 @@ Ao contrário do placeholder inicial, o diretório já reúne uma aplicação fu
 
 ## O que esta UI faz hoje
 
-O wizard atual cobre o fluxo principal de instalação do servidor RAGOS, incluindo:
+O wizard atual cobre o fluxo principal de instalação do servidor NODE, incluindo:
 
 - boas-vindas e aceite explícito;
 - localização, locale e teclado;
@@ -84,9 +84,9 @@ O arquivo principal é `src/main.rs`. Ele expõe a API local usada pela interfac
 
 Esta UI não substitui o fluxo shell de forma conceitual; ela o organiza.
 
-Quando este projeto for consumido pelo monorepo principal do RAGOS, o backend e a interface precisam continuar coerentes com:
+Quando este projeto for consumido pelo monorepo principal do NODE, o backend e a interface precisam continuar coerentes com:
 
-- `installer/bin/ragos-install`;
+- `installer/bin/node-install`;
 - `installer/params.nix`;
 - o fluxo final de `nixos-install`.
 

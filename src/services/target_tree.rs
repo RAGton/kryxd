@@ -23,7 +23,7 @@ use crate::services::partitioner::DiskoRenderer;
 use crate::services::security::{PasswordHash, SecretStore, SecurityError};
 
 /// Repositório efêmero preparado antes do particionamento.
-pub const DEFAULT_STAGING_REPOSITORY: &str = "/run/kryonix-installer/target/kryonixos";
+pub const DEFAULT_STAGING_REPOSITORY: &str = "/run/kryxd/target/kryonixos";
 /// Raiz montada do sistema que será instalado.
 pub const DEFAULT_TARGET_MOUNT: &str = "/mnt";
 /// Caminho do repositório dentro do sistema instalado.
@@ -70,7 +70,7 @@ impl Default for TargetTreePaths {
         Self {
             staging_repository: PathBuf::from(DEFAULT_STAGING_REPOSITORY),
             target_mount: PathBuf::from(DEFAULT_TARGET_MOUNT),
-            git_home: PathBuf::from("/run/kryonix-installer/target/git-home"),
+            git_home: PathBuf::from("/run/kryxd/target/git-home"),
         }
     }
 }

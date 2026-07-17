@@ -14,16 +14,16 @@ Este repositório é a fonte canônica do installer. O motor Kryonix
 .
 ├── Cargo.toml / Cargo.lock     # backend Rust (Axum, tokio, walkdir, …)
 ├── src/                        # executor, network, disk, auth, target_tree, …
-├── ui/                         # Vite + React (kryonix-installer-ui-web)
+├── ui/                         # Vite + React (kryxd-ui)
 ├── schemas/                    # JSON schema do install plan
 ├── nix/                        # derivations (package.nix, ui.nix)
-└── flake.nix                   # outputs: packages.${system}.{default, kryonix-installer}
+└── flake.nix                   # outputs: packages.${system}.{default, kryxd}
 ```
 
 ## Build via Nix
 
 ```sh
-nix build .#kryonix-installer
+nix build .#kryxd
 nix flake check --keep-going
 nix flake show --all-systems
 ```
@@ -49,18 +49,18 @@ npm run build
 
 ```nix
 # flake.nix
-inputs.kryonix-installer.url = "github:RAGton/kryonix-installer";
+inputs.kryxd.url = "github:RAGton/kryxd";
 
 # overlay
 final: prev: {
-  kryonix-installer = inputs.kryonix-installer.packages.${final.system}.kryonix-installer;
+  kryxd = inputs.kryxd.packages.${final.system}.kryxd;
 }
 ```
 
 DEV local pode sobrescrever via:
 
 ```sh
-nix build --override-input kryonix-installer path:../kryonix-installer
+nix build --override-input kryxd path:../kryxd
 ```
 
 ## Licença

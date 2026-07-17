@@ -4,7 +4,7 @@ set -euo pipefail
 echo "[+] Iniciando captura de evidências de UI e Testes..."
 
 # Configuração de caminhos e arquivos
-# Baseado na execução a partir da raiz de repos/kryonix-installer
+# Baseado na execução a partir da raiz de repos/kryxd
 EVIDENCE_DIR="../kryonix-vault/09-Logs/evidence"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 TAR_FILE="evidence_${TIMESTAMP}.tar.gz"

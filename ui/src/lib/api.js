@@ -1,33 +1,91 @@
-export async function getFleetStatus() {
-  const res = await fetch('/api/v1/fleet/status');
-  if (!res.ok) throw new Error('Failed to fetch fleet status');
+async function requestJson(path, options = {}) {
+  const res = await fetch(path, {
+    credentials: 'same-origin',
+    ...options,
+    headers: {
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error(detail.error || `Request failed: ${path}`);
+  }
   return res.json();
+}
+
+export async function loginGateway(credentials) {
+  return requestJson('/api/v1/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(credentials)
+  });
+}
+
+export async function getSession() {
+  return requestJson('/api/v1/auth/session');
+}
+
+export async function getFleetStatus() {
+  return requestJson('/api/v1/fleet/status');
 }
 
 export async function getStorageQuotasi() {
-  const res = await fetch('/api/v1/storage/quotas');
-  if (!res.ok) throw new Error('Failed to fetch storage quotas');
-  return res.json();
+  return requestJson('/api/v1/storage/quotas');
 }
 
 export async function getStoragePools() {
-  const res = await fetch('/api/v2/storage/pools');
-  if (!res.ok) throw new Error('Failed to fetch storage pools');
-  return res.json();
+  return requestJson('/api/v2/storage/pools');
+}
+
+export async function getCephStatus() {
+  return requestJson('/api/v2/storage/ceph/status');
+}
+
+export async function getCephOsds() {
+  return requestJson('/api/v2/storage/ceph/osds');
+}
+
+export async function getReplicationStatus() {
+  return requestJson('/api/v2/storage/replication/status');
+}
+
+export async function generateReplicationPlan(data) {
+  return requestJson('/api/v2/storage/replication/plan', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
 }
 
 export async function getVirtNodes() {
-  const res = await fetch('/api/v2/virt/nodes');
-  if (!res.ok) throw new Error('Failed to fetch virt nodes');
-  return res.json();
+  return requestJson('/api/v2/virt/nodes');
+}
+
+export async function getVirtInstances() {
+  return requestJson('/api/v2/virt/instances');
+}
+
+export async function getClusterTopology() {
+  return requestJson('/api/v2/cluster/topology');
+}
+
+export async function createInstance(config) {
+  return requestJson('/api/v2/virt/instances', {
+    method: 'POST',
+    body: JSON.stringify(config)
+  });
 }
 
 export async function createVirtInstance(config) {
-  const res = await fetch('/api/v2/virt/instances', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(config)
+  return createInstance(config);
+}
+
+export async function changeInstanceState(id, action) {
+  return requestJson(`/api/v2/virt/instances/${encodeURIComponent(id)}/state`, {
+    method: 'PUT',
+    body: JSON.stringify({ action })
   });
-  if (!res.ok) throw new Error('Failed to create instance');
-  return res.json();
+}
+
+export async function getHostMetrics() {
+  return requestJson('/api/v2/metrics/host');
 }

@@ -4,13 +4,15 @@ pub mod fleet;
 pub mod storage;
 pub mod ldap;
 
+use std::sync::Arc;
+
 use axum::Router;
 
-pub fn router<S>() -> Router<S>
-where
-    S: Clone + Send + Sync + 'static,
-{
+use crate::{AppState, api::auth};
+
+pub fn router() -> Router<Arc<AppState>> {
     Router::new()
+        .merge(auth::router())
         .merge(system::router())
         .merge(fleet::router())
         .merge(storage::router())

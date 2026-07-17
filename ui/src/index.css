@@ -1005,3 +1005,119 @@ textarea:focus-visible {
   font-size: 13px;
   color: var(--text2);
 }
+
+/* ── KVE AI Studio Enterprise Skin ─────────────────────────────────────── */
+
+:root {
+  --color-kve-bg: #05070a;
+  --color-kve-panel: rgba(10, 11, 20, 0.85);
+  --color-kve-border: rgba(56, 189, 248, 0.08);
+  --color-kve-accent: #38bdf8;
+  --color-kve-accent-muted: rgba(56, 189, 248, 0.1);
+  --color-kve-success: #0ea5e9;
+  --color-kve-warning: #f59e0b;
+  --color-kve-danger: #ef4444;
+  --color-kve-indigo: #1d4ed8;
+}
+
+body {
+  background-image:
+    radial-gradient(circle at 50% -20%, rgba(56, 189, 248, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 0% 100%, rgba(29, 78, 216, 0.05) 0%, transparent 40%),
+    linear-gradient(rgba(15, 23, 42, 0.5) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.5) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 30px 30px, 30px 30px;
+}
+
+.glass {
+  backdrop-filter: blur(12px);
+  background: var(--color-kve-panel);
+  border: 1px solid var(--color-kve-border);
+}
+
+.glass-hover {
+  transition: all 300ms ease;
+}
+
+.glass-hover:hover {
+  background: rgba(30, 41, 59, 0.8);
+}
+
+.technical-grid {
+  background-image:
+    linear-gradient(rgba(56, 189, 248, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+  animation: pulse-slow 8s ease-in-out infinite;
+}
+
+.hex-grid {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath fill-rule='evenodd' d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h2v7.5L28 15v16.5l-12.98 7.5V49h-2v-10L0 31.5V15zM12.98 41.5L1 34.58v-1.15l11.99 6.91 11.99-6.91v1.15L12.98 41.5z' fill='%2338bdf8' fill-opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.noise-overlay {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/svg%3E");
+  filter: contrast(150%) brightness(100%);
+}
+
+.react-grid-layout {
+  position: relative;
+  transition: height 200ms ease;
+}
+
+.react-grid-item {
+  transition: all 200ms ease;
+  transition-property: left, top;
+}
+
+.react-grid-item.cssTransforms {
+  transition-property: transform;
+}
+
+.react-grid-item.resizing,
+.react-grid-item.react-draggable-dragging {
+  z-index: 1000;
+  will-change: width, height;
+}
+
+.react-grid-item.react-draggable-dragging {
+  transition: none;
+  will-change: transform;
+}
+
+.react-grid-item.dropping {
+  visibility: hidden;
+}
+
+.react-grid-placeholder {
+  z-index: 2;
+  user-select: none;
+  border-radius: 1rem;
+  border: 2px dashed rgba(56, 189, 248, 0.4);
+  background: rgba(56, 189, 248, 0.1);
+}
+
+.react-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+}
+
+.react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(56, 189, 248, 0.4);
+  border-bottom: 2px solid rgba(56, 189, 248, 0.4);
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}

@@ -28,7 +28,7 @@ use crate::services::partitioner::{DiskValidator, DiskoRenderer, PartitionerErro
 use crate::services::security::{PasswordHasher, SecurityError};
 
 /// Diretório efêmero padrão dos planos e segredos durante a instalação.
-pub const DEFAULT_PLAN_STORE_ROOT: &str = "/run/kryonix-installer/secrets";
+pub const DEFAULT_PLAN_STORE_ROOT: &str = "/run/kryxd/secrets";
 
 const PLAN_FILE_NAME: &str = "plan.json";
 const ADMIN_PASSWORD_HASH_FILE_NAME: &str = "admin-password.hash";

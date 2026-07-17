@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const dir = '/home/rocha/kryonix/kryonix-installer/ui/src/pages';
+const dir = '/home/rocha/kryonix/kryxd/ui/src/pages';
 const files = fs.readdirSync(dir).filter(f => f.endsWith('.jsx'));
 
 files.forEach(f => {

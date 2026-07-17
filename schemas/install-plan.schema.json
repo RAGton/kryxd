@@ -106,6 +106,22 @@
         }
       }
     },
+    "btrfsStoragePlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "userQgroupLimit"
+      ],
+      "properties": {
+        "userQgroupLimit": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*(K|M|G|T|P)(i?B)?$",
+          "examples": [
+            "100G"
+          ]
+        }
+      }
+    },
     "storagePlan": {
       "type": "object",
       "additionalProperties": false,
@@ -184,6 +200,16 @@
               "type": "null"
             }
           ]
+        },
+        "btrfs": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/btrfsStoragePlan"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "allOf": [
@@ -235,6 +261,36 @@
             "properties": {
               "zfs": {
                 "$ref": "#/$defs/zfsStoragePlan"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "required": [
+                  "filesystem"
+                ],
+                "properties": {
+                  "filesystem": {
+                    "const": "btrfs"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "btrfs"
+            ],
+            "properties": {
+              "btrfs": {
+                "$ref": "#/$defs/btrfsStoragePlan"
               }
             }
           }

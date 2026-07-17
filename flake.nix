@@ -1,5 +1,5 @@
 {
-  description = "Kryonix Installer — declarative web installer for KryonixOS (Axum backend + Vite/React UI).";
+  description = "kryxd — Kryonix Daemon for continuous datacenter orchestration (Axum backend + Vite/React UI).";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-26.05";
@@ -27,11 +27,11 @@
         system:
         let
           pkgs = pkgsFor system;
-          kryonix-installer = pkgs.callPackage ./nix/package.nix { };
+          kryxd = pkgs.callPackage ./nix/package.nix { };
         in
         {
-          inherit kryonix-installer;
-          default = kryonix-installer;
+          inherit kryxd;
+          default = kryxd;
         }
       );
 
@@ -46,7 +46,7 @@
           pkgs = pkgsFor system;
         in
         {
-          cargo-tests = self.packages.${system}.kryonix-installer;
+          cargo-tests = self.packages.${system}.kryxd;
           ui-build = pkgs.callPackage ./nix/ui.nix { };
         }
       );

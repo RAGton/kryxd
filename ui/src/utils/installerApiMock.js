@@ -41,7 +41,7 @@ export const installerApiMock = {
           kind: 'github',
           repo,
           branch,
-          clone_path: '/run/kryonix-installer/sources/kryonixos',
+          clone_path: '/run/kryxd/sources/kryonixos',
           target_path: '/etc/kryonixos',
           validated: true,
         }

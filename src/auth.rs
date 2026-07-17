@@ -297,7 +297,7 @@ pub async fn list_repos(State(state): State<Arc<AppState>>) -> impl IntoResponse
         .get("https://api.github.com/user/repos")
         .header("Authorization", format!("Bearer {token}"))
         .header("Accept", "application/vnd.github+json")
-        .header("User-Agent", "kryonix-installer/0.1")
+        .header("User-Agent", "kryxd/0.1")
         .query(&[("per_page", "100"), ("sort", "updated")])
         .send()
         .await
@@ -430,7 +430,7 @@ async fn fetch_github_user(client: &reqwest::Client, token: &str) -> Option<GhUs
         .get("https://api.github.com/user")
         .header("Authorization", format!("Bearer {token}"))
         .header("Accept", "application/vnd.github+json")
-        .header("User-Agent", "kryonix-installer/0.1")
+        .header("User-Agent", "kryxd/0.1")
         .send()
         .await
         .ok()?

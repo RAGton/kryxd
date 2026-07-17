@@ -1,6 +1,9 @@
 //! Superfície HTTP v2 do instalador.
 
 pub mod console;
+pub mod auth;
+pub mod cluster;
+pub mod incus;
 pub mod install;
 pub mod storage;
 pub mod system;
@@ -25,6 +28,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/preflight", post(install::post_preflight))
         .route("/install", post(install::post_install))
         .nest("/virt", virt::router())
+        .nest("/cluster", cluster::router())
         .nest("/console", console::router())
         .nest("/storage", storage::router())
         .merge(system::router())

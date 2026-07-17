@@ -101,14 +101,14 @@ fn is_denied(name: &str) -> bool {
 /// — que filtra por *nome* de arquivo/diretório em qualquer profundidade —
 /// esta lista compara o caminho relativo inteiro.
 ///
-/// O caso de uso é `packages/kryonix-installer/`: source do próprio
+/// O caso de uso é `packages/kryxd/`: source do próprio
 /// installer dentro do motor. Ele é ferramenta de provisionamento, não
 /// componente do produto final, e estava vazando para
-/// `/mnt/etc/kryonixos/engine/packages/kryonix-installer/`. A externalização
-/// do installer para repo próprio (`github:RAGton/kryonix-installer`)
+/// `/mnt/etc/kryonixos/engine/packages/kryxd/`. A externalização
+/// do installer para repo próprio (`github:RAGton/kryxd`)
 /// resolve o problema na fonte; esta denylist é a defesa em profundidade
 /// para o caso de o fallback continuar presente no source do motor.
-const COPY_DENYLIST_RELATIVE_PATHS: &[&str] = &["packages/kryonix-installer"];
+const COPY_DENYLIST_RELATIVE_PATHS: &[&str] = &["packages/kryxd"];
 
 fn is_denied_relative(rel: &Path) -> bool {
     COPY_DENYLIST_RELATIVE_PATHS
@@ -1093,8 +1093,8 @@ mod tests {
     #[test]
     fn relative_denylist_blocks_internal_installer_source() {
         assert!(
-            is_denied_relative(Path::new("packages/kryonix-installer")),
-            "packages/kryonix-installer deve ser negado pela denylist relativa"
+            is_denied_relative(Path::new("packages/kryxd")),
+            "packages/kryxd deve ser negado pela denylist relativa"
         );
         // A denylist relativa bate o caminho exato; sub-paths não precisam ser
         // testados porque walkdir.filter_entry corta a subárvore inteira quando
@@ -1128,11 +1128,11 @@ mod tests {
         std::fs::create_dir_all(&src).expect("mkdir src");
 
         // Fixture: mini-engine com o fallback do installer presente.
-        let installer_src = src.join("packages/kryonix-installer/src");
+        let installer_src = src.join("packages/kryxd/src");
         std::fs::create_dir_all(&installer_src).expect("mkdir installer src");
         std::fs::write(
-            src.join("packages/kryonix-installer/Cargo.toml"),
-            "[package]\nname = \"kryonix-installer\"\n",
+            src.join("packages/kryxd/Cargo.toml"),
+            "[package]\nname = \"kryxd\"\n",
         )
         .expect("write Cargo.toml");
         std::fs::write(installer_src.join("main.rs"), "fn main() {}").expect("write main.rs");
@@ -1164,11 +1164,11 @@ mod tests {
 
         // Estado crítico: o source do installer NÃO pode vazar para o target.
         assert!(
-            !dst.join("packages/kryonix-installer").exists(),
-            "packages/kryonix-installer deve ser excluído pela denylist relativa"
+            !dst.join("packages/kryxd").exists(),
+            "packages/kryxd deve ser excluído pela denylist relativa"
         );
         assert!(
-            !dst.join("packages/kryonix-installer/Cargo.toml").exists(),
+            !dst.join("packages/kryxd/Cargo.toml").exists(),
             "arquivo dentro do installer interno também não pode existir"
         );
 

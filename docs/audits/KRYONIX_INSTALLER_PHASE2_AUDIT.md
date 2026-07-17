@@ -196,13 +196,13 @@ curl -X POST http://127.0.0.1:8080/dry-run \
   -d '{"disk":{"mode":"dry-run","target":"/dev/vda",...}}'
 
 # 7. Rodar safety checks standalone
-cargo test --package kryonix-installer -- safety 2>&1
+cargo test --package kryxd -- safety 2>&1
 
 # 8. Validar target flake gerado (após instalação em VM)
 nix flake check /mnt/etc/kryonixos --no-build
 
 # 9. Checar NVMe no safety
-cargo test --package kryonix-installer -- nvme 2>&1
+cargo test --package kryxd -- nvme 2>&1
 
 # 10. Verificar ausência de PXE e referencias internas
 grep -rn "LAN/PXE\|LAN-PXE\|path:/nix/store\|self\.outPath" src/ || echo "OK"

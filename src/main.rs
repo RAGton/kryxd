@@ -27,10 +27,7 @@ use std::convert::Infallible;
 use std::process::Command;
 use std::sync::Arc;
 use tokio::sync::{RwLock, broadcast};
-use tower_http::{
-    cors::{AllowOrigin, Any, CorsLayer},
-    services::ServeDir,
-};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 
 // ── Shared state ──────────────────────────────────────────────────────────────
 
@@ -280,7 +277,7 @@ async fn main() {
 
     let http_client = reqwest::Client::builder()
         .use_rustls_tls()
-        .user_agent("kryonix-installer/0.1")
+        .user_agent("kryxd/0.1")
         .build()
         .expect("Failed to build HTTP client");
 
@@ -301,10 +298,7 @@ async fn main() {
         install_service: Arc::new(api::install::InstallService::default()),
     });
 
-    let ui_dir = std::env::var("KRYONIX_INSTALLER_UI_DIR")
-        .unwrap_or_else(|_| "/run/current-system/sw/share/kryonix-installer/ui/dist".to_string());
-
-    let app = Router::new()
+    let legacy_api = Router::new()
         .route("/health", get(health))
         .route("/version", get(version_handler))
         // Hardware probe — canonical path matches spec, /probe kept for compat
@@ -336,8 +330,6 @@ async fn main() {
         .route("/install", post(install))
         .route("/install/status", get(install_status))
         .route("/install/progress", get(install_progress))
-        .nest("/api/v1", api::v1::router())
-        .nest("/api/v2", api::router())
         // Profiles
         .route("/profile/apply", post(apply_profile_endpoint))
         // Debug — inspeção do target flake gerado em /mnt/etc/kryonixos
@@ -357,7 +349,12 @@ async fn main() {
         .route("/api/disks/:device/partitions", get(get_partitions_handler))
         .route("/api/partition", post(partition_endpoint))
         .route("/api/reboot", post(reboot_endpoint))
-        .route("/api/stream", get(stream_logs))
+        .route("/api/stream", get(stream_logs));
+
+    let app = Router::new()
+        .nest("/api/v1", api::v1::router().nest("/legacy", legacy_api))
+        .nest("/api/v2", api::router())
+        .nest("/api/virt", api::virt::router())
         .layer(
             CorsLayer::new()
                 .allow_methods(Any)
@@ -374,8 +371,7 @@ async fn main() {
                     },
                 )),
         )
-        .with_state(state)
-        .fallback_service(ServeDir::new(ui_dir).fallback(ServeDir::new("ui/static")));
+        .with_state(state);
 
     let bind_addr =
         std::env::var("KRYONIX_INSTALLER_BIND").unwrap_or_else(|_| "127.0.0.1:8080".to_string());

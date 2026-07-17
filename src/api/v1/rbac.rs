@@ -6,13 +6,19 @@ use axum::{
 };
 use serde_json::{json, Value};
 
+use crate::api::auth;
+
 pub struct RequireCoreRole;
 
 #[async_trait]
 impl<S: Send + Sync> FromRequestParts<S> for RequireCoreRole {
     type Rejection = (StatusCode, Json<Value>);
 
-    async fn from_request_parts(_parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        if auth::is_core_session(&parts.headers) {
+            return Ok(RequireCoreRole);
+        }
+
         if let Ok(identity) = kryx::services::identity::check_identity() {
             if matches!(
                 identity.role,

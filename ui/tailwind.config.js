@@ -6,6 +6,15 @@ export default {
       colors: {
         'kryonix-dark': '#0f172a',
         'kryonix-blue': '#3b82f6',
+        'kve-bg': '#05070a',
+        'kve-panel': 'rgba(10, 11, 20, 0.85)',
+        'kve-border': 'rgba(56, 189, 248, 0.08)',
+        'kve-accent': '#38bdf8',
+        'kve-accent-muted': 'rgba(56, 189, 248, 0.1)',
+        'kve-success': '#0ea5e9',
+        'kve-warning': '#f59e0b',
+        'kve-danger': '#ef4444',
+        'kve-indigo': '#1d4ed8',
         'bg': 'var(--kx-bg)',
         'bg-elevated': 'var(--kx-surface)',
         'bg-surface': 'var(--kx-surface-elevated)',
@@ -47,11 +56,21 @@ export default {
         'fade-in-up': {
           '0%': { opacity: '0', transform: 'translateY(16px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'pulse-slow': {
+          '0%, 100%': { opacity: '0.3' },
+          '50%': { opacity: '0.6' },
+        },
+        'pulse-soft': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.7' },
         }
       },
       animation: {
         'fade-in': 'fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         'fade-in-up': 'fade-in-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'pulse-slow': 'pulse-slow 8s ease-in-out infinite',
+        'pulse-soft': 'pulse-soft 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       }
     },
   },
