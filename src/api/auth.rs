@@ -38,6 +38,13 @@ pub struct SessionClaims {
     pub iat: i64,
 }
 
+#[derive(Debug, Clone)]
+struct LoginIdentity {
+    uuid: String,
+    role: String,
+    edition: String,
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/auth/login", post(login))
@@ -48,15 +55,7 @@ async fn login(
     State(_state): State<Arc<AppState>>,
     Json(payload): Json<LoginRequest>,
 ) -> Result<impl axum::response::IntoResponse, (StatusCode, Json<ErrorResponse>)> {
-    let identity = kryx::services::identity::check_identity().map_err(|e| {
-        (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(ErrorResponse {
-                error: "IDENTITY_UNAVAILABLE".into(),
-                details: Some(e),
-            }),
-        )
-    })?;
+    let identity = login_identity()?;
 
     let expected_password = expected_password(&identity.uuid);
     let username_ok = matches!(payload.username.as_str(), "admin" | "gabriel" | "root");
@@ -74,7 +73,7 @@ async fn login(
 
     let now = Utc::now().timestamp();
     let expires_at = now + SESSION_TTL_SECONDS;
-    let role = format!("{:?}", identity.role);
+    let role = identity.role.clone();
     let claims = SessionClaims {
         sub: identity.uuid,
         role: role.clone(),
@@ -96,6 +95,28 @@ async fn login(
             expires_at,
         }),
     ))
+}
+
+fn login_identity() -> Result<LoginIdentity, (StatusCode, Json<ErrorResponse>)> {
+    match kryx::services::identity::check_identity() {
+        Ok(identity) => Ok(LoginIdentity {
+            uuid: identity.uuid,
+            role: format!("{:?}", identity.role),
+            edition: identity.edition,
+        }),
+        Err(_e) if std::env::var("KRYONIX_AUTH_PASSWORD").is_ok() => Ok(LoginIdentity {
+            uuid: "kryxd-dev-local".into(),
+            role: "Core".into(),
+            edition: "dev".into(),
+        }),
+        Err(e) => Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ErrorResponse {
+                error: "IDENTITY_UNAVAILABLE".into(),
+                details: Some(e),
+            }),
+        )),
+    }
 }
 
 async fn session(headers: HeaderMap) -> Result<Json<Value>, (StatusCode, Json<ErrorResponse>)> {

@@ -4,6 +4,8 @@ import WizardInstaller from './WizardInstaller.jsx';
 import DashboardLayoutWithTree from './layouts/DashboardLayoutWithTree.jsx';
 import ContextLayout from './layouts/ContextLayout.jsx';
 import Login from './views/Login';
+import DashboardView from './views/Dashboard';
+import PveResourceView from './views/PveResourceView';
 import Storage from './pages/kcp/Storage.jsx';
 import LocalSettings from './pages/kcp/LocalSettings.jsx';
 import KcpTerminal from './components/kcp/console/KcpTerminal.jsx';
@@ -17,6 +19,28 @@ function ContextPlaceholder({ title, description }) {
       <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-400">{description}</p>
     </div>
   );
+}
+
+function DatacenterResourceSummary() {
+  return <DashboardView />;
+}
+
+function NodeResourceSummary() {
+  const { nodeId } = useParams();
+  const id = nodeId || 'local-node';
+  return <PveResourceView type="node" id={id} label={id} />;
+}
+
+function VmResourceSummary() {
+  const { vmId } = useParams();
+  const id = vmId || 'vm';
+  return <PveResourceView type="qemu" id={id} label={id} />;
+}
+
+function CtResourceSummary() {
+  const { ctId } = useParams();
+  const id = ctId || 'ct';
+  return <PveResourceView type="lxc" id={id} label={id} />;
 }
 
 function RequireSession({ session, children }) {
@@ -291,13 +315,16 @@ export default function App() {
 
     async function loadBootstrap() {
       try {
-        const identityRes = await fetch('/api/v1/system/identity');
-        if (!identityRes.ok) throw new Error('No identity');
-        const identityData = await identityRes.json();
-        const sessionData = await getSession().catch(() => null);
+        const [identityData, sessionData] = await Promise.all([
+          fetch('/api/v1/system/identity')
+            .then((res) => (res.ok ? res.json() : null))
+            .catch(() => null),
+          getSession().catch(() => null),
+        ]);
         if (!alive) return;
         setIdentity(identityData);
         setSession(sessionData);
+        setError(false);
       } catch {
         if (!alive) return;
         setError(true);
@@ -320,11 +347,7 @@ export default function App() {
     );
   }
 
-  if (error || !identity) {
-    return <WizardInstaller />;
-  }
-
-  const role = identity.role || 'Desktop';
+  const role = session?.role || identity?.role || 'Core';
   const isCore = role === 'Core' || role === 'ThinkServer';
 
   return (
@@ -337,8 +360,8 @@ export default function App() {
 
         <Route path="/" element={<ProtectedRedirect session={session} to={isCore ? '/kcp/datacenter/summary' : '/local-settings'} />} />
         <Route path="/fleet" element={<ProtectedRedirect session={session} to="/kcp/datacenter/cluster" />} />
-        <Route path="/storage" element={<ProtectedRedirect session={session} to="/kcp/node/pve-alpha/storage/local-zfs/summary" />} />
-        <Route path="/virt" element={<ProtectedRedirect session={session} to="/kcp/node/pve-alpha/vm/100/summary" />} />
+        <Route path="/storage" element={<ProtectedRedirect session={session} to="/kcp/datacenter/storage" />} />
+        <Route path="/virt" element={<ProtectedRedirect session={session} to="/kcp/datacenter/summary" />} />
         <Route path="/local-settings" element={<ProtectedLocalSettings session={session} />} />
 
         {isCore && (
@@ -354,7 +377,7 @@ export default function App() {
 
             <Route path="datacenter" element={<ContextLayout />}>
               <Route index element={<Navigate to="summary" replace />} />
-              <Route path="summary" element={<ContextPlaceholder title="Datacenter Summary" description="Resumo do KVE datacenter: saúde geral, inventário, alertas e eventos recentes." />} />
+              <Route path="summary" element={<DatacenterResourceSummary />} />
               <Route path="cluster" element={<ContextPlaceholder title="Cluster" description="Membros, quórum, voters, leader e estado distribuído do cluster entram aqui." />} />
               <Route path="storage" element={<CephDatacenterStorage />} />
               <Route path="firewall" element={<ContextPlaceholder title="Firewall" description="Políticas globais de firewall e regras de datacenter entram aqui." />} />
@@ -362,7 +385,7 @@ export default function App() {
 
             <Route path="node/:nodeId" element={<ContextLayout />}>
               <Route index element={<Navigate to="summary" replace />} />
-              <Route path="summary" element={<ContextPlaceholder title="Node Summary" description="Visão contextual do host: identidade, status, recursos e health." />} />
+              <Route path="summary" element={<NodeResourceSummary />} />
               <Route path="shell" element={<ContextPlaceholder title="Shell" description="Shell administrativo seguro do node entra aqui em fase controlada." />} />
               <Route path="network" element={<ContextPlaceholder title="Network" description="Interfaces, bridges, uplinks, VLANs e estado de rede do node." />} />
               <Route path="disks" element={<NodeDisksPage />} />
@@ -377,7 +400,7 @@ export default function App() {
 
             <Route path="node/:nodeId/vm/:vmId" element={<ContextLayout />}>
               <Route index element={<Navigate to="summary" replace />} />
-              <Route path="summary" element={<ContextPlaceholder title="VM Summary" description="Resumo da VM selecionada: status, node, CPU, memória, disco e rede." />} />
+              <Route path="summary" element={<VmResourceSummary />} />
               <Route path="console" element={<KcpTerminal />} />
               <Route path="hardware" element={<ContextPlaceholder title="Hardware" description="CPU, memória, discos e NICs da VM entram aqui." />} />
               <Route path="snapshots" element={<ContextPlaceholder title="Snapshots" description="Linha do tempo de snapshots e ações seguras de restore entram aqui." />} />
@@ -385,7 +408,7 @@ export default function App() {
 
             <Route path="node/:nodeId/ct/:ctId" element={<ContextLayout />}>
               <Route index element={<Navigate to="summary" replace />} />
-              <Route path="summary" element={<ContextPlaceholder title="CT Summary" description="Resumo do container selecionado: status, node, recursos e rede." />} />
+              <Route path="summary" element={<CtResourceSummary />} />
               <Route path="console" element={<KcpTerminal />} />
               <Route path="hardware" element={<ContextPlaceholder title="Hardware" description="Limites de CPU, memória, rootfs e devices do container." />} />
               <Route path="snapshots" element={<ContextPlaceholder title="Snapshots" description="Snapshots e rollback do container entram aqui." />} />
