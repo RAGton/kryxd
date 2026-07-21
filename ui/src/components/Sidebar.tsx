@@ -26,7 +26,7 @@ import { ViewType, ResourceTreeNode } from '../types';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ContextMenu from './ContextMenu';
-import logoImg from '../assets/images/kryonix_logo_1784247250954.jpg';
+import logoImg from '../assets/logo.png';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

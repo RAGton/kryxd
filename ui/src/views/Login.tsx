@@ -14,7 +14,7 @@ import {
   Network 
 } from 'lucide-react';
 
-import logoImg from '../assets/images/kryonix_logo_1784247250954.jpg';
+import logoImg from '../assets/logo.png';
 
 interface LoginProps {
   onLogin: (session?: unknown) => void;
