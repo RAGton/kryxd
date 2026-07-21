@@ -26,10 +26,12 @@ use executor::{ProgressEvent, SafetyCheck, run_preflight};
 use futures_util::stream::Stream;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
 use tokio::sync::{RwLock, broadcast};
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
+use tower_http::services::{ServeDir, ServeFile};
 
 // ── Shared state ──────────────────────────────────────────────────────────────
 
@@ -256,6 +258,12 @@ fn save_install_state(status: &InstallStatus) {
     }
 }
 
+fn ui_dist_dir() -> PathBuf {
+    std::env::var_os("KRYXD_UI_DIST")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ui/dist"))
+}
+
 pub fn load_install_state() -> InstallStatus {
     if let Ok(json) = std::fs::read_to_string("/tmp/kryonix-install-state.json")
         && let Ok(status) = serde_json::from_str(&json)
@@ -370,10 +378,14 @@ async fn main() {
         .route("/api/stream", get(stream_logs))
         .merge(destructive_api);
 
+    let ui_dist = ui_dist_dir();
+    let index_file = ui_dist.join("index.html");
+
     let app = Router::new()
         .nest("/api/v1", api::v1::router().nest("/legacy", legacy_api))
         .nest("/api/v2", api::router())
         .nest("/api/virt", api::virt::router())
+        .fallback_service(ServeDir::new(ui_dist).not_found_service(ServeFile::new(index_file)))
         .layer(
             CorsLayer::new()
                 .allow_methods(Any)

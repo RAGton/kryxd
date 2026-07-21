@@ -5,6 +5,7 @@
   pkg-config,
   openssl,
   pam,
+  kryxdUi ? null,
 }:
 
 rustPlatform.buildRustPackage {
@@ -33,7 +34,13 @@ rustPlatform.buildRustPackage {
   doCheck = false;
 
   postInstall = ''
+    ${lib.optionalString (kryxdUi != null) ''
+      mkdir -p $out/share/kryxd/ui
+      cp -r ${kryxdUi}/dist $out/share/kryxd/ui/
+    ''}
+
     wrapProgram $out/bin/kryxd \
+      --set KRYXD_UI_DIST $out/share/kryxd/ui/dist \
       --set RUST_LOG info
     # GITHUB_CLIENT_ID must be supplied at runtime by the caller (nixos module or CLI).
     # Intentionally NOT hardcoded here — it is a deployment-time secret.

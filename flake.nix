@@ -27,10 +27,12 @@
         system:
         let
           pkgs = pkgsFor system;
-          kryxd = pkgs.callPackage ./nix/package.nix { };
+          kryxdUi = pkgs.callPackage ./nix/ui.nix { };
+          kryxd = pkgs.callPackage ./nix/package.nix { inherit kryxdUi; };
         in
         {
           inherit kryxd;
+          inherit kryxdUi;
           default = kryxd;
         }
       );
@@ -47,7 +49,7 @@
         in
         {
           cargo-tests = self.packages.${system}.kryxd;
-          ui-build = pkgs.callPackage ./nix/ui.nix { };
+          ui-build = self.packages.${system}.kryxdUi;
         }
       );
 
