@@ -11,7 +11,8 @@ import {
   Server, 
   ChevronDown, 
   ChevronUp, 
-  Network 
+  Network,
+  Monitor,
 } from 'lucide-react';
 
 import logoImg from '../assets/logo.png';
@@ -20,10 +21,33 @@ interface LoginProps {
   onLogin: (session?: unknown) => void;
 }
 
+const OPERATIONAL_SCOPE_OPTIONS = [
+  {
+    id: 'desktop',
+    label: 'Desktop',
+    icon: Monitor,
+    description: '🖥️ Workstation local com apps gráficos, telemetria e ajustes do host.',
+  },
+  {
+    id: 'cluster',
+    label: 'Think Server',
+    icon: Globe,
+    description: '🌐 Gerenciamento do Kryonix Think Server e virtualização.',
+  },
+  {
+    id: 'node',
+    label: 'Node',
+    icon: Server,
+    description: '🧩 Gerenciamento de node, sistemas diskless e boot de rede.',
+  },
+] as const;
+
+type OperationalScope = (typeof OPERATIONAL_SCOPE_OPTIONS)[number]['id'];
+
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [operationalScope, setOperationalScope] = useState<'node' | 'cluster'>('cluster');
+  const [operationalScope, setOperationalScope] = useState<OperationalScope>('desktop');
   const [targetHost, setTargetHost] = useState('');
   const [realm, setRealm] = useState('pve');
   const [realmDropdownOpen, setRealmDropdownOpen] = useState(false);
@@ -41,7 +65,17 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, realm }),
+        body: JSON.stringify({
+          username,
+          password,
+          realm,
+          operationalScope,
+          requestedCapabilities: {
+            desktop: operationalScope === 'desktop',
+            thinkServer: operationalScope === 'cluster',
+            node: operationalScope === 'node',
+          },
+        }),
       });
 
       if (!response.ok) {
@@ -51,6 +85,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
       const session = await response.json();
       localStorage.setItem('kve_operational_scope', operationalScope);
+      localStorage.setItem(
+        'kve_requested_capabilities',
+        JSON.stringify({
+          desktop: operationalScope === 'desktop',
+          thinkServer: operationalScope === 'cluster',
+          node: operationalScope === 'node',
+        }),
+      );
       if (targetHost) {
         localStorage.setItem('kve_remote_ip', targetHost);
       } else {
@@ -99,36 +141,28 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             {/* Operational Scope Premium Selector */}
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Escopo Operacional (Operational Scope)</label>
-              <div className="grid grid-cols-2 gap-2 bg-slate-950/60 p-1 border border-kve-border rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => setOperationalScope('node')}
-                  className={`py-2 px-3 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-2 ${
-                    operationalScope === 'node' 
-                      ? 'bg-kve-accent text-kve-bg shadow-[0_0_15px_rgba(56,189,248,0.3)]' 
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
-                  }`}
-                >
-                  <Server size={12} />
-                  Node Server
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOperationalScope('cluster')}
-                  className={`py-2 px-3 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-2 ${
-                    operationalScope === 'cluster' 
-                      ? 'bg-kve-accent text-kve-bg shadow-[0_0_15px_rgba(56,189,248,0.3)]' 
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
-                  }`}
-                >
-                  <Globe size={12} />
-                  KVE
-                </button>
+              <div className="grid grid-cols-3 gap-2 bg-slate-950/60 p-1 border border-kve-border rounded-xl">
+                {OPERATIONAL_SCOPE_OPTIONS.map((option) => {
+                  const Icon = option.icon;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setOperationalScope(option.id)}
+                      className={`py-2 px-2 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${
+                        operationalScope === option.id
+                          ? 'bg-kve-accent text-kve-bg shadow-[0_0_15px_rgba(56,189,248,0.3)]'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
+                      }`}
+                    >
+                      <Icon size={12} />
+                      {option.label}
+                    </button>
+                  );
+                })}
               </div>
               <p className="text-[9px] text-slate-500 text-center leading-normal">
-                {operationalScope === 'node' 
-                  ? '🖥️ Gerenciamento de sistemas diskless e boot de rede.' 
-                  : '🌐 Gerenciamento do sistema KVE de virtualização.'}
+                {OPERATIONAL_SCOPE_OPTIONS.find((option) => option.id === operationalScope)?.description}
               </p>
             </div>
 
