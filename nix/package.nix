@@ -4,6 +4,7 @@
   makeWrapper,
   pkg-config,
   openssl,
+  pam,
 }:
 
 rustPlatform.buildRustPackage {
@@ -20,7 +21,7 @@ rustPlatform.buildRustPackage {
     makeWrapper
     pkg-config
   ];
-  buildInputs = [ openssl ];
+  buildInputs = [ openssl pam ];
 
   # reqwest with rustls-tls links against openssl for the host build
   OPENSSL_NO_VENDOR = 1;
