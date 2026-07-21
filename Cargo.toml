@@ -27,3 +27,6 @@ notify  = "6"
 tracing = "0.1"
 walkdir = "2"
 pam = "0.8.0"
+
+[dev-dependencies]
+tower = { version = "0.4", features = ["util"] }

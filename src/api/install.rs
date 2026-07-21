@@ -906,6 +906,7 @@ mod tests {
             auth: crate::auth::new_auth_state(),
             http_client: reqwest::Client::new(),
             installer_token: TEST_INSTALLER_TOKEN.into(),
+            runtime_mode: crate::state::RuntimeMode::LiveInstaller,
             install_service: Arc::new(InstallService::new(store)),
         });
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")

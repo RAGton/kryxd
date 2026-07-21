@@ -1,4 +1,6 @@
 pub mod api;
+pub mod middleware;
+pub mod state;
 mod auth;
 mod detection;
 mod disk;
@@ -41,16 +43,17 @@ pub struct AppState {
     pub http_client: reqwest::Client,
     /// Token for destructive API calls
     pub installer_token: String,
+    pub runtime_mode: state::RuntimeMode,
     /// Casos de uso e stores isolados da API v2.
     pub install_service: Arc<api::install::InstallService>,
 }
 
 // ── Common error type ─────────────────────────────────────────────────────────
 
-#[derive(Serialize, Deserialize)]
-struct ErrorResponse {
-    error: String,
-    details: Option<String>,
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ErrorResponse {
+    pub error: String,
+    pub details: Option<String>,
 }
 
 type ApiError = (StatusCode, Json<ErrorResponse>);
@@ -253,7 +256,7 @@ fn save_install_state(status: &InstallStatus) {
     }
 }
 
-fn load_install_state() -> InstallStatus {
+pub fn load_install_state() -> InstallStatus {
     if let Ok(json) = std::fs::read_to_string("/tmp/kryonix-install-state.json")
         && let Ok(status) = serde_json::from_str(&json)
     {
@@ -288,6 +291,17 @@ async fn main() {
     println!("Pass this token in the X-Kryonix-Installer-Token header.");
     println!("============================================================");
 
+    let runtime_mode = match kryx::services::identity::check_identity() {
+        Ok(identity) => {
+            println!("Detected InstalledHost mode. Identity: {:?}", identity);
+            state::RuntimeMode::InstalledHost(identity)
+        },
+        Err(_) => {
+            println!("No valid identity found. Falling back to LiveInstaller mode.");
+            state::RuntimeMode::LiveInstaller
+        }
+    };
+
     let state = Arc::new(AppState {
         log_sender: Arc::new(log_tx),
         progress_tx: Arc::new(progress_tx),
@@ -295,8 +309,18 @@ async fn main() {
         auth: auth::new_auth_state(),
         http_client,
         installer_token,
+        runtime_mode,
         install_service: Arc::new(api::install::InstallService::default()),
     });
+
+    let destructive_api = Router::new()
+        .route("/plan", post(plan))
+        .route("/dry-run", post(dry_run))
+        .route("/install", post(install))
+        .route("/disk/apply", post(disk_apply_endpoint))
+        .route("/install/finalize", post(install_finalize_endpoint))
+        .route("/api/partition", post(partition_endpoint))
+        .layer(axum::middleware::from_fn_with_state(state.clone(), middleware::installer_guard::installer_guard));
 
     let legacy_api = Router::new()
         .route("/health", get(health))
@@ -325,9 +349,6 @@ async fn main() {
             "/api/source/github/create-from-template",
             post(source::create_from_template),
         )
-        .route("/plan", post(plan))
-        .route("/dry-run", post(dry_run))
-        .route("/install", post(install))
         .route("/install/status", get(install_status))
         .route("/install/progress", get(install_progress))
         // Profiles
@@ -339,17 +360,15 @@ async fn main() {
         // Detection
         .route("/api/detection", get(detection_handler))
         // Disk Planner
-        .route("/disk/apply", post(disk_apply_endpoint))
         .route("/disk/manual-setup", get(manual_setup_handler))
         // Installation
-        .route("/install/finalize", post(install_finalize_endpoint))
         .route("/api/validate-install", get(validate_install_handler))
         // Disk utilities
         .route("/api/disks", get(get_disks))
         .route("/api/disks/:device/partitions", get(get_partitions_handler))
-        .route("/api/partition", post(partition_endpoint))
         .route("/api/reboot", post(reboot_endpoint))
-        .route("/api/stream", get(stream_logs));
+        .route("/api/stream", get(stream_logs))
+        .merge(destructive_api);
 
     let app = Router::new()
         .nest("/api/v1", api::v1::router().nest("/legacy", legacy_api))

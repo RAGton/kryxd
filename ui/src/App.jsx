@@ -347,6 +347,10 @@ export default function App() {
     );
   }
 
+  if (!identity) {
+    return <WizardInstaller />;
+  }
+
   const role = session?.role || identity?.role || 'Core';
   const isCore = role === 'Core' || role === 'ThinkServer';
 

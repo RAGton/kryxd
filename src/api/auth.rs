@@ -4,6 +4,7 @@ use axum::{
     http::{HeaderMap, StatusCode, header},
     routing::{get, post},
 };
+use pam::Client;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -57,11 +58,19 @@ async fn login(
 ) -> Result<impl axum::response::IntoResponse, (StatusCode, Json<ErrorResponse>)> {
     let identity = login_identity()?;
 
-    let expected_password = expected_password(&identity.uuid);
-    let username_ok = matches!(payload.username.as_str(), "admin" | "gabriel" | "root");
-    let password_ok = constant_time_eq(payload.password.as_bytes(), expected_password.as_bytes());
+    let mut auth = Client::with_password("kryxd").map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: "PAM_INIT_FAILED".into(),
+                details: Some(e.to_string()),
+            }),
+        )
+    })?;
 
-    if !username_ok || !password_ok {
+    auth.conversation_mut().set_credentials(&payload.username, &payload.password);
+    
+    if auth.authenticate().is_err() {
         return Err((
             StatusCode::UNAUTHORIZED,
             Json(ErrorResponse {

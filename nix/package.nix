@@ -20,6 +20,7 @@ rustPlatform.buildRustPackage {
   nativeBuildInputs = [
     makeWrapper
     pkg-config
+    rustPlatform.bindgenHook
   ];
   buildInputs = [ openssl pam ];
 
