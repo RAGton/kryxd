@@ -40,6 +40,7 @@ interface SidebarProps {
   setCollapsed: (collapsed: boolean) => void;
   thinkServerActive?: boolean;
   setThinkServerActive?: (active: boolean) => void;
+  hideResourceTree?: boolean;
 }
 
 const ResourceTree: React.FC<{
@@ -119,7 +120,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   collapsed, 
   setCollapsed,
   thinkServerActive = false,
-  setThinkServerActive
+  setThinkServerActive,
+  hideResourceTree = false
 }) => {
   const [selectedNodeId, setSelectedNodeId] = useState<string>('dc-01');
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, node: any } | null>(null);
@@ -256,7 +258,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       <div className="flex-1 overflow-hidden flex flex-col">
         {/* Resource Tree */}
-        {!collapsed && (
+        {!collapsed && !hideResourceTree && (
           <div className="flex-1 overflow-y-auto py-2 custom-scrollbar border-b border-kve-border border-opacity-30">
             <h3 className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">
               {thinkServerActive ? 'Infra Centralizada' : 'Recursos'}

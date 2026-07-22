@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import WizardInstaller from './WizardInstaller.jsx';
 import DashboardLayoutWithTree from './layouts/DashboardLayoutWithTree.jsx';
 import ContextLayout from './layouts/ContextLayout.jsx';
 import Login from './views/Login';
 import DashboardView from './views/Dashboard';
 import PveResourceView from './views/PveResourceView';
+import BackgroundMosaic from './components/BackgroundMosaic';
+import Sidebar from './components/Sidebar';
+import Topbar from './components/Topbar';
 import Storage from './pages/kcp/Storage.jsx';
 import LocalSettings from './pages/kcp/LocalSettings.jsx';
 import KcpTerminal from './components/kcp/console/KcpTerminal.jsx';
@@ -63,6 +66,60 @@ function ProtectedLocalSettings({ session }) {
     <RequireSession session={session}>
       <div className="min-h-screen bg-[#0a0a0a] p-6 text-slate-100">
         <LocalSettings />
+      </div>
+    </RequireSession>
+  );
+}
+
+function ControlCenterHostLayout({ identity, session, children }) {
+  const navigate = useNavigate();
+  const [collapsed, setCollapsed] = useState(false);
+  const [selectedResource, setSelectedResource] = useState({
+    id: identity?.uuid || 'local-host',
+    type: identity?.role || 'Desktop',
+    label: identity?.edition || 'Kryonix Desktop'
+  });
+
+  const handleViewChange = (view) => {
+    if (view === 'dashboard') {
+      navigate('/desktop');
+      return;
+    }
+    // TODO: V2 API Bind — habilitar telas extras somente após capabilities reais do Axum.
+    navigate('/desktop');
+  };
+
+  return (
+    <RequireSession session={session}>
+      <div className="relative flex h-screen w-screen overflow-hidden bg-kve-bg pb-8 text-slate-100 selection:bg-kve-accent/30 selection:text-white">
+        <BackgroundMosaic />
+        <Sidebar
+          currentView="dashboard"
+          onViewChange={handleViewChange}
+          onResourceSelect={setSelectedResource}
+          collapsed={collapsed}
+          setCollapsed={setCollapsed}
+          hideResourceTree
+        />
+
+        <main className="relative z-10 flex min-w-0 flex-1 flex-col">
+          <Topbar
+            currentView="dashboard"
+            selectedResource={selectedResource}
+            onResourceSelect={setSelectedResource}
+          />
+          <div className="custom-scrollbar flex-1 overflow-y-auto p-8">
+            <div className="mx-auto max-w-7xl">{children}</div>
+          </div>
+          <footer className="glass z-40 flex h-8 shrink-0 items-center justify-between border-t border-kve-border px-8">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500">
+              Axum API: /api/v1/system/identity · /api/v2/metrics/host
+            </span>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-slate-600">
+              {identity?.role || 'Desktop'} · {identity?.edition || 'Kryonix'}
+            </span>
+          </footer>
+        </main>
       </div>
     </RequireSession>
   );
@@ -362,11 +419,12 @@ export default function App() {
           element={session?.authenticated ? <Navigate to="/" replace /> : <Login onLogin={setSession} />}
         />
 
-        <Route path="/" element={<ProtectedRedirect session={session} to={isCore ? '/kcp/datacenter/summary' : '/local-settings'} />} />
+        <Route path="/" element={<ProtectedRedirect session={session} to={isCore ? '/kcp/datacenter/summary' : '/desktop'} />} />
         <Route path="/fleet" element={<ProtectedRedirect session={session} to="/kcp/datacenter/cluster" />} />
         <Route path="/storage" element={<ProtectedRedirect session={session} to="/kcp/datacenter/storage" />} />
         <Route path="/virt" element={<ProtectedRedirect session={session} to="/kcp/datacenter/summary" />} />
         <Route path="/local-settings" element={<ProtectedLocalSettings session={session} />} />
+        <Route path="/desktop" element={<ControlCenterHostLayout identity={identity} session={session}><DashboardView /></ControlCenterHostLayout>} />
 
         {isCore && (
           <Route
@@ -422,7 +480,7 @@ export default function App() {
           </Route>
         )}
 
-        <Route path="*" element={<Navigate to={isCore ? '/' : '/local-settings'} replace />} />
+        <Route path="*" element={<Navigate to={isCore ? '/' : '/desktop'} replace />} />
       </Routes>
     </BrowserRouter>
   );
