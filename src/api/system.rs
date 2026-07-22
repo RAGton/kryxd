@@ -1,7 +1,7 @@
-use axum::{routing::get, Json, Router};
+use axum::{Json, Router, routing::get};
 use serde::Serialize;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tokio::{fs, time::sleep};
+use tokio::{fs, process::Command, time::sleep};
 
 /// Capacidades não destrutivas expostas pela API v2 do daemon.
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -27,6 +27,7 @@ pub struct HostMetrics {
     pub sampled_at_ms: u128,
     pub cpu_percent: f32,
     pub memory: MemoryMetrics,
+    pub storage: StorageMetrics,
     pub source: &'static str,
 }
 
@@ -37,6 +38,16 @@ pub struct MemoryMetrics {
     pub free_mb: u64,
     pub used_mb: u64,
     pub used_percent: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageMetrics {
+    pub mountpoint: String,
+    pub total_bytes: u64,
+    pub used_bytes: u64,
+    pub available_bytes: u64,
+    pub used_percent: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -87,6 +98,9 @@ async fn collect_host_metrics() -> HostMetrics {
     let memory = read_memory_metrics()
         .await
         .unwrap_or_else(|_| mock_memory_metrics());
+    let storage = read_storage_metrics()
+        .await
+        .unwrap_or_else(|_| fallback_storage_metrics());
 
     let cpu_percent = first_cpu
         .zip(second_cpu)
@@ -97,7 +111,57 @@ async fn collect_host_metrics() -> HostMetrics {
         sampled_at_ms: now_ms(),
         cpu_percent,
         memory,
+        storage,
         source: "procfs-or-dynamic-mock",
+    }
+}
+
+async fn read_storage_metrics() -> Result<StorageMetrics, String> {
+    let output = Command::new("df")
+        .args(["-Pk", "/"])
+        .output()
+        .await
+        .map_err(|e| format!("failed to read root filesystem usage: {e}"))?;
+    if !output.status.success() {
+        return Err("df failed for root filesystem".to_string());
+    }
+
+    let output_text = String::from_utf8_lossy(&output.stdout).to_string();
+    let line = output_text
+        .lines()
+        .last()
+        .ok_or_else(|| "missing df output".to_string())?;
+    let fields: Vec<_> = line.split_whitespace().collect();
+    if fields.len() < 6 {
+        return Err("invalid df output".to_string());
+    }
+
+    let total_kib = fields[1].parse::<u64>().map_err(|_| "invalid total size")?;
+    let used_kib = fields[2].parse::<u64>().map_err(|_| "invalid used size")?;
+    let available_kib = fields[3]
+        .parse::<u64>()
+        .map_err(|_| "invalid available size")?;
+    let used_percent = fields[4]
+        .trim_end_matches('%')
+        .parse::<u8>()
+        .map_err(|_| "invalid usage percent")?;
+
+    Ok(StorageMetrics {
+        mountpoint: fields[5].to_string(),
+        total_bytes: total_kib.saturating_mul(1024),
+        used_bytes: used_kib.saturating_mul(1024),
+        available_bytes: available_kib.saturating_mul(1024),
+        used_percent,
+    })
+}
+
+fn fallback_storage_metrics() -> StorageMetrics {
+    StorageMetrics {
+        mountpoint: "/".to_string(),
+        total_bytes: 0,
+        used_bytes: 0,
+        available_bytes: 0,
+        used_percent: 0,
     }
 }
 
@@ -215,7 +279,9 @@ fn now_ms() -> u128 {
 mod tests {
     use serde_json::json;
 
-    use super::{cpu_percent_between, current_status, parse_cpu_snapshot, parse_memory_metrics, CpuSnapshot};
+    use super::{
+        CpuSnapshot, cpu_percent_between, current_status, parse_cpu_snapshot, parse_memory_metrics,
+    };
 
     #[test]
     fn status_exposes_only_declared_api_capabilities() {
@@ -237,8 +303,8 @@ mod tests {
 
     #[test]
     fn parses_proc_stat_aggregate_cpu_line() {
-        let snapshot = parse_cpu_snapshot("cpu  10 20 30 40 5 0 0 0 0 0\ncpu0 1 2 3 4")
-            .expect("cpu snapshot");
+        let snapshot =
+            parse_cpu_snapshot("cpu  10 20 30 40 5 0 0 0 0 0\ncpu0 1 2 3 4").expect("cpu snapshot");
 
         assert_eq!(snapshot.idle, 45);
         assert_eq!(snapshot.total, 105);
@@ -247,8 +313,14 @@ mod tests {
     #[test]
     fn computes_cpu_percent_between_snapshots() {
         let percent = cpu_percent_between(
-            CpuSnapshot { idle: 40, total: 100 },
-            CpuSnapshot { idle: 60, total: 200 },
+            CpuSnapshot {
+                idle: 40,
+                total: 100,
+            },
+            CpuSnapshot {
+                idle: 60,
+                total: 200,
+            },
         )
         .expect("cpu percent");
 

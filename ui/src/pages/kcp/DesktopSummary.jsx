@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Cpu, Monitor, UserRound } from 'lucide-react';
+import { Activity, Cpu, HardDrive, Monitor, UserRound } from 'lucide-react';
 import KveCard from '../../components/KveCard';
 import { getHostMetrics, getSystemIdentity } from '../../lib/api.js';
 
@@ -8,6 +8,14 @@ function formatMb(value) {
   const mb = Number(value);
   if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
   return `${Math.round(mb)} MB`;
+}
+
+function formatBytes(value) {
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes) || bytes <= 0) return '—';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 }
 
 export default function DesktopSummary({ session }) {
@@ -90,6 +98,18 @@ export default function DesktopSummary({ session }) {
             </p>
             <div className="h-2 overflow-hidden rounded-full bg-slate-800">
               <div className="h-full rounded-full bg-kve-indigo" style={{ width: `${Math.min(memory?.usedPercent || 0, 100)}%` }} />
+            </div>
+          </div>
+        </KveCard>
+
+        <KveCard title="Storage" subtitle={metrics?.storage?.mountpoint || '/'} icon={<HardDrive size={18} />}>
+          <div className="space-y-3">
+            <p className="text-3xl font-black text-white">{metrics?.storage?.usedPercent ?? '—'}%</p>
+            <p className="font-mono text-xs text-slate-400">
+              {formatBytes(metrics?.storage?.usedBytes)} usados · {formatBytes(metrics?.storage?.availableBytes)} livres
+            </p>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+              <div className="h-full rounded-full bg-kve-warning" style={{ width: `${Math.min(metrics?.storage?.usedPercent || 0, 100)}%` }} />
             </div>
           </div>
         </KveCard>
