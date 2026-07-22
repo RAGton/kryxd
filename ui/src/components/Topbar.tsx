@@ -26,6 +26,8 @@ interface TopbarProps {
   thinkServerActive?: boolean;
   onThinkServerToggle?: () => void;
   onLogout?: () => void;
+  desktopMode?: boolean;
+  session?: { username?: string; real_name?: string; uid?: number; is_admin?: boolean };
 }
 
 const Topbar: React.FC<TopbarProps> = ({ 
@@ -34,7 +36,9 @@ const Topbar: React.FC<TopbarProps> = ({
   onResourceSelect,
   thinkServerActive = false,
   onThinkServerToggle,
-  onLogout
+  onLogout,
+  desktopMode = false,
+  session
 }) => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isKveCluster, setIsKveCluster] = useState(false);
@@ -79,7 +83,7 @@ const Topbar: React.FC<TopbarProps> = ({
       <div className="flex items-center gap-6">
         <div className="flex flex-col">
           <h1 className="text-lg font-bold text-white tracking-tight leading-tight uppercase italic flex items-center gap-2">
-            {thinkServerActive && currentView === 'node-server' ? (
+            {desktopMode ? 'Kryonix Control Center' : thinkServerActive && currentView === 'node-server' ? (
               <>
                 <Monitor size={16} className="text-kve-accent" />
                 Node Server
@@ -90,7 +94,7 @@ const Topbar: React.FC<TopbarProps> = ({
           </h1>
           <div className="flex items-center gap-2 text-[10px] font-mono text-slate-500 uppercase tracking-widest">
             <Globe size={10} />
-            <span>KRYONIX VE-DC-01</span>
+            <span>Kryonix Desktop</span>
             {selectedResource && !thinkServerActive && (
               <>
                 <span className="text-slate-700">/</span>
@@ -108,20 +112,18 @@ const Topbar: React.FC<TopbarProps> = ({
           </div>
         </div>
 
-        <div className="hidden lg:flex items-center gap-4 px-4 border-l border-kve-border">
-          <div className="flex items-center gap-2">
-            <Activity size={14} className="text-kve-success animate-pulse-soft" />
-            <span className="text-xs font-mono text-slate-400">SYS: OK</span>
+        {!desktopMode && (
+          <div className="hidden lg:flex items-center gap-4 px-4 border-l border-kve-border">
+            <div className="flex items-center gap-2">
+              <Activity size={14} className="text-kve-success animate-pulse-soft" />
+              <span className="text-xs font-mono text-slate-400">SYS: OK</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Cpu size={14} className="text-kve-accent" />
+              <span className="text-xs font-mono text-slate-400">LOAD: 0.42</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Cpu size={14} className="text-kve-accent" />
-            <span className="text-xs font-mono text-slate-400">LOAD: 0.42</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Zap size={14} className="text-kve-warning" />
-            <span className="text-xs font-mono text-slate-400">BOOT: PXE/HTTP</span>
-          </div>
-        </div>
+        )}
       </div>
 
       <div className="flex items-center gap-4">
@@ -193,7 +195,7 @@ const Topbar: React.FC<TopbarProps> = ({
               className="flex items-center gap-2 ml-2 p-1 pr-2 rounded-lg hover:bg-slate-800 transition-colors border border-transparent hover:border-kve-border"
             >
               <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-xs font-bold text-white shrink-0 border border-kve-border">
-                AR
+                {(session?.real_name || session?.username || 'US').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()}
               </div>
               <ChevronDown size={14} className={`text-slate-400 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -206,8 +208,8 @@ const Topbar: React.FC<TopbarProps> = ({
                 />
                 <div className="absolute right-0 mt-2 w-56 bg-slate-900 border border-kve-border rounded-xl shadow-2xl py-2 z-50 overflow-hidden">
                   <div className="px-4 py-2 border-b border-kve-border/50 mb-2">
-                    <p className="text-sm font-bold text-white truncate">Aguiar Rocha</p>
-                    <p className="text-[10px] text-slate-500 font-mono truncate">root@kve-pve</p>
+                    <p className="text-sm font-bold text-white truncate">{session?.real_name || session?.username || 'Usuário local'}</p>
+                    <p className="text-[10px] text-slate-500 font-mono truncate">@{session?.username || '—'} · UID {session?.uid ?? '—'}</p>
                   </div>
                   
                   <button className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">

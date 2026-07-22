@@ -101,6 +101,7 @@ function ControlCenterHostLayout({ identity, session, children }) {
           collapsed={collapsed}
           setCollapsed={setCollapsed}
           hideResourceTree
+          desktopMode
         />
 
         <main className="relative z-10 flex min-w-0 flex-1 flex-col">
@@ -108,16 +109,15 @@ function ControlCenterHostLayout({ identity, session, children }) {
             currentView="dashboard"
             selectedResource={selectedResource}
             onResourceSelect={setSelectedResource}
+            desktopMode
+            session={session}
           />
           <div className="custom-scrollbar flex-1 overflow-y-auto p-8">
             <div className="mx-auto max-w-7xl">{children}</div>
           </div>
-          <footer className="glass z-40 flex h-8 shrink-0 items-center justify-between border-t border-kve-border px-8">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500">
-              Axum API: /api/v1/system/identity · /api/v2/metrics/host
-            </span>
+          <footer className="glass z-40 flex h-8 shrink-0 items-center justify-end border-t border-kve-border px-8">
             <span className="text-[10px] font-mono uppercase tracking-widest text-slate-600">
-              {identity?.role || 'Desktop'} · {identity?.edition || 'Kryonix'}
+              {identity?.edition || 'Kryonix Desktop'}
             </span>
           </footer>
         </main>

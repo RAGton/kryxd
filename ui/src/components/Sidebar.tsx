@@ -41,6 +41,7 @@ interface SidebarProps {
   thinkServerActive?: boolean;
   setThinkServerActive?: (active: boolean) => void;
   hideResourceTree?: boolean;
+  desktopMode?: boolean;
 }
 
 const ResourceTree: React.FC<{
@@ -121,7 +122,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   setCollapsed,
   thinkServerActive = false,
   setThinkServerActive,
-  hideResourceTree = false
+  hideResourceTree = false,
+  desktopMode = false
 }) => {
   const [selectedNodeId, setSelectedNodeId] = useState<string>('dc-01');
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, node: any } | null>(null);
@@ -217,14 +219,20 @@ const Sidebar: React.FC<SidebarProps> = ({
     });
   };
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Resumo', icon: LayoutDashboard },
-    { id: 'users', label: 'Usuários', icon: Users },
-    { id: 'storage', label: 'Storage', icon: Database },
-    { id: 'logs', label: 'Logs', icon: FileText },
-    { id: 'api-hub', label: 'Contratos API', icon: Network },
-    { id: 'settings', label: 'Configurações', icon: Settings },
-  ];
+  const menuItems = (desktopMode
+    ? [
+        { id: 'dashboard', label: 'Visão geral', icon: LayoutDashboard },
+        { id: 'users', label: 'Meu usuário', icon: Users },
+        { id: 'settings', label: 'Configurações', icon: Settings },
+      ]
+    : [
+        { id: 'dashboard', label: 'Resumo', icon: LayoutDashboard },
+        { id: 'users', label: 'Usuários', icon: Users },
+        { id: 'storage', label: 'Storage', icon: Database },
+        { id: 'logs', label: 'Logs', icon: FileText },
+        { id: 'api-hub', label: 'Contratos API', icon: Network },
+        { id: 'settings', label: 'Configurações', icon: Settings },
+      ]);
 
   const currentActiveTree = thinkServerActive ? netbootTree : resourceTree;
 
@@ -240,7 +248,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <img src={logoImg} alt="Logo" className="w-full h-full object-cover" />
             </div>
             <span className="font-bold text-sm tracking-tight text-white uppercase italic">
-              {thinkServerActive ? (
+              {desktopMode ? 'Kryonix Control Center' : thinkServerActive ? (
                 <>KRYONIX <span className="text-kve-accent font-bold">NODE</span></>
               ) : (
                 <>KRYONIX <span className="text-[10px] font-normal text-slate-500">NODE</span></>
