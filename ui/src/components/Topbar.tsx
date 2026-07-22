@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Search, 
   Bell, 
@@ -40,6 +41,7 @@ const Topbar: React.FC<TopbarProps> = ({
   desktopMode = false,
   session
 }) => {
+  const navigate = useNavigate();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isKveCluster, setIsKveCluster] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -183,7 +185,12 @@ const Topbar: React.FC<TopbarProps> = ({
             <Bell size={20} />
             <span className="absolute top-2 right-2 w-2 h-2 bg-kve-danger rounded-full border-2 border-kve-bg" />
           </button>
-          <button className="p-2 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 hover:text-white">
+          <button
+            onClick={() => navigate('/desktop/terminal')}
+            title="Abrir terminal do host"
+            aria-label="Abrir terminal do host"
+            className="p-2 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 hover:text-white"
+          >
             <Terminal size={20} />
           </button>
           <button className="p-2 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 hover:text-white">
