@@ -210,6 +210,12 @@ fn user_identity(username: &str) -> UserIdentity {
     }
 }
 
+pub fn authenticated_session(
+    headers: &HeaderMap,
+) -> Result<SessionClaims, (StatusCode, Json<ErrorResponse>)> {
+    session_claims_from_headers(headers)
+}
+
 pub fn is_core_session(headers: &HeaderMap) -> bool {
     session_claims_from_headers(headers)
         .map(|claims| matches!(claims.role.as_str(), "Core" | "ThinkServer"))

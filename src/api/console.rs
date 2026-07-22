@@ -1,33 +1,150 @@
 //! KCP Web Console - WebSocket proxy for Incus instances.
-//! 
+//!
 //! SECURITY: This module acts as a reverse proxy - Incus secrets NEVER leave the backend.
 //! The browser connects to Axum, and Axum connects to Incus.
 
 use axum::{
-    extract::{Path, WebSocketUpgrade},
-    http::StatusCode,
-    response::IntoResponse,
     Json,
+    extract::{Path, WebSocketUpgrade},
+    http::{HeaderMap, StatusCode},
+    response::IntoResponse,
     routing::get,
 };
 use futures_util::{SinkExt, StreamExt};
+use portable_pty::{CommandBuilder, PtySize, native_pty_system};
+use std::io::{Read, Write};
 use std::sync::Arc;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
 use tracing::{debug, error, info};
+use users::os::unix::UserExt;
 
-use crate::AppState;
 use super::v1::rbac::RequireCoreRole;
+use crate::AppState;
 
 pub fn router() -> axum::Router<Arc<AppState>> {
     axum::Router::new()
+        .route("/host/ws", get(websocket_host_terminal))
         .route("/instances/:name/console/ws", get(websocket_console))
 }
 
+/// Terminal local do host, sempre limitado à sessão PAM autenticada.
+async fn websocket_host_terminal(
+    headers: HeaderMap,
+    ws: WebSocketUpgrade,
+) -> Result<impl IntoResponse, (StatusCode, Json<crate::ErrorResponse>)> {
+    let claims = crate::api::auth::authenticated_session(&headers)?;
+    let username = claims.username;
+    Ok(ws.on_upgrade(move |socket| handle_host_terminal(socket, username)))
+}
+
+async fn handle_host_terminal(socket: axum::extract::ws::WebSocket, username: String) {
+    let Some(user) = users::get_user_by_name(&username) else {
+        error!("Authenticated terminal user does not exist: {username}");
+        return;
+    };
+
+    let shell = user.shell().to_string_lossy().into_owned();
+    let home = user.home_dir().to_string_lossy().into_owned();
+    let pty_system = native_pty_system();
+    let pair = match pty_system.openpty(PtySize {
+        rows: 32,
+        cols: 120,
+        pixel_width: 0,
+        pixel_height: 0,
+    }) {
+        Ok(pair) => pair,
+        Err(error) => {
+            error!("Failed to open host terminal PTY: {error}");
+            return;
+        }
+    };
+
+    let mut command = CommandBuilder::new("runuser");
+    command.args(["--user", &username, "--", &shell, "-l"]);
+    command.env("HOME", &home);
+    command.env("USER", &username);
+    command.env("TERM", "xterm-256color");
+
+    let mut child = match pair.slave.spawn_command(command) {
+        Ok(child) => child,
+        Err(error) => {
+            error!("Failed to spawn host terminal shell: {error}");
+            return;
+        }
+    };
+    drop(pair.slave);
+
+    let reader = match pair.master.try_clone_reader() {
+        Ok(reader) => reader,
+        Err(error) => {
+            error!("Failed to clone host terminal reader: {error}");
+            let _ = child.kill();
+            return;
+        }
+    };
+    let mut writer = match pair.master.take_writer() {
+        Ok(writer) => writer,
+        Err(error) => {
+            error!("Failed to open host terminal writer: {error}");
+            let _ = child.kill();
+            return;
+        }
+    };
+
+    let (output_tx, mut output_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(32);
+    std::thread::spawn(move || {
+        let mut reader = reader;
+        let mut buffer = [0u8; 8192];
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) | Err(_) => break,
+                Ok(size) => {
+                    if output_tx.blocking_send(buffer[..size].to_vec()).is_err() {
+                        break;
+                    }
+                }
+            }
+        }
+    });
+
+    let (mut sink, mut stream) = socket.split();
+    loop {
+        tokio::select! {
+            message = stream.next() => {
+                match message {
+                    Some(Ok(axum::extract::ws::Message::Text(text))) => {
+                        if writer.write_all(text.as_bytes()).is_err() { break; }
+                        let _ = writer.flush();
+                    }
+                    Some(Ok(axum::extract::ws::Message::Binary(data))) => {
+                        if writer.write_all(&data).is_err() { break; }
+                        let _ = writer.flush();
+                    }
+                    Some(Ok(axum::extract::ws::Message::Close(_))) | None => break,
+                    Some(Ok(_)) => {}
+                    Some(Err(_)) => break,
+                }
+            }
+            output = output_rx.recv() => {
+                match output {
+                    Some(bytes) => {
+                        let text = String::from_utf8_lossy(&bytes).into_owned();
+                        if sink.send(axum::extract::ws::Message::Text(text.into())).await.is_err() { break; }
+                    }
+                    None => break,
+                }
+            }
+        }
+    }
+
+    let _ = child.kill();
+}
+
 /// WebSocket proxy endpoint for instance console access.
-/// 
+///
 /// # RBAC
 /// Only Core or ThinkServer roles can open console sessions (via RequireCoreRole middleware).
-/// 
+///
 /// # Flow
 /// 1. Browser connects to this endpoint
 /// 2. Backend authenticates to Incus locally
@@ -53,24 +170,19 @@ async fn websocket_console(
         }
     };
 
-    info!("Console WebSocket proxy ready for instance: {}", instance_name);
-    
-    Ok(ws.on_upgrade(move |socket| {
-        handle_websocket_upgrade(socket, incus_ws_url, instance_name)
-    }))
+    info!(
+        "Console WebSocket proxy ready for instance: {}",
+        instance_name
+    );
+
+    Ok(ws.on_upgrade(move |socket| handle_websocket_upgrade(socket, incus_ws_url, instance_name)))
 }
 
 /// Obtain the Incus console WebSocket URL via exec endpoint.
 /// Uses `incus exec` with a shell to get interactive console access.
 async fn get_incus_console_url(instance_name: &str) -> Result<String, String> {
     let output = tokio::process::Command::new("incus")
-        .args([
-            "exec",
-            instance_name,
-            "--raw",
-            "--",
-            "sh",
-        ])
+        .args(["exec", instance_name, "--raw", "--", "sh"])
         .output()
         .await
         .map_err(|e| format!("Failed to spawn incus exec: {}", e))?;
@@ -105,9 +217,12 @@ async fn handle_websocket_upgrade(
             error!("Failed to connect to Incus WebSocket: {}", e);
             // Send error to browser before closing
             let (mut sender, _) = browser_socket.split();
-            let _ = sender.send(axum::extract::ws::Message::Text(
-                format!("ERROR: Could not connect to instance console: {}", e)
-            )).await;
+            let _ = sender
+                .send(axum::extract::ws::Message::Text(format!(
+                    "ERROR: Could not connect to instance console: {}",
+                    e
+                )))
+                .await;
             return;
         }
     };
@@ -161,29 +276,43 @@ async fn handle_websocket_upgrade(
         while let Some(msg) = incus_stream.next().await {
             match msg {
                 Ok(WsMessage::Text(text)) => {
-                    if let Err(e) = browser_sink.send(axum::extract::ws::Message::Text(text)).await {
+                    if let Err(e) = browser_sink
+                        .send(axum::extract::ws::Message::Text(text))
+                        .await
+                    {
                         error!("Error forwarding incus->browser: {}", e);
                         break;
                     }
                 }
                 Ok(WsMessage::Binary(data)) => {
-                    if let Err(e) = browser_sink.send(axum::extract::ws::Message::Binary(data)).await {
+                    if let Err(e) = browser_sink
+                        .send(axum::extract::ws::Message::Binary(data))
+                        .await
+                    {
                         error!("Error forwarding incus->browser binary: {}", e);
                         break;
                     }
                 }
                 Ok(WsMessage::Close(_)) => {
-                    let _ = browser_sink.send(axum::extract::ws::Message::Close(None)).await;
+                    let _ = browser_sink
+                        .send(axum::extract::ws::Message::Close(None))
+                        .await;
                     break;
                 }
                 Ok(WsMessage::Ping(data)) => {
-                    if let Err(e) = browser_sink.send(axum::extract::ws::Message::Ping(data)).await {
+                    if let Err(e) = browser_sink
+                        .send(axum::extract::ws::Message::Ping(data))
+                        .await
+                    {
                         error!("Error forwarding ping: {}", e);
                         break;
                     }
                 }
                 Ok(WsMessage::Pong(data)) => {
-                    if let Err(e) = browser_sink.send(axum::extract::ws::Message::Pong(data)).await {
+                    if let Err(e) = browser_sink
+                        .send(axum::extract::ws::Message::Pong(data))
+                        .await
+                    {
                         error!("Error forwarding pong: {}", e);
                         break;
                     }
@@ -201,7 +330,9 @@ async fn handle_websocket_upgrade(
 }
 
 /// Connect to Incus WebSocket as client.
-async fn connect_to_incus_ws(url: &str) -> Result<
+async fn connect_to_incus_ws(
+    url: &str,
+) -> Result<
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
     String,
 > {
@@ -209,6 +340,6 @@ async fn connect_to_incus_ws(url: &str) -> Result<
     let (socket, _) = tokio_tungstenite::connect_async(url)
         .await
         .map_err(|e| format!("WebSocket connection failed: {}", e))?;
-    
+
     Ok(socket)
 }

@@ -50,6 +50,19 @@ pub struct StorageMetrics {
     pub used_percent: u8,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemDetails {
+    pub cpu_model: String,
+    pub cpu_cores: u32,
+    pub gpu_info: Vec<String>,
+    pub kernel: String,
+    pub uptime_seconds: u64,
+    pub uptime_display: String,
+    pub nixos_generation: Option<String>,
+    pub systemd_health: String,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct CpuSnapshot {
     idle: u64,
@@ -63,6 +76,7 @@ where
 {
     Router::new()
         .route("/system/status", get(system_status))
+        .route("/system/details", get(system_details))
         .route("/metrics/host", get(host_metrics))
 }
 
@@ -73,6 +87,10 @@ where
 /// produzir efeitos colaterais.
 pub async fn system_status() -> Json<SystemStatus> {
     Json(current_status())
+}
+
+pub async fn system_details() -> Json<SystemDetails> {
+    Json(collect_system_details().await)
 }
 
 pub async fn host_metrics() -> Json<HostMetrics> {
@@ -88,6 +106,103 @@ fn current_status() -> SystemStatus {
             secrets: true,
             preflight: true,
         },
+    }
+}
+
+async fn collect_system_details() -> SystemDetails {
+    let cpuinfo = fs::read_to_string("/proc/cpuinfo")
+        .await
+        .unwrap_or_default();
+    let cpu_model = cpuinfo
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("model name\t: ")
+                .or_else(|| line.strip_prefix("Hardware\t: "))
+        })
+        .unwrap_or("CPU desconhecida")
+        .trim()
+        .to_string();
+    let cpu_cores = cpuinfo
+        .lines()
+        .filter(|line| line.starts_with("processor"))
+        .count() as u32;
+    let kernel = Command::new("uname")
+        .arg("-r")
+        .output()
+        .await
+        .ok()
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "desconhecido".into());
+    let uptime_seconds = fs::read_to_string("/proc/uptime")
+        .await
+        .ok()
+        .and_then(|value| value.split_whitespace().next()?.parse::<f64>().ok())
+        .map(|value| value as u64)
+        .unwrap_or_default();
+    let nixos_generation = fs::read_link("/nix/var/nix/profiles/system")
+        .await
+        .ok()
+        .and_then(|path| {
+            path.file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+        });
+    let systemd_health = Command::new("systemctl")
+        .args(["is-system-running", "--quiet"])
+        .status()
+        .await
+        .map(|status| {
+            if status.success() {
+                "healthy"
+            } else {
+                "degraded"
+            }
+        })
+        .unwrap_or("unknown")
+        .to_string();
+
+    SystemDetails {
+        cpu_model,
+        cpu_cores,
+        gpu_info: detect_gpu_info().await,
+        kernel,
+        uptime_seconds,
+        uptime_display: format_uptime(uptime_seconds),
+        nixos_generation,
+        systemd_health,
+    }
+}
+
+async fn detect_gpu_info() -> Vec<String> {
+    let mut gpus = Vec::new();
+    if let Ok(mut entries) = fs::read_dir("/sys/class/drm").await {
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !name.starts_with("card") || name.contains('-') {
+                continue;
+            }
+            let vendor = fs::read_to_string(entry.path().join("device/vendor"))
+                .await
+                .unwrap_or_else(|_| "GPU detectada".into())
+                .trim()
+                .to_string();
+            gpus.push(format!("{name} ({vendor})"));
+        }
+    }
+    if gpus.is_empty() {
+        gpus.push("Nenhuma GPU dedicada detectada".into());
+    }
+    gpus
+}
+
+fn format_uptime(seconds: u64) -> String {
+    let days = seconds / 86_400;
+    let hours = (seconds % 86_400) / 3_600;
+    let minutes = (seconds % 3_600) / 60;
+    if days > 0 {
+        format!("{days}d {hours}h {minutes}min")
+    } else {
+        format!("{hours}h {minutes}min")
     }
 }
 
