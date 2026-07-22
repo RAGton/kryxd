@@ -12,6 +12,7 @@ use axum::{
 };
 use futures_util::{SinkExt, StreamExt};
 use portable_pty::{CommandBuilder, PtySize, native_pty_system};
+use serde::Deserialize;
 use std::io::{Read, Write};
 use std::sync::Arc;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
@@ -20,6 +21,15 @@ use users::os::unix::UserExt;
 
 use super::v1::rbac::RequireCoreRole;
 use crate::AppState;
+#[derive(Debug, Deserialize)]
+struct TerminalClientMessage {
+    #[serde(rename = "type")]
+    kind: Option<String>,
+    data: Option<String>,
+    input: Option<String>,
+    cols: Option<u16>,
+    rows: Option<u16>,
+}
 
 pub fn router() -> axum::Router<Arc<AppState>> {
     axum::Router::new()
@@ -37,9 +47,14 @@ async fn websocket_host_terminal(
     Ok(ws.on_upgrade(move |socket| handle_host_terminal(socket, username)))
 }
 
-async fn handle_host_terminal(socket: axum::extract::ws::WebSocket, username: String) {
+async fn handle_host_terminal(mut socket: axum::extract::ws::WebSocket, username: String) {
     let Some(user) = users::get_user_by_name(&username) else {
-        error!("Authenticated terminal user does not exist: {username}");
+        send_terminal_error(
+            &mut socket,
+            "USER_NOT_FOUND",
+            "Usuário autenticado não existe no host",
+        )
+        .await;
         return;
     };
 
@@ -55,6 +70,12 @@ async fn handle_host_terminal(socket: axum::extract::ws::WebSocket, username: St
         Ok(pair) => pair,
         Err(error) => {
             error!("Failed to open host terminal PTY: {error}");
+            send_terminal_error(
+                &mut socket,
+                "PTY_OPEN_FAILED",
+                "Não foi possível abrir a PTY do host",
+            )
+            .await;
             return;
         }
     };
@@ -63,30 +84,54 @@ async fn handle_host_terminal(socket: axum::extract::ws::WebSocket, username: St
     command.args(["--user", &username, "--", &shell, "-l"]);
     command.env("HOME", &home);
     command.env("USER", &username);
+    command.env("LOGNAME", &username);
     command.env("TERM", "xterm-256color");
+    command.env(
+        "PATH",
+        format!("/run/current-system/sw/bin:/etc/profiles/per-user/{username}/bin:/bin:/usr/bin"),
+    );
 
     let mut child = match pair.slave.spawn_command(command) {
         Ok(child) => child,
         Err(error) => {
             error!("Failed to spawn host terminal shell: {error}");
+            send_terminal_error(
+                &mut socket,
+                "SHELL_SPAWN_FAILED",
+                "Não foi possível iniciar o shell do usuário",
+            )
+            .await;
             return;
         }
     };
     drop(pair.slave);
 
-    let reader = match pair.master.try_clone_reader() {
+    let master = pair.master;
+    let reader = match master.try_clone_reader() {
         Ok(reader) => reader,
         Err(error) => {
             error!("Failed to clone host terminal reader: {error}");
             let _ = child.kill();
+            send_terminal_error(
+                &mut socket,
+                "PTY_READER_FAILED",
+                "Falha ao ler a saída do terminal",
+            )
+            .await;
             return;
         }
     };
-    let mut writer = match pair.master.take_writer() {
+    let mut writer = match master.take_writer() {
         Ok(writer) => writer,
         Err(error) => {
             error!("Failed to open host terminal writer: {error}");
             let _ = child.kill();
+            send_terminal_error(
+                &mut socket,
+                "PTY_WRITER_FAILED",
+                "Falha ao enviar entrada ao terminal",
+            )
+            .await;
             return;
         }
     };
@@ -108,13 +153,48 @@ async fn handle_host_terminal(socket: axum::extract::ws::WebSocket, username: St
     });
 
     let (mut sink, mut stream) = socket.split();
+    let ready = serde_json::json!({
+        "type": "ready",
+        "username": username,
+        "shell": shell,
+        "home": home,
+        "cols": 120,
+        "rows": 32,
+    });
+    if sink
+        .send(axum::extract::ws::Message::Text(ready.to_string().into()))
+        .await
+        .is_err()
+    {
+        let _ = child.kill();
+        return;
+    }
+
     loop {
         tokio::select! {
             message = stream.next() => {
                 match message {
                     Some(Ok(axum::extract::ws::Message::Text(text))) => {
-                        if writer.write_all(text.as_bytes()).is_err() { break; }
-                        let _ = writer.flush();
+                        if let Ok(control) = serde_json::from_str::<TerminalClientMessage>(&text) {
+                            match control.kind.as_deref() {
+                                Some("resize") => {
+                                    let cols = control.cols.unwrap_or(120).clamp(2, 500);
+                                    let rows = control.rows.unwrap_or(32).clamp(2, 200);
+                                    if let Err(error) = master.resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 }) {
+                                        let _ = sink.send(axum::extract::ws::Message::Text(serde_json::json!({"type":"error","code":"PTY_RESIZE_FAILED","message":error.to_string()}).to_string().into())).await;
+                                    }
+                                }
+                                Some("input") => {
+                                    let data = control.data.or(control.input).unwrap_or_default();
+                                    if writer.write_all(data.as_bytes()).is_err() { break; }
+                                    let _ = writer.flush();
+                                }
+                                _ => {}
+                            }
+                        } else {
+                            if writer.write_all(text.as_bytes()).is_err() { break; }
+                            let _ = writer.flush();
+                        }
                     }
                     Some(Ok(axum::extract::ws::Message::Binary(data))) => {
                         if writer.write_all(&data).is_err() { break; }
@@ -138,6 +218,13 @@ async fn handle_host_terminal(socket: axum::extract::ws::WebSocket, username: St
     }
 
     let _ = child.kill();
+}
+
+async fn send_terminal_error(socket: &mut axum::extract::ws::WebSocket, code: &str, message: &str) {
+    let payload = serde_json::json!({"type": "error", "code": code, "message": message});
+    let _ = socket
+        .send(axum::extract::ws::Message::Text(payload.to_string().into()))
+        .await;
 }
 
 /// WebSocket proxy endpoint for instance console access.
