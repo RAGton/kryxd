@@ -201,7 +201,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     <ShieldCheck size={18} className="text-kve-success" />
                   </div>
                   <p className="mt-2 text-[9px] leading-normal text-slate-500">
-                    Perfil fixo detectado em /api/v1/system/identity. Neste host Desktop o login usa PAM local; seleção manual de outros papéis fica bloqueada.
+                    Perfil fixo detectado para este host. O login usa PAM local; seleção manual de outros papéis fica bloqueada.
                   </p>
                 </div>
               ) : (

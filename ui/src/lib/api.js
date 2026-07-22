@@ -90,6 +90,10 @@ export async function changeInstanceState(id, action) {
   });
 }
 
+export async function getHostDetails() {
+  return requestJson('/api/v2/system/details');
+}
+
 export async function getHostMetrics() {
   return requestJson('/api/v2/metrics/host');
 }

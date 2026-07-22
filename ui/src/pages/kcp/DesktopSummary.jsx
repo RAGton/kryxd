@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Activity, Cpu, HardDrive, Monitor, UserRound } from 'lucide-react';
 import KveCard from '../../components/KveCard';
-import { getHostMetrics, getSystemIdentity } from '../../lib/api.js';
+import { getHostDetails, getHostMetrics, getSystemIdentity } from '../../lib/api.js';
 
 function formatMb(value) {
   if (!Number.isFinite(Number(value))) return '—';
@@ -21,6 +21,7 @@ function formatBytes(value) {
 export default function DesktopSummary({ session }) {
   const [identity, setIdentity] = useState(null);
   const [metrics, setMetrics] = useState(null);
+  const [details, setDetails] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -28,13 +29,15 @@ export default function DesktopSummary({ session }) {
 
     async function loadDesktopSummary() {
       try {
-        const [identityData, metricsData] = await Promise.all([
+        const [identityData, metricsData, detailsData] = await Promise.all([
           getSystemIdentity().catch(() => null),
           getHostMetrics().catch(() => null),
+          getHostDetails().catch(() => null),
         ]);
         if (!alive) return;
         setIdentity(identityData);
         setMetrics(metricsData);
+        setDetails(detailsData);
         setError('');
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : 'Falha ao carregar telemetria local.');
@@ -55,7 +58,7 @@ export default function DesktopSummary({ session }) {
     <div className="space-y-6 min-h-screen pb-20">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-kve-accent">Kryonix Control Center</p>
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-kve-accent">Resumo do host</p>
           <h2 className="mt-2 text-3xl font-black tracking-tight text-white">Seu computador</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-400">
             Visão rápida do host e da sessão atual.
@@ -81,7 +84,7 @@ export default function DesktopSummary({ session }) {
           </div>
         </KveCard>
 
-        <KveCard title="CPU" subtitle="/api/v2/metrics/host" icon={<Cpu size={18} />}>
+        <KveCard title="CPU" subtitle={details?.cpuModel || 'Processador'} icon={<Cpu size={18} />}>
           <div className="space-y-3">
             <p className="text-3xl font-black text-white">{metrics?.cpuPercent ?? '—'}%</p>
             <div className="h-2 overflow-hidden rounded-full bg-slate-800">
@@ -90,7 +93,7 @@ export default function DesktopSummary({ session }) {
           </div>
         </KveCard>
 
-        <KveCard title="Memória" subtitle="procfs via Axum" icon={<Activity size={18} />}>
+        <KveCard title="Memória" subtitle="Uso atual" icon={<Activity size={18} />}>
           <div className="space-y-3">
             <p className="text-3xl font-black text-white">{memory?.usedPercent ?? '—'}%</p>
             <p className="font-mono text-xs text-slate-500">
@@ -118,6 +121,10 @@ export default function DesktopSummary({ session }) {
           <div className="space-y-3">
             <p className="text-2xl font-black text-white">{identity?.role || 'Desktop'}</p>
             <p className="text-xs leading-5 text-slate-400">{identity?.edition || 'Kryonix Desktop'}</p>
+            <p className="text-xs text-slate-500">{details?.cpuCores || '—'} núcleos · {details?.uptimeDisplay || 'Uptime indisponível'}</p>
+            <p className="text-xs text-slate-500">Kernel {details?.kernel || '—'}</p>
+            <p className="text-xs text-slate-500">NixOS {details?.nixosGeneration || 'geração desconhecida'} · systemd {details?.systemdHealth || 'unknown'}</p>
+            <p className="truncate text-xs text-slate-500" title={details?.gpuInfo?.join(', ')}>{details?.gpuInfo?.join(', ') || 'GPU indisponível'}</p>
           </div>
         </KveCard>
       </div>

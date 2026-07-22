@@ -222,6 +222,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const menuItems = (desktopMode
     ? [
         { id: 'dashboard', label: 'Visão geral', icon: LayoutDashboard },
+        { id: 'terminal', label: 'Terminal', icon: Terminal },
         { id: 'users', label: 'Meu usuário', icon: Users },
         { id: 'settings', label: 'Configurações', icon: Settings },
       ]

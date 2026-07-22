@@ -13,6 +13,7 @@ import Topbar from './components/Topbar';
 import Storage from './pages/kcp/Storage.jsx';
 import LocalSettings from './pages/kcp/LocalSettings.jsx';
 import KcpTerminal from './components/kcp/console/KcpTerminal.jsx';
+import TerminalConsole from './components/TerminalConsole.tsx';
 import { getCephOsds, getCephStatus, getSession, getStoragePools } from './lib/api.js';
 
 function ContextPlaceholder({ title, description }) {
@@ -86,7 +87,10 @@ function ControlCenterHostLayout({ identity, session, children }) {
       navigate('/desktop');
       return;
     }
-    // TODO: V2 API Bind — habilitar telas extras somente após capabilities reais do Axum.
+    if (view === 'terminal') {
+      navigate('/desktop/terminal');
+      return;
+    }
     navigate('/desktop');
   };
 
@@ -426,6 +430,7 @@ export default function App() {
         <Route path="/virt" element={<ProtectedRedirect session={session} to="/kcp/datacenter/summary" />} />
         <Route path="/local-settings" element={<ProtectedLocalSettings session={session} />} />
         <Route path="/desktop" element={<ControlCenterHostLayout identity={identity} session={session}><DesktopSummary session={session} /></ControlCenterHostLayout>} />
+        <Route path="/desktop/terminal" element={<ControlCenterHostLayout identity={identity} session={session}><TerminalConsole /></ControlCenterHostLayout>} />
 
         {isCore && (
           <Route
