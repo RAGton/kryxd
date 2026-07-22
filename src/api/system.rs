@@ -146,6 +146,13 @@ async fn collect_system_details() -> SystemDetails {
         .and_then(|path| {
             path.file_name()
                 .map(|name| name.to_string_lossy().into_owned())
+        })
+        .map(|name| {
+            name.strip_prefix("system-")
+                .unwrap_or(&name)
+                .strip_suffix("-link")
+                .unwrap_or(&name)
+                .to_string()
         });
     let systemd_health = Command::new("systemctl")
         .args(["is-system-running", "--quiet"])
@@ -174,6 +181,21 @@ async fn collect_system_details() -> SystemDetails {
 }
 
 async fn detect_gpu_info() -> Vec<String> {
+    if let Ok(output) = Command::new("lspci").output().await {
+        let gpus: Vec<String> = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .filter(|line| {
+                line.contains("VGA compatible controller")
+                    || line.contains("3D controller")
+                    || line.contains("Display controller")
+            })
+            .map(|line| line.trim().to_string())
+            .collect();
+        if !gpus.is_empty() {
+            return gpus;
+        }
+    }
+
     let mut gpus = Vec::new();
     if let Ok(mut entries) = fs::read_dir("/sys/class/drm").await {
         while let Ok(Some(entry)) = entries.next_entry().await {
