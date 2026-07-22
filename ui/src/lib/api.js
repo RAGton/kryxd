@@ -25,6 +25,10 @@ export async function getSession() {
   return requestJson('/api/v1/auth/session');
 }
 
+export async function getSystemIdentity() {
+  return requestJson('/api/v1/system/identity');
+}
+
 export async function getFleetStatus() {
   return requestJson('/api/v1/fleet/status');
 }

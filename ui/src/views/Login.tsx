@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ShieldAlert, 
@@ -44,16 +44,62 @@ const OPERATIONAL_SCOPE_OPTIONS = [
 
 type OperationalScope = (typeof OPERATIONAL_SCOPE_OPTIONS)[number]['id'];
 
+type SystemIdentity = {
+  role?: string;
+  hostname?: string;
+  edition?: string;
+};
+
+function scopeFromRole(role?: string): OperationalScope {
+  if (role === 'ThinkServer' || role === 'Core') return 'cluster';
+  if (role === 'Node') return 'node';
+  return 'desktop';
+}
+
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [operationalScope, setOperationalScope] = useState<OperationalScope>('desktop');
   const [targetHost, setTargetHost] = useState('');
-  const [realm, setRealm] = useState('pve');
+  const [realm, setRealm] = useState('pam');
   const [realmDropdownOpen, setRealmDropdownOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [identity, setIdentity] = useState<SystemIdentity | null>(null);
+  const [identityChecked, setIdentityChecked] = useState(false);
+
+  const fixedHostIdentity = Boolean(identity?.role);
+  const effectiveScope = fixedHostIdentity ? scopeFromRole(identity?.role) : operationalScope;
+  const effectiveRealm = fixedHostIdentity ? 'pam' : realm;
+  const selectedScope = OPERATIONAL_SCOPE_OPTIONS.find((option) => option.id === effectiveScope);
+
+  useEffect(() => {
+    let alive = true;
+
+    fetch('/api/v1/system/identity', { credentials: 'same-origin' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: SystemIdentity | null) => {
+        if (!alive) return;
+        setIdentity(data);
+        if (data?.role) {
+          setOperationalScope(scopeFromRole(data.role));
+          setRealm('pam');
+          setTargetHost('');
+          setShowAdvanced(false);
+        }
+      })
+      .catch(() => {
+        if (alive) setIdentity(null);
+      })
+      .finally(() => {
+        if (alive) setIdentityChecked(true);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,12 +114,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         body: JSON.stringify({
           username,
           password,
-          realm,
-          operationalScope,
+          realm: effectiveRealm,
+          operationalScope: effectiveScope,
           requestedCapabilities: {
-            desktop: operationalScope === 'desktop',
-            thinkServer: operationalScope === 'cluster',
-            node: operationalScope === 'node',
+            desktop: effectiveScope === 'desktop',
+            thinkServer: effectiveScope === 'cluster',
+            node: effectiveScope === 'node',
           },
         }),
       });
@@ -84,16 +130,16 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
 
       const session = await response.json();
-      localStorage.setItem('kve_operational_scope', operationalScope);
+      localStorage.setItem('kve_operational_scope', effectiveScope);
       localStorage.setItem(
         'kve_requested_capabilities',
         JSON.stringify({
-          desktop: operationalScope === 'desktop',
-          thinkServer: operationalScope === 'cluster',
-          node: operationalScope === 'node',
+          desktop: effectiveScope === 'desktop',
+          thinkServer: effectiveScope === 'cluster',
+          node: effectiveScope === 'node',
         }),
       );
-      if (targetHost) {
+      if (!fixedHostIdentity && targetHost) {
         localStorage.setItem('kve_remote_ip', targetHost);
       } else {
         localStorage.removeItem('kve_remote_ip');
@@ -141,68 +187,91 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             {/* Operational Scope Premium Selector */}
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Escopo Operacional (Operational Scope)</label>
-              <div className="grid grid-cols-3 gap-2 bg-slate-950/60 p-1 border border-kve-border rounded-xl">
-                {OPERATIONAL_SCOPE_OPTIONS.map((option) => {
-                  const Icon = option.icon;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => setOperationalScope(option.id)}
-                      className={`py-2 px-2 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${
-                        operationalScope === option.id
-                          ? 'bg-kve-accent text-kve-bg shadow-[0_0_15px_rgba(56,189,248,0.3)]'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
-                      }`}
-                    >
-                      <Icon size={12} />
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="text-[9px] text-slate-500 text-center leading-normal">
-                {OPERATIONAL_SCOPE_OPTIONS.find((option) => option.id === operationalScope)?.description}
-              </p>
+              {fixedHostIdentity ? (
+                <div className="rounded-xl border border-kve-accent/20 bg-kve-accent/10 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-widest text-kve-accent">
+                        {selectedScope?.label || 'Desktop'} Local
+                      </p>
+                      <p className="mt-1 text-[10px] text-slate-500">
+                        {identity?.hostname || 'host local'} · {identity?.edition || identity?.role || 'Kryonix'}
+                      </p>
+                    </div>
+                    <ShieldCheck size={18} className="text-kve-success" />
+                  </div>
+                  <p className="mt-2 text-[9px] leading-normal text-slate-500">
+                    Perfil fixo detectado em /api/v1/system/identity. A seleção manual de Desktop/Think Server/Node fica bloqueada neste host.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-2 bg-slate-950/60 p-1 border border-kve-border rounded-xl">
+                    {OPERATIONAL_SCOPE_OPTIONS.map((option) => {
+                      const Icon = option.icon;
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => setOperationalScope(option.id)}
+                          className={`py-2 px-2 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${
+                            operationalScope === option.id
+                              ? 'bg-kve-accent text-kve-bg shadow-[0_0_15px_rgba(56,189,248,0.3)]'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
+                          }`}
+                        >
+                          <Icon size={12} />
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[9px] text-slate-500 text-center leading-normal">
+                    {selectedScope?.description}
+                  </p>
+                </>
+              )}
+              {!identityChecked && <p className="text-[9px] text-slate-600 text-center">Detectando identidade do host…</p>}
             </div>
 
-            {/* Target Host / Remote IP - Collapsible Accordion */}
-            <div className="border-t border-b border-kve-border/40 py-2">
-              <button
-                type="button"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="w-full flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider hover:text-white transition-colors"
-              >
-                <span className="flex items-center gap-1.5">
-                  <Network size={12} className="text-kve-accent" />
-                  Target Host / Remote IP (Opcional)
-                </span>
-                {showAdvanced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-              </button>
-              
-              <AnimatePresence>
-                {showAdvanced && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden pt-2"
-                  >
-                    <div className="relative group">
-                      <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-kve-accent transition-colors" size={14} />
-                      <input 
-                        type="text" 
-                        placeholder="Ex: 192.168.1.10" 
-                        className="w-full bg-slate-900/40 border border-kve-border rounded-lg pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-kve-accent/50 transition-all placeholder:text-slate-700 font-mono"
-                        value={targetHost}
-                        onChange={(e) => setTargetHost(e.target.value)}
-                      />
-                    </div>
-                    <p className="text-[9px] text-slate-600 mt-1">Conecte-se e controle frotas remotas alternativas.</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            {!fixedHostIdentity && (
+              <div className="border-t border-b border-kve-border/40 py-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="w-full flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider hover:text-white transition-colors"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Network size={12} className="text-kve-accent" />
+                    Target Host / Remote IP (Opcional)
+                  </span>
+                  {showAdvanced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                </button>
+                
+                <AnimatePresence>
+                  {showAdvanced && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden pt-2"
+                    >
+                      <div className="relative group">
+                        <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-kve-accent transition-colors" size={14} />
+                        <input 
+                          type="text" 
+                          placeholder="Ex: 192.168.1.10" 
+                          className="w-full bg-slate-900/40 border border-kve-border rounded-lg pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-kve-accent/50 transition-all placeholder:text-slate-700 font-mono"
+                          value={targetHost}
+                          onChange={(e) => setTargetHost(e.target.value)}
+                        />
+                      </div>
+                      <p className="text-[9px] text-slate-600 mt-1">Conecte-se e controle frotas remotas alternativas.</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
 
             {/* Credentials Fields */}
             <div className="space-y-4">
@@ -212,7 +281,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-kve-accent transition-colors" size={16} />
                   <input 
                     type="text" 
-                    placeholder="Username / UID (admin)" 
+                    placeholder="Usuário Linux deste host (ex.: rocha)" 
                     className="w-full bg-slate-900/50 border border-kve-border rounded-xl pl-9 pr-4 py-2.5 text-xs text-white focus:outline-none focus:border-kve-accent/50 transition-all placeholder:text-slate-700"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
@@ -227,7 +296,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-kve-accent transition-colors" size={16} />
                   <input 
                     type="password" 
-                    placeholder="Chave (admin)" 
+                    placeholder="Senha do usuário Linux" 
                     className="w-full bg-slate-900/50 border border-kve-border rounded-xl pl-9 pr-4 py-2.5 text-xs text-white focus:outline-none focus:border-kve-accent/50 transition-all placeholder:text-slate-700"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -243,19 +312,21 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   <div className="relative">
                     <button
                       type="button"
-                      onClick={() => setRealmDropdownOpen(!realmDropdownOpen)}
+                      onClick={() => {
+                        if (!fixedHostIdentity) setRealmDropdownOpen(!realmDropdownOpen);
+                      }}
                       className={`w-full bg-slate-900/50 border rounded-xl pl-9 pr-9 py-2.5 text-xs text-white text-left focus:outline-none transition-all flex items-center justify-between ${realmDropdownOpen ? 'border-kve-accent/50 shadow-[0_0_10px_rgba(56,189,248,0.1)]' : 'border-kve-border hover:border-slate-700'}`}
                     >
                       <span className="truncate">
-                        {realm === 'pam' && 'Linux PAM standard authentication'}
-                        {realm === 'pve' && 'Kryonix VE authentication server'}
-                        {realm === 'ldap' && 'LDAP Directory'}
+                        {effectiveRealm === 'pam' && 'Linux PAM standard authentication'}
+                        {effectiveRealm === 'pve' && 'Kryonix VE authentication server'}
+                        {effectiveRealm === 'ldap' && 'LDAP Directory'}
                       </span>
-                      <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none transition-transform duration-200 ${realmDropdownOpen ? 'rotate-180' : ''}`} size={14} />
+                      <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none transition-transform duration-200 ${realmDropdownOpen && !fixedHostIdentity ? 'rotate-180' : ''}`} size={14} />
                     </button>
                     
                     <AnimatePresence>
-                      {realmDropdownOpen && (
+                      {realmDropdownOpen && !fixedHostIdentity && (
                         <>
                           <div 
                             className="fixed inset-0 z-40" 

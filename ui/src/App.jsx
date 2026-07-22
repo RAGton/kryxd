@@ -6,6 +6,7 @@ import ContextLayout from './layouts/ContextLayout.jsx';
 import Login from './views/Login';
 import DashboardView from './views/Dashboard';
 import PveResourceView from './views/PveResourceView';
+import DesktopSummary from './pages/kcp/DesktopSummary.jsx';
 import BackgroundMosaic from './components/BackgroundMosaic';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
@@ -424,7 +425,7 @@ export default function App() {
         <Route path="/storage" element={<ProtectedRedirect session={session} to="/kcp/datacenter/storage" />} />
         <Route path="/virt" element={<ProtectedRedirect session={session} to="/kcp/datacenter/summary" />} />
         <Route path="/local-settings" element={<ProtectedLocalSettings session={session} />} />
-        <Route path="/desktop" element={<ControlCenterHostLayout identity={identity} session={session}><DashboardView /></ControlCenterHostLayout>} />
+        <Route path="/desktop" element={<ControlCenterHostLayout identity={identity} session={session}><DesktopSummary /></ControlCenterHostLayout>} />
 
         {isCore && (
           <Route
