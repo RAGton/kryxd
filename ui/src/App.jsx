@@ -425,7 +425,7 @@ export default function App() {
         <Route path="/storage" element={<ProtectedRedirect session={session} to="/kcp/datacenter/storage" />} />
         <Route path="/virt" element={<ProtectedRedirect session={session} to="/kcp/datacenter/summary" />} />
         <Route path="/local-settings" element={<ProtectedLocalSettings session={session} />} />
-        <Route path="/desktop" element={<ControlCenterHostLayout identity={identity} session={session}><DesktopSummary /></ControlCenterHostLayout>} />
+        <Route path="/desktop" element={<ControlCenterHostLayout identity={identity} session={session}><DesktopSummary session={session} /></ControlCenterHostLayout>} />
 
         {isCore && (
           <Route

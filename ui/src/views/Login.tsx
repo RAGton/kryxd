@@ -32,7 +32,7 @@ const OPERATIONAL_SCOPE_OPTIONS = [
     id: 'cluster',
     label: 'Think Server',
     icon: Globe,
-    description: '🌐 Gerenciamento do Kryonix Think Server e virtualização.',
+    description: '🌐 Administração do Core/Think Server e virtualização quando este host tiver esse papel.',
   },
   {
     id: 'node',
@@ -126,7 +126,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
       if (!response.ok) {
         const detail = await response.json().catch(() => ({}));
-        throw new Error(detail.error || 'Credenciais inválidas para o KVE Gateway.');
+        throw new Error(detail.error || 'Credenciais inválidas para este host Kryonix.');
       }
 
       const session = await response.json();
@@ -146,7 +146,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
       onLogin(session);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha de autenticação no KVE Gateway.');
+      setError(err instanceof Error ? err.message : 'Falha de autenticação neste host Kryonix.');
       setIsLoading(false);
     }
   };
@@ -201,7 +201,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     <ShieldCheck size={18} className="text-kve-success" />
                   </div>
                   <p className="mt-2 text-[9px] leading-normal text-slate-500">
-                    Perfil fixo detectado em /api/v1/system/identity. A seleção manual de Desktop/Think Server/Node fica bloqueada neste host.
+                    Perfil fixo detectado em /api/v1/system/identity. Neste host Desktop o login usa PAM local; seleção manual de outros papéis fica bloqueada.
                   </p>
                 </div>
               ) : (

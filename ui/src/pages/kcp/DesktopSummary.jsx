@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Cpu, HardDrive, Monitor, ShieldCheck } from 'lucide-react';
+import { Activity, Cpu, Monitor, UserRound } from 'lucide-react';
 import KveCard from '../../components/KveCard';
 import { getHostMetrics, getSystemIdentity } from '../../lib/api.js';
 
@@ -10,7 +10,7 @@ function formatMb(value) {
   return `${Math.round(mb)} MB`;
 }
 
-export default function DesktopSummary() {
+export default function DesktopSummary({ session }) {
   const [identity, setIdentity] = useState(null);
   const [metrics, setMetrics] = useState(null);
   const [error, setError] = useState('');
@@ -47,14 +47,14 @@ export default function DesktopSummary() {
     <div className="space-y-6 min-h-screen pb-20">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-kve-accent">Kryonix Desktop</p>
-          <h2 className="mt-2 text-3xl font-black tracking-tight text-white">Resumo local do host</h2>
-          <p className="mt-2 max-w-2xl text-sm text-slate-500">
-            Painel limpo consumindo somente o Axum do próprio kryxd. Sem mock server NodeJS e sem endpoints legados /api/nodes.
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-kve-accent">Kryonix Control Center</p>
+          <h2 className="mt-2 text-3xl font-black tracking-tight text-white">Seu computador</h2>
+          <p className="mt-2 max-w-2xl text-sm text-slate-400">
+            Visão rápida do host e da sessão atual.
           </p>
         </div>
         <div className="rounded-full border border-kve-border bg-slate-950/70 px-4 py-2 text-xs font-mono uppercase tracking-widest text-slate-400">
-          {identity?.hostname || 'host local'} · {identity?.role || 'Desktop'}
+          {identity?.edition || 'Kryonix Desktop'}
         </div>
       </div>
 
@@ -65,11 +65,11 @@ export default function DesktopSummary() {
       )}
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <KveCard title="Identidade" subtitle="/api/v1/system/identity" icon={<Monitor size={18} />}>
+        <KveCard title="Sessão atual" subtitle="Usuário conectado" icon={<UserRound size={18} />}>
           <div className="space-y-3">
-            <p className="text-2xl font-black text-white">{identity?.edition || 'Kryonix Desktop'}</p>
-            <p className="font-mono text-xs text-slate-500">role: {identity?.role || 'Desktop'}</p>
-            <p className="font-mono text-xs text-slate-500">hostname: {identity?.hostname || '—'}</p>
+            <p className="text-2xl font-black text-white">{session?.real_name || session?.username || 'Usuário local'}</p>
+            <p className="font-mono text-xs text-slate-400">@{session?.username || '—'} · UID {session?.uid ?? '—'}</p>
+            <p className="text-xs text-slate-500">{session?.is_admin ? 'Administrador' : 'Usuário padrão'}</p>
           </div>
         </KveCard>
 
@@ -94,21 +94,13 @@ export default function DesktopSummary() {
           </div>
         </KveCard>
 
-        <KveCard title="Estado" subtitle="local session" icon={<ShieldCheck size={18} />}>
+        <KveCard title="Host" subtitle="Identidade do sistema" icon={<Monitor size={18} />}>
           <div className="space-y-3">
-            <p className="text-2xl font-black text-emerald-300">PAM Local</p>
-            <p className="text-xs leading-5 text-slate-500">
-              Autenticação restrita à máquina local quando o backend declara uma identidade fixa.
-            </p>
+            <p className="text-2xl font-black text-white">{identity?.role || 'Desktop'}</p>
+            <p className="text-xs leading-5 text-slate-400">{identity?.edition || 'Kryonix Desktop'}</p>
           </div>
         </KveCard>
       </div>
-
-      <KveCard title="Storage" subtitle="V2 API Bind pendente" icon={<HardDrive size={18} />}>
-        <p className="text-sm leading-6 text-slate-400">
-          TODO: ligar este bloco ao contrato agregado de storage do Axum. Nesta fase ele não chama /api/storage nem qualquer endpoint legado NodeJS.
-        </p>
-      </KveCard>
     </div>
   );
 }

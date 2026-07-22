@@ -4,12 +4,12 @@ use axum::{
     http::{HeaderMap, StatusCode, header},
     routing::{get, post},
 };
-use pam::Client;
 use chrono::Utc;
+use pam::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::sync::Arc;
+use std::{fs, sync::Arc};
 
 use crate::{AppState, ErrorResponse};
 
@@ -27,6 +27,10 @@ pub struct LoginRequest {
 pub struct LoginResponse {
     authenticated: bool,
     role: String,
+    username: String,
+    real_name: String,
+    uid: u32,
+    is_admin: bool,
     expires_at: i64,
 }
 
@@ -35,6 +39,10 @@ pub struct SessionClaims {
     pub sub: String,
     pub role: String,
     pub edition: String,
+    pub username: String,
+    pub real_name: String,
+    pub uid: u32,
+    pub is_admin: bool,
     pub exp: i64,
     pub iat: i64,
 }
@@ -44,6 +52,14 @@ struct LoginIdentity {
     uuid: String,
     role: String,
     edition: String,
+}
+
+#[derive(Debug, Clone)]
+struct UserIdentity {
+    username: String,
+    real_name: String,
+    uid: u32,
+    is_admin: bool,
 }
 
 pub fn router() -> Router<Arc<AppState>> {
@@ -68,8 +84,9 @@ async fn login(
         )
     })?;
 
-    auth.conversation_mut().set_credentials(&payload.username, &payload.password);
-    
+    auth.conversation_mut()
+        .set_credentials(&payload.username, &payload.password);
+
     if auth.authenticate().is_err() {
         return Err((
             StatusCode::UNAUTHORIZED,
@@ -83,10 +100,15 @@ async fn login(
     let now = Utc::now().timestamp();
     let expires_at = now + SESSION_TTL_SECONDS;
     let role = identity.role.clone();
+    let user = user_identity(&payload.username);
     let claims = SessionClaims {
         sub: identity.uuid,
         role: role.clone(),
         edition: identity.edition,
+        username: user.username.clone(),
+        real_name: user.real_name.clone(),
+        uid: user.uid,
+        is_admin: user.is_admin,
         iat: now,
         exp: expires_at,
     };
@@ -101,6 +123,10 @@ async fn login(
         Json(LoginResponse {
             authenticated: true,
             role,
+            username: user.username,
+            real_name: user.real_name,
+            uid: user.uid,
+            is_admin: user.is_admin,
             expires_at,
         }),
     ))
@@ -133,8 +159,55 @@ async fn session(headers: HeaderMap) -> Result<Json<Value>, (StatusCode, Json<Er
     Ok(Json(json!({
         "authenticated": true,
         "role": claims.role,
+        "username": claims.username,
+        "real_name": claims.real_name,
+        "uid": claims.uid,
+        "is_admin": claims.is_admin,
         "expires_at": claims.exp,
     })))
+}
+
+fn user_identity(username: &str) -> UserIdentity {
+    let mut real_name = username.to_string();
+    let mut uid = u32::MAX;
+
+    if let Ok(passwd) = fs::read_to_string("/etc/passwd") {
+        if let Some(entry) = passwd
+            .lines()
+            .find(|line| line.starts_with(&format!("{username}:")))
+        {
+            let fields: Vec<_> = entry.split(':').collect();
+            uid = fields
+                .get(2)
+                .and_then(|value| value.parse().ok())
+                .unwrap_or(u32::MAX);
+            if let Some(gecos) = fields.get(4) {
+                if let Some(name) = gecos.split(',').next().filter(|name| !name.is_empty()) {
+                    real_name = name.to_string();
+                }
+            }
+        }
+    }
+
+    let is_admin = uid == 0
+        || fs::read_to_string("/etc/group")
+            .map(|groups| {
+                groups.lines().any(|line| {
+                    let fields: Vec<_> = line.split(':').collect();
+                    matches!(fields.first(), Some(&"wheel") | Some(&"sudo"))
+                        && fields.get(3).is_some_and(|members| {
+                            members.split(',').any(|member| member == username)
+                        })
+                })
+            })
+            .unwrap_or(false);
+
+    UserIdentity {
+        username: username.to_string(),
+        real_name,
+        uid,
+        is_admin,
+    }
 }
 
 pub fn is_core_session(headers: &HeaderMap) -> bool {
@@ -143,13 +216,19 @@ pub fn is_core_session(headers: &HeaderMap) -> bool {
         .unwrap_or(false)
 }
 
-fn session_claims_from_headers(headers: &HeaderMap) -> Result<SessionClaims, (StatusCode, Json<ErrorResponse>)> {
-    let token = session_token_from_headers(headers).ok_or_else(|| auth_error("SESSION_REQUIRED"))?;
+fn session_claims_from_headers(
+    headers: &HeaderMap,
+) -> Result<SessionClaims, (StatusCode, Json<ErrorResponse>)> {
+    let token =
+        session_token_from_headers(headers).ok_or_else(|| auth_error("SESSION_REQUIRED"))?;
     verify_token(&token)
 }
 
 fn session_token_from_headers(headers: &HeaderMap) -> Option<String> {
-    if let Some(auth) = headers.get(header::AUTHORIZATION).and_then(|value| value.to_str().ok()) {
+    if let Some(auth) = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+    {
         if let Some(token) = auth.strip_prefix("Bearer ") {
             return Some(token.trim().to_string());
         }
@@ -172,13 +251,17 @@ fn verify_token(token: &str) -> Result<SessionClaims, (StatusCode, Json<ErrorRes
     }
 
     let signing_input = format!("{header}.{payload}");
-    let expected = base64_url_encode(&hmac_sha256(session_secret().as_bytes(), signing_input.as_bytes()));
+    let expected = base64_url_encode(&hmac_sha256(
+        session_secret().as_bytes(),
+        signing_input.as_bytes(),
+    ));
     if !constant_time_eq(signature.as_bytes(), expected.as_bytes()) {
         return Err(auth_error("INVALID_SESSION"));
     }
 
     let payload_bytes = base64_url_decode(payload).ok_or_else(|| auth_error("INVALID_SESSION"))?;
-    let claims: SessionClaims = serde_json::from_slice(&payload_bytes).map_err(|_| auth_error("INVALID_SESSION"))?;
+    let claims: SessionClaims =
+        serde_json::from_slice(&payload_bytes).map_err(|_| auth_error("INVALID_SESSION"))?;
     if claims.exp <= Utc::now().timestamp() {
         return Err(auth_error("SESSION_EXPIRED"));
     }
@@ -198,7 +281,10 @@ fn sign_claims(claims: &SessionClaims) -> Result<String, (StatusCode, Json<Error
     })?;
     let payload = base64_url_encode(&payload);
     let signing_input = format!("{header}.{payload}");
-    let signature = base64_url_encode(&hmac_sha256(session_secret().as_bytes(), signing_input.as_bytes()));
+    let signature = base64_url_encode(&hmac_sha256(
+        session_secret().as_bytes(),
+        signing_input.as_bytes(),
+    ));
     Ok(format!("{signing_input}.{signature}"))
 }
 
@@ -210,7 +296,10 @@ fn expected_password(uuid: &str) -> String {
     hasher.update(b"kryonix-auth:");
     hasher.update(uuid.as_bytes());
     let digest = hasher.finalize();
-    digest[..12].iter().map(|byte| format!("{byte:02x}")).collect()
+    digest[..12]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 fn session_secret() -> String {
