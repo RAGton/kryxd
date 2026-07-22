@@ -12,6 +12,9 @@ const data = [
   { time: '10:30', value: 28 },
 ];
 
+// TODO: V2 API Bind — trocar a série estática por /api/v2/metrics/host quando
+// houver histórico de telemetria no Axum. Não chamar endpoints NodeJS legados.
+
 const CpuWidget: React.FC = () => {
   return (
     <div className="h-full flex flex-col">

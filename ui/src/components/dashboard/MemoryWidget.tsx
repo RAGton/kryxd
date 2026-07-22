@@ -1,6 +1,8 @@
 import React from 'react';
 import { Cpu } from 'lucide-react';
 
+// TODO: V2 API Bind — trocar os valores estáticos por /api/v2/metrics/host.
+// Mantido estático nesta fase para não depender de mock server NodeJS.
 const MemoryWidget: React.FC = () => {
   return (
     <div className="h-full flex flex-col justify-center">

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Database } from 'lucide-react';
 
+// TODO: V2 API Bind — trocar os valores estáticos por /api/v2/storage/pools
+// ou contrato agregado de storage no Axum. Não chamar /api/storage legado.
 const StorageWidget: React.FC = () => {
   return (
     <div className="h-full flex flex-col justify-center">
