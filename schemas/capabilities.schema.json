@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kryonix.dev/schemas/capabilities-v1.schema.json",
+  "title": "Kryonix Capability Registry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "registryVersion",
+    "schemaVersion",
+    "wireContract",
+    "capabilities"
+  ],
+  "properties": {
+    "registryVersion": {
+      "const": 1
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "source": {
+      "type": "string"
+    },
+    "wireContract": {
+      "const": "InstallPlanV2.features"
+    },
+    "invariants": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "wireKey",
+          "domain",
+          "status",
+          "requires",
+          "conflicts"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*(\\.[a-z0-9-]+)+$"
+          },
+          "wireKey": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "level": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "requires": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "partial",
+              "stub",
+              "legacy",
+              "unsupported"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "risk": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "blockReason": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "unsupported"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "blockReason"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

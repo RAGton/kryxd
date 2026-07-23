@@ -1,6 +1,6 @@
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
-import installPlanSchema from '../install-plan.schema.json' with { type: 'json' };
+import installPlanSchema from '../generated/installPlanSchema.js';
 import {
   createInstallPlanDraft,
   extractUiTransientState,
@@ -8,7 +8,10 @@ import {
 import { FEATURE_CATALOG } from '../data/featureCatalog.js';
 import { PROFILE_CATALOG } from '../data/profileCatalog.js';
 
-export const INSTALL_PLAN_VERSION = 1;
+import { INSTALL_PLAN_VERSION } from '../generated/installPlanVersion.js';
+import { CAPABILITY_BY_ID } from '../generated/capabilities.js';
+
+export { INSTALL_PLAN_VERSION };
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
@@ -226,99 +229,88 @@ export function buildInstallPlanPayload(draftInput) {
     .filter(f => f?.status === 'partial')
     .map(f => f.id);
 
-  // Build raw payload then clean optional empty fields for schema compliance
-  const rawPayload = {
-    version: 2,
-    source: draft.sourceKind === 'github-user-repo' ? {
-      kind: 'github-user-repo',
-      repo: draft.sourceRepoUrl,
-      branch: draft.sourceBranch || "main",
-      clonePath: "/run/kryxd/sources/kryonixos",
-      targetPath: "/etc/kryonixos",
-      commit: draft.sourceRepoCommit || null,
-      host: draft.sourceHost || null,
-      validated: true,
-    } : draft.sourceKind === 'github-create-from-template' ? {
-      kind: 'github-create-from-template',
-      templateRepo: draft.templateRepoUrl,
-      repo: draft.createdRepoUrl,
-      branch: draft.sourceBranch || "main",
-      clonePath: "/run/kryxd/sources/kryonixos",
-      targetPath: "/etc/kryonixos",
-      validated: Boolean(draft.sourceValidated),
-      created: true,
-    } : draft.sourceKind === 'template' ? {
-      kind: 'template',
-      templateRepo: draft.templateRepoUrl,
-      validated: true,
-    } : {
-      kind: 'offline-defaults',
-      validated: true,
-    },
-    profile: {
-      id: profileObj.id,
-      name: profileObj.name,
-      mode: profileObj.mode,
-    },
-    features,
-    confirmedFeatures,
-    storage: {
-      topology: isThinkServer ? 'single' : (diskProfile === 'two' || diskMode === 'two' ? 'split' : diskProfile),
-      filesystem: isThinkServer ? 'zfs' : (sanitizeString(draft.rootFs) || 'btrfs'),
-      target_disks: selectedDisks,
-      boot_disk: sysDisk,
-      enableSrvData,
-      srvDataMode: enableSrvData ? 'btrfs-subvolume' : 'disabled',
-      enableAiModels: features.storage['ai-models'] === true,
-    },
-    security: {
-      allowWeakPassword: Boolean(draft.allowWeakPassword),
-    },
-    targetRemoteAccess: {
-      enabled: Boolean(draft.targetRemoteAccessEnabled),
-      port: 8080,
-    },
-    network: {
-      hostname: sanitizeString(draft.hostName),
-      interface: sanitizeString(draft.mgmtInterface),
-      serverIp: sanitizeString(draft.serverIp) || '0.0.0.0',
-      prefixLength: mgmtPrefix,
-      mode: sanitizeString(draft.mgmtMode) || 'dhcp',
-      // gateway is required by schema; in DHCP mode use user input or placeholder
-      gateway: sanitizeString(draft.mgmtGateway) || (draft.mgmtMode === 'dhcp' ? '0.0.0.0' : undefined),
-      dns: sanitizeDnsList(draft.mgmtDns),
-      httpPort: Number.isFinite(Number(draft.httpPort)) ? Number(draft.httpPort) : 0,
-      // wan is required by schema; always include with at least interface+mode
-      wan: {
-        interface: wanInterface || '',
-        mode: wanMode,
-        address: wanEnabled ? sanitizeString(draft.wanAddress) || undefined : undefined,
-        prefixLength: wanEnabled ? wanPrefix ?? undefined : undefined,
-        gateway: wanEnabled ? sanitizeString(draft.wanGateway) || undefined : undefined,
-        dns: wanEnabled ? sanitizeDnsList(draft.wanDns) : [],
-        pppoeUser: wanEnabled ? sanitizeString(draft.pppoeUser) || undefined : undefined,
-      },
-    },
-    locale: {
-      country: sanitizeString(draft.country) || 'BR',
-      timezone: sanitizeString(draft.timeZone) || 'America/Cuiaba',
-      locale: sanitizeString(draft.systemLocale) || 'pt_BR.UTF-8',
-      keymap: sanitizeString(draft.consoleKeymap) || 'br-abnt2',
-    },
-    admin: {
-      user: sanitizeString(draft.adminUser),
-      uid: 1000,
-      email: sanitizeString(draft.adminEmail),
-      fullName: sanitizeString(draft.adminFullName),
-      authorizedKeys: uniqueStrings(parseAuthorizedKeys(draft.adminAuthorizedKeys)),
-    },
+  const topology = isThinkServer ? 'single' : (diskMode === 'two' ? 'split' : 'single');
+  const unsupportedStorage = diskProfile === 'raid' || diskProfile === 'manual' || storageMode === 'lvm';
+  if (unsupportedStorage) {
+    throw new Error('A topologia RAID, manual ou LVM ainda é unsupported no InstallPlanV2.');
+  }
+  if (draft.luksEnabled) {
+    throw new Error('LUKS2 ainda é unsupported no InstallPlanV2.');
+  }
+  if (selectedDisks.length === 0 || !sysDisk) {
+    throw new Error('O InstallPlanV2 exige pelo menos um disco de sistema.');
+  }
+  if (topology === 'split' && !dataDisk) {
+    throw new Error('O layout split exige um disco de dados.');
+  }
+
+  const rootFilesystem = isThinkServer ? 'zfs' : (sanitizeString(draft.rootFs) || 'btrfs');
+  const dataFilesystem = sanitizeString(draft.dataFs) || 'btrfs';
+  const supportedFilesystems = new Set(['btrfs', 'zfs', 'ext4', 'xfs']);
+  if (!supportedFilesystems.has(rootFilesystem) || !supportedFilesystems.has(dataFilesystem)) {
+    throw new Error('Filesystem desconhecido no InstallPlanV2.');
+  }
+  const zfsQuota = sanitizeString(draft.zfsUserRefquota);
+  const btrfsQgroup = sanitizeString(draft.btrfsUserQgroupLimit);
+  if ((rootFilesystem === 'zfs' || dataFilesystem === 'zfs') && !zfsQuota) {
+    throw new Error('ZFS exige zfsUserRefquota configurado.');
+  }
+  if (topology === 'split' && dataFilesystem === 'btrfs' && !btrfsQgroup) {
+    throw new Error('BTRFS de dados exige btrfsUserQgroupLimit configurado.');
+  }
+
+  for (const featId of selectedFeatures) {
+    const capability = CAPABILITY_BY_ID[featId];
+    if (!capability) {
+      throw new Error(`Capability não registrada: ${featId}`);
+    }
+    if (capability.status === 'unsupported') {
+      throw new Error(`Capability unsupported: ${featId}`);
+    }
+    for (const requiredId of capability.requires || []) {
+      if (!selectedFeatures.includes(requiredId)) {
+        throw new Error(`${featId} exige a capability ${requiredId}.`);
+      }
+    }
+    for (const conflictId of capability.conflicts || []) {
+      if (selectedFeatures.includes(conflictId)) {
+        throw new Error(`${featId} conflita com ${conflictId}.`);
+      }
+    }
+  }
+
+  const repositoryUrl = sanitizeString(draft.sourceRepoUrl) || 'https://github.com/RAGton/kryonixos';
+  const upstreamUrl = sanitizeString(draft.templateRepoUrl) || 'https://github.com/RAGton/kryonixos';
+  const root = { filesystem: rootFilesystem, encryption: 'none' };
+  const data = topology === 'split' ? { filesystem: dataFilesystem, encryption: 'none' } : null;
+  const storage = {
+    topology,
+    systemDisks: [sysDisk],
+    dataDisks: topology === 'split' ? [dataDisk] : [],
+    root,
+    data,
+    raidLevel: null,
+    manualPartitions: [],
+    zfs: rootFilesystem === 'zfs' || dataFilesystem === 'zfs' ? { userRefquota: zfsQuota } : null,
+    btrfs: topology === 'split' && dataFilesystem === 'btrfs' ? { userQgroupLimit: btrfsQgroup } : null,
   };
 
-  // Payload is schema-compliant:
-  // - source.repo/branch/commit = null (allowed by schema)
-  // - network.gateway = '0.0.0.0' sentinel in DHCP mode (valid ipv4)
-  // - network.wan always present with interface='' + mode (required by schema)
-  return rawPayload;
+  return {
+    version: INSTALL_PLAN_VERSION,
+    isThinkServer,
+    repository: {
+      coreUrl: 'https://github.com/RAGton/kryonix',
+      upstreamUrl,
+      downstreamUrl: repositoryUrl,
+      branch: sanitizeString(draft.sourceBranch) || 'main',
+    },
+    storage,
+    features,
+  };
+}
+
+export function buildInstallPlanV2(wizardState) {
+  return buildInstallPlanPayload(wizardState);
 }
 
 export function buildInstallSecretsPayload(draftInput) {
@@ -340,6 +332,10 @@ export function validateInstallPlanPayload(payload) {
     throw new Error(formatAjvErrors(validateSchema.errors));
   }
   return payload;
+}
+
+export function validateInstallPlanV2(plan) {
+  return validateInstallPlanPayload(plan);
 }
 
 export function getInstallPlanCompatibilityIssues(payload) {
@@ -412,36 +408,6 @@ function validatePasswordRules(secrets, allowWeak, result) {
   }
 }
 
-function validateFinalDraft(draft, payload, secrets, result) {
-  try {
-    validateInstallPlanPayload(payload);
-  } catch (error) {
-    addBlockingIssue(result, error instanceof Error ? error.message : 'Plano inválido.');
-  }
-
-  for (const compatibilityIssue of getInstallPlanCompatibilityIssues(payload)) {
-    addBlockingIssue(result, compatibilityIssue);
-  }
-
-  if (!isCanonicalTimezone(payload.locale.timezone)) {
-    addFieldError(result, 'timeZone', 'Selecione um timezone IANA canônico.');
-  }
-
-  validatePasswordRules(secrets, Boolean(draft.allowWeakPassword), result);
-
-  if (draft.allowWeakPassword) {
-    addWarning(result, 'Senha forte ignorada por modo laboratório (allowWeakPassword).');
-  }
-
-  if (payload.admin.uid < 1000) {
-    addBlockingIssue(result, 'UID do administrador deve ser 1000 ou maior.');
-  }
-
-  if (!emailPattern.test(payload.admin.email)) {
-    addFieldError(result, 'adminEmail', 'Informe um e-mail válido.');
-  }
-}
-
 function validateAdminStep(payload, secrets, result, draft) {
   if (!payload.admin.user) addFieldError(result, 'adminUser', 'Informe o usuário administrador.');
   if (!payload.admin.fullName) addFieldError(result, 'adminFullName', 'Informe o nome completo do administrador.');
@@ -454,10 +420,61 @@ function validateAdminStep(payload, secrets, result, draft) {
   validatePasswordRules(secrets, Boolean(draft?.allowWeakPassword), result);
 }
 
+function validateFinalDraft(draft, secrets, result) {
+  try {
+    const plan = buildInstallPlanV2(draft);
+    validateInstallPlanV2(plan);
+    for (const compatibilityIssue of getInstallPlanCompatibilityIssues(plan)) {
+      addBlockingIssue(result, compatibilityIssue);
+    }
+  } catch (error) {
+    addBlockingIssue(result, error instanceof Error ? error.message : 'Plano inválido.');
+  }
+
+  validatePasswordRules(secrets, Boolean(draft.allowWeakPassword), result);
+
+  if (draft.allowWeakPassword) {
+    addWarning(result, 'Senha forte ignorada por modo laboratório (allowWeakPassword).');
+  }
+}
+
+function buildValidationProjection(draft) {
+  const wanInterface = sanitizeString(draft.wanInterface);
+  const wanMode = sanitizeString(draft.wanMode) || 'dhcp';
+  const topology = draft.diskProfile === 'raid' || draft.diskProfile === 'manual'
+    ? draft.diskProfile
+    : (draft.diskMode === 'two' ? 'split' : 'single');
+  return {
+    locale: {
+      country: sanitizeString(draft.country),
+      timezone: sanitizeString(draft.timeZone),
+      locale: sanitizeString(draft.systemLocale),
+      keymap: sanitizeString(draft.consoleKeymap),
+    },
+    network: {
+      interface: sanitizeString(draft.mgmtInterface),
+      mode: sanitizeString(draft.mgmtMode) || 'dhcp',
+      httpPort: Number(draft.httpPort),
+      wan: { interface: wanInterface, mode: wanMode, pppoeUser: sanitizeString(draft.pppoeUser) },
+    },
+    storage: {
+      topology,
+      target_disks: Array.isArray(draft.selectedDisks) ? uniqueStrings(draft.selectedDisks) : [],
+      boot_disk: sanitizeString(draft.sysDisk),
+    },
+    admin: {
+      user: sanitizeString(draft.adminUser),
+      fullName: sanitizeString(draft.adminFullName),
+      email: sanitizeString(draft.adminEmail),
+      uid: 1000,
+    },
+  };
+}
+
 export function validateStep(stepId, draftInput, uiInput = {}) {
   const draft = createInstallPlanDraft(draftInput);
   const uiState = extractUiTransientState(uiInput);
-  const payload = buildInstallPlanPayload(draft);
+  const payload = buildValidationProjection(draft);
   const secrets = buildInstallSecretsPayload(draft);
   const result = createValidationResult();
 
@@ -598,14 +615,14 @@ export function validateStep(stepId, draftInput, uiInput = {}) {
       validateAdminStep(payload, secrets, result, draft);
       return result;
     case 'summary':
-      validateFinalDraft(draft, payload, secrets, result);
+      validateFinalDraft(draft, secrets, result);
       appendStorageUiValidation(result, uiState);
       if (!uiState.destructiveConfirmed) {
         addBlockingIssue(result, 'Confirme o aviso destrutivo para continuar.');
       }
       return result;
     case 'install':
-      validateFinalDraft(draft, payload, secrets, result);
+      validateFinalDraft(draft, secrets, result);
       appendStorageUiValidation(result, uiState);
       if (!uiState.destructiveConfirmed) {
         addBlockingIssue(result, 'Confirme o wipe de discos antes de iniciar.');

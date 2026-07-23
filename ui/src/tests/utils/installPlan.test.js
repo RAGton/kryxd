@@ -26,7 +26,7 @@ describe('installPlan', () => {
   });
 
   describe('buildInstallPlanPayload', () => {
-    it('builds a default valid payload', () => {
+    it('builds a default valid InstallPlanV2', () => {
       const draft = {
         sourceKind: 'offline-defaults',
         profileId: 'desktop',
@@ -46,13 +46,15 @@ describe('installPlan', () => {
       };
 
       const payload = buildInstallPlanPayload(draft);
-      
-      assert.equal(payload.version, 1);
-      assert.equal(payload.profile.id, 'desktop');
-      assert.equal(payload.disk.sysDisk, '/dev/sda');
-      assert.equal(payload.network.interface, 'eth0');
-      assert.equal(payload.locale.country, 'BR');
-      assert.equal(payload.admin.user, 'rocha');
+
+      assert.equal(payload.version, 2);
+      assert.deepEqual(Object.keys(payload).sort(), ['features', 'isThinkServer', 'repository', 'storage', 'version']);
+      assert.equal(payload.repository.branch, 'main');
+      assert.deepEqual(payload.storage.systemDisks, ['/dev/sda']);
+      assert.equal(payload.storage.topology, 'single');
+      assert.equal(payload.network, undefined);
+      assert.equal(payload.locale, undefined);
+      assert.equal(payload.admin, undefined);
     });
     
     it('activates srvData appropriately', () => {
@@ -63,12 +65,12 @@ describe('installPlan', () => {
         sysDisk: '/dev/sda',
         mgmtInterface: 'eth0',
         mgmtMode: 'dhcp',
-        selectedFeatures: ['ai.ollama']
+        selectedFeatures: ['storage.srv-data', 'ai.ollama']
       };
 
       const payload = buildInstallPlanPayload(draft);
-      assert.equal(payload.storage.enableSrvData, true);
-      assert.equal(payload.storage.srvDataMode, 'btrfs-subvolume');
+      assert.equal(payload.features.storage['srv-data'], true);
+      assert.deepEqual(payload.storage.data, null);
     });
   });
 

@@ -1,18 +1,18 @@
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     routing::{get, put},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::Arc;
 use tokio::process::Command;
 
-use crate::api::incus::{self, encode_path_segment, operation_id};
-use crate::api::v1::rbac::RequireCoreRole;
 use crate::AppState;
 use crate::ErrorResponse;
+use crate::api::incus::{self, encode_path_segment, operation_id};
+use crate::api::v1::rbac::RequireCoreRole;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()

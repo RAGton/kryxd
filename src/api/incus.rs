@@ -25,7 +25,11 @@ pub async fn put_json(path: &str, body: &Value) -> Result<IncusResponse, String>
     request_json("PUT", path, Some(body)).await
 }
 
-async fn request_json(method: &str, path: &str, body: Option<&Value>) -> Result<IncusResponse, String> {
+async fn request_json(
+    method: &str,
+    path: &str,
+    body: Option<&Value>,
+) -> Result<IncusResponse, String> {
     let socket = incus_socket_path();
     let mut stream = UnixStream::connect(&socket)
         .await
@@ -110,7 +114,9 @@ fn parse_http_json(response: &[u8]) -> Result<IncusResponse, String> {
 }
 
 pub fn encode_path_segment(value: &str) -> String {
-    byte_serialize(value.as_bytes()).collect()
+    byte_serialize(value.as_bytes())
+        .collect::<String>()
+        .replace('+', "%20")
 }
 
 pub fn operation_id(response: &IncusResponse) -> Option<String> {

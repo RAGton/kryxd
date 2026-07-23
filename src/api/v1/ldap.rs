@@ -1,6 +1,6 @@
-use axum::{Json, Router, routing::post};
-use serde_json::{json, Value};
 use crate::api::v1::rbac::RequireCoreRole;
+use axum::{Json, Router, routing::post};
+use serde_json::{Value, json};
 
 pub fn router<S>() -> Router<S>
 where

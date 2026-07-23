@@ -1,10 +1,9 @@
 use axum::{
-    async_trait,
+    Json, async_trait,
     extract::FromRequestParts,
     http::{StatusCode, request::Parts},
-    Json,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::api::auth;
 
@@ -27,7 +26,7 @@ impl<S: Send + Sync> FromRequestParts<S> for RequireCoreRole {
                 return Ok(RequireCoreRole);
             }
         }
-        
+
         Err((
             StatusCode::FORBIDDEN,
             Json(json!({"error": "Forbidden", "details": "Core or ThinkServer role required"})),

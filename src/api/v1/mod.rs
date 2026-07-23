@@ -1,8 +1,8 @@
-pub mod rbac;
-pub mod system;
 pub mod fleet;
-pub mod storage;
 pub mod ldap;
+pub mod rbac;
+pub mod storage;
+pub mod system;
 
 use std::sync::Arc;
 

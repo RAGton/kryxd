@@ -1,7 +1,7 @@
-use axum::{Json, Router, routing::get};
-use serde_json::{json, Value};
-use tokio::process::Command;
 use crate::api::v1::rbac::RequireCoreRole;
+use axum::{Json, Router, routing::get};
+use serde_json::{Value, json};
+use tokio::process::Command;
 
 pub fn router<S>() -> Router<S>
 where
@@ -10,16 +10,29 @@ where
     Router::new().route("/storage/quotas", get(get_quotas))
 }
 
-pub async fn get_quotas(_rbac: RequireCoreRole) -> Result<Json<Vec<Value>>, (axum::http::StatusCode, String)> {
+pub async fn get_quotas(
+    _rbac: RequireCoreRole,
+) -> Result<Json<Vec<Value>>, (axum::http::StatusCode, String)> {
     let output = Command::new("zfs")
-        .args(["list", "-o", "name,used,available,quota", "-p", "-t", "filesystem", "-H"])
+        .args([
+            "list",
+            "-o",
+            "name,used,available,quota",
+            "-p",
+            "-t",
+            "filesystem",
+            "-H",
+        ])
         .output()
         .await
         .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     if !output.status.success() {
         let err = String::from_utf8_lossy(&output.stderr);
-        return Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, err.to_string()));
+        return Err((
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            err.to_string(),
+        ));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);

@@ -23,7 +23,7 @@ use tokio::process::Command;
 use uuid::Uuid;
 
 use crate::AppState;
-use crate::domain::{Encryption, InstallPlanV2, InstallSecretsV2, Topology};
+use crate::domain::{CapabilityError, Encryption, InstallPlanV2, InstallSecretsV2, Topology};
 use crate::services::partitioner::{DiskValidator, DiskoRenderer, PartitionerError};
 use crate::services::security::{PasswordHasher, SecurityError};
 
@@ -180,6 +180,7 @@ impl InstallService {
 
     /// Valida e persiste um plano sanitizado, retornando seu digest.
     pub fn save_plan(&self, plan: &InstallPlanV2) -> Result<String, InstallServiceError> {
+        validate_plan_capabilities(plan)?;
         self.store.save_plan(plan)
     }
 
@@ -354,6 +355,7 @@ pub async fn post_install(
         .install_service
         .store()
         .load_plan(&request.plan_digest)?;
+    reject_unimplemented_capabilities(&plan)?;
     let config_content = kryx::services::translator::generate_nix_config(&plan)
         .map_err(InstallServiceError::Translation)?;
 
@@ -396,6 +398,7 @@ pub enum InstallServiceError {
     PlanIntegrityMismatch,
     PlanSerialization(String),
     InvalidPersistedPlan(String),
+    Capability(CapabilityError),
     UnsafePath(PathBuf),
     Filesystem {
         operation: &'static str,
@@ -430,6 +433,7 @@ impl fmt::Display for InstallServiceError {
             Self::InvalidPersistedPlan(_) => {
                 formatter.write_str("o plano persistido não respeita o contrato v2")
             }
+            Self::Capability(error) => write!(formatter, "{error}"),
             Self::UnsafePath(_) => formatter.write_str("caminho inseguro no store de planos"),
             Self::Filesystem { operation, .. } => {
                 write!(formatter, "falha de filesystem ao {operation}")
@@ -457,6 +461,7 @@ impl std::error::Error for InstallServiceError {
             Self::Security(source) => Some(source),
             Self::Partitioner(source) => Some(source),
             Self::Migration(source) => Some(source),
+            Self::Capability(source) => Some(source),
             _ => None,
         }
     }
@@ -473,6 +478,11 @@ impl IntoResponse for InstallServiceError {
             Self::InvalidPersistedPlan(_) => {
                 (StatusCode::CONFLICT, "INVALID_PERSISTED_PLAN", false)
             }
+            Self::Capability(_) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "UNSUPPORTED_CAPABILITY",
+                true,
+            ),
             Self::Partitioner(PartitionerError::CapabilityNotImplemented(_)) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "UNSUPPORTED_STORAGE_CAPABILITY",
@@ -530,12 +540,16 @@ impl IntoResponse for InstallServiceError {
                 "INSTALLER_INTERNAL_ERROR",
                 false,
             ),
-            Self::BlockingTaskFailed => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "BLOCKING_TASK_FAILED", false)
-            }
-            Self::Translation(_) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "TRANSLATION_FAILED", false)
-            }
+            Self::BlockingTaskFailed => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "BLOCKING_TASK_FAILED",
+                false,
+            ),
+            Self::Translation(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "TRANSLATION_FAILED",
+                false,
+            ),
         };
 
         let body = ErrorResponse {
@@ -587,6 +601,11 @@ fn reject_unimplemented_capabilities(plan: &InstallPlanV2) -> Result<(), Install
     }
 
     Ok(())
+}
+
+fn validate_plan_capabilities(plan: &InstallPlanV2) -> Result<(), InstallServiceError> {
+    kryx::domain::validate_feature_selection(&plan.features)
+        .map_err(InstallServiceError::Capability)
 }
 
 fn require_installer_token(

@@ -1,7 +1,7 @@
+use crate::api::v1::rbac::RequireCoreRole;
 use axum::{Json, Router, routing::get};
 use serde_json::Value;
 use std::fs;
-use crate::api::v1::rbac::RequireCoreRole;
 
 pub fn router<S>() -> Router<S>
 where
@@ -13,7 +13,7 @@ where
 pub async fn get_status(_rbac: RequireCoreRole) -> Json<Vec<Value>> {
     let mut manifests = Vec::new();
     let dir = "/var/lib/kryonix/telemetry";
-    
+
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -26,6 +26,6 @@ pub async fn get_status(_rbac: RequireCoreRole) -> Json<Vec<Value>> {
             }
         }
     }
-    
+
     Json(manifests)
 }

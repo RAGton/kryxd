@@ -61,7 +61,7 @@ test('etapa de rede bloqueia avanço sem conexao ou modo offline', () => {
   assert.equal(validOffline.blockingIssues.includes('Conecte-se à internet ou selecione "Continuar offline" para prosseguir.'), false);
 });
 
-test('draft gera install-plan canonico sem vazar estado transitorio', () => {
+test('draft gera InstallPlanV2 canonico sem vazar estado transitorio', () => {
   const draft = createValidDraft({
     wanMode: 'static',
     wanAddress: '203.0.113.10',
@@ -77,17 +77,18 @@ test('draft gera install-plan canonico sem vazar estado transitorio', () => {
     wanIdentified: false,
   });
 
-  assert.equal(plan.version, 1);
-  assert.equal(plan.network.hostname, 'srv-rag');
-  assert.equal(plan.network.interface, 'enp1s0');
-  assert.equal(plan.network.prefixLength, 24);
-  assert.equal(plan.network.wan.interface, 'enp2s0');
-  assert.equal(plan.network.wan.mode, 'static');
-  assert.deepEqual(plan.network.wan.dns, ['1.1.1.1', '8.8.8.8']);
-  assert.equal(plan.locale.timezone, 'America/Cuiaba');
-  assert.equal(plan.admin.user, 'rag');
-  assert.equal(plan.disk.sysDisk, '/dev/sda');
-  assert.equal('destructiveConfirmed' in plan, false);
+  assert.equal(plan.version, 2);
+  assert.equal(plan.isThinkServer, false);
+  assert.deepEqual(Object.keys(plan).sort(), ['features', 'isThinkServer', 'repository', 'storage', 'version']);
+  assert.equal(plan.repository.downstreamUrl, 'https://github.com/RAGton/kryonixos');
+  assert.equal(plan.storage.topology, 'single');
+  assert.deepEqual(plan.storage.systemDisks, ['/dev/sda']);
+  assert.equal(plan.storage.root.filesystem, 'btrfs');
+  assert.deepEqual(plan.features.system, {});
+  assert.equal(plan.network, undefined);
+  assert.equal(plan.locale, undefined);
+  assert.equal(plan.admin, undefined);
+  assert.equal(plan.destructiveConfirmed, undefined);
 });
 
 test('timezone da etapa final precisa ser IANA canonico', () => {
@@ -174,7 +175,7 @@ test('validacao por etapa respeita campos UX sem poluir o payload', () => {
   assert.ok(summaryValidation.blockingIssues.includes('Confirme o aviso destrutivo para continuar.'));
 });
 
-test('single, split e RAID geram payload coerente com o contrato', () => {
+test('single e split geram storage coerente e RAID é bloqueado no InstallPlanV2', () => {
   const singlePlan = buildInstallPlanPayload(createValidDraft({
     selectedDisks: ['/dev/sda'],
     diskMode: 'one',
@@ -183,10 +184,11 @@ test('single, split e RAID geram payload coerente com o contrato', () => {
     rootFs: 'xfs',
   }));
 
-  assert.equal(singlePlan.disk.mode, 'one');
-  assert.equal(singlePlan.disk.profile, 'single');
-  assert.equal(singlePlan.disk.rootFs, 'btrfs');
-  assert.equal(singlePlan.disk.dataFs, 'btrfs');
+  assert.equal(singlePlan.storage.topology, 'single');
+  assert.deepEqual(singlePlan.storage.systemDisks, ['/dev/sda']);
+  assert.deepEqual(singlePlan.storage.dataDisks, []);
+  assert.equal(singlePlan.storage.root.filesystem, 'xfs');
+  assert.equal(singlePlan.storage.data, null);
 
   const splitPlan = buildInstallPlanPayload(createValidDraft({
     diskMode: 'two',
@@ -198,28 +200,18 @@ test('single, split e RAID geram payload coerente com o contrato', () => {
     dataFs: 'ext4',
   }));
 
-  assert.equal(splitPlan.disk.mode, 'two');
-  assert.deepEqual(splitPlan.disk.selectedDisks, ['/dev/sda', '/dev/sdb']);
-  assert.equal(splitPlan.disk.dataDisk, '/dev/sdb');
-  assert.equal(splitPlan.disk.rootFs, 'xfs');
-  assert.equal(splitPlan.disk.dataFs, 'ext4');
+  assert.equal(splitPlan.storage.topology, 'split');
+  assert.deepEqual(splitPlan.storage.systemDisks, ['/dev/sda']);
+  assert.deepEqual(splitPlan.storage.dataDisks, ['/dev/sdb']);
+  assert.equal(splitPlan.storage.root.filesystem, 'xfs');
+  assert.equal(splitPlan.storage.data.filesystem, 'ext4');
 
-  const raidPlan = buildInstallPlanPayload(createValidDraft({
-    diskMode: 'one',
-    diskProfile: 'raid',
+  assert.throws(() => buildInstallPlanPayload(createValidDraft({
+    storageMode: 'raid',
     selectedDisks: ['/dev/sda', '/dev/sdb'],
     sysDisk: '/dev/sda',
     raidLevel: 'raid1',
-    luksEnabled: true,
-  }));
-
-  assert.equal(raidPlan.disk.mode, 'one');
-  assert.equal(raidPlan.disk.profile, 'raid');
-  assert.deepEqual(raidPlan.disk.selectedDisks, ['/dev/sda', '/dev/sdb']);
-  assert.equal(raidPlan.disk.raidLevel, 'raid1');
-  assert.equal(raidPlan.disk.luksEnabled, true);
-  assert.equal(raidPlan.disk.rootFs, 'btrfs');
-  assert.equal(raidPlan.disk.dataFs, 'btrfs');
+  })), /unsupported/i);
 });
 
 test('single, split e raid10 invalidos geram erros especificos', () => {
@@ -268,148 +260,37 @@ test('storage blocking issues vindos da UI bloqueiam summary e install', () => {
 });
 
 
-test('buildInstallPlanPayload usa 0.0.0.0 como sentinela gateway no modo DHCP (schema exige IPv4)', () => {
-  // O schema atual exige network.gateway (required, format ipv4).
-  // Em DHCP usamos 0.0.0.0 como sentinela técnica temporária.
-  const draft = createValidDraft({
-    mgmtMode: 'dhcp',
-    mgmtGateway: '',
-    wanInterface: '',
-    serverIp: '10.0.0.10',
-  });
-
-  const plan = buildInstallPlanPayload(draft);
-
-  // gateway presente como sentinela IPv4 válida
-  assert.equal(plan.network.gateway, '0.0.0.0');
-  // wan segue esperado no teste separado
-  assert.ok(plan.network.wan);
-});
-
-test('buildInstallPlanPayload inclui gateway quando preenchido no modo static', () => {
-  const draft = createValidDraft({
-    mgmtMode: 'static',
-    mgmtGateway: '10.0.0.1',
-    serverIp: '10.0.0.10',
-  });
-
-  const plan = buildInstallPlanPayload(draft);
-
-  assert.equal(plan.network.gateway, '10.0.0.1');
-});
-
-test('buildInstallPlanPayload mantém wan objeto vazio quando não há WAN configurada (schema exige wan)', () => {
-  // O schema atual exige network.wan (required com interface + mode).
-  // Sem WAN configurada, mantemos objeto sentinela com interface='' e mode='dhcp'.
-  const draft = createValidDraft({
-    wanInterface: '',
-    wanMode: 'dhcp',
-  });
-
-  const plan = buildInstallPlanPayload(draft);
-
-  // wan presente como objeto sentinela
-  assert.ok(plan.network.wan);
-  assert.equal(plan.network.wan.interface, '');
-  assert.equal(plan.network.wan.mode, 'dhcp');
-});
-
-test('buildInstallPlanPayload inclui wan quando interface preenchida', () => {
-  const draft = createValidDraft({
-    wanInterface: 'enp2s0',
-    wanMode: 'dhcp',
-  });
-
-  const plan = buildInstallPlanPayload(draft);
-
-  assert.ok(plan.network.wan);
-  assert.equal(plan.network.wan.interface, 'enp2s0');
-  assert.equal(plan.network.wan.mode, 'dhcp');
-});
-
-test('buildInstallPlanPayload não vaza campos extras em source', () => {
+test('buildInstallPlanPayload não vaza campos extras em repository', () => {
   const draft = createValidDraft();
   const plan = buildInstallPlanPayload(draft);
 
-  // source deve conter apenas campos definidos
-  const allowedSourceKeys = ['kind', 'repo', 'branch', 'commit', 'host', 'clonePath', 'targetPath', 'validated', 'created', 'templateRepo'];
-  for (const key of Object.keys(plan.source)) {
-    assert.ok(allowedSourceKeys.includes(key), `source contém chave extra: ${key}`);
-  }
+  assert.deepEqual(Object.keys(plan.repository).sort(), ['branch', 'coreUrl', 'downstreamUrl', 'upstreamUrl']);
+  assert.equal(plan.repository.coreUrl, 'https://github.com/RAGton/kryonix');
+  assert.equal(plan.repository.downstreamUrl, 'https://github.com/RAGton/kryonixos');
+  assert.equal(plan.source, undefined);
 });
 
-test('schema validation passa para payload DHCP com gateway omitido', () => {
-  const draft = createValidDraft({
+test('schema validation passa para InstallPlanV2 single', () => {
+  const plan = buildInstallPlanPayload(createValidDraft({
     mgmtMode: 'dhcp',
     mgmtGateway: '',
     wanInterface: '',
-  });
-
-  const plan = buildInstallPlanPayload(draft);
-
-  // Não deve lançar erro de validação
-  assert.doesNotThrow(() => validateInstallPlanPayload(plan));
-});
-
-test('schema validation passa para payload static com gateway', () => {
-  const draft = createValidDraft({
-    mgmtMode: 'static',
-    mgmtGateway: '10.0.0.1',
-    serverIp: '10.0.0.10',
-    mgmtNetmask: '255.255.255.0',
-    mgmtDns: '1.1.1.1,8.8.8.8',
-    wanInterface: '',
-  });
-
-  const plan = buildInstallPlanPayload(draft);
+  }));
 
   assert.doesNotThrow(() => validateInstallPlanPayload(plan));
 });
 
-test('buildInstallPlanPayload inclui mgmtMode no payload de rede', () => {
-  const draft = createValidDraft({
-    mgmtMode: 'static',
-    mgmtGateway: '10.0.0.1',
-    serverIp: '10.0.0.10',
-    mgmtNetmask: '255.255.255.0',
-    mgmtDns: '1.1.1.1,8.8.8.8',
-    wanInterface: '',
-  });
+test('schema validation passa para InstallPlanV2 split', () => {
+  const plan = buildInstallPlanPayload(createValidDraft({
+    diskMode: 'two',
+    sysDisk: '/dev/sda',
+    dataDisk: '/dev/sdb',
+    selectedDisks: ['/dev/sda', '/dev/sdb'],
+    rootFs: 'btrfs',
+    dataFs: 'ext4',
+  }));
 
-  const plan = buildInstallPlanPayload(draft);
-
-  assert.equal(plan.network.mode, 'static');
-});
-
-test('buildInstallPlanPayload modo DHCP mantém mode=dhcp', () => {
-  const draft = createValidDraft({
-    mgmtMode: 'dhcp',
-    mgmtGateway: '',
-    serverIp: '10.0.0.10',
-    wanInterface: '',
-  });
-
-  const plan = buildInstallPlanPayload(draft);
-
-  assert.equal(plan.network.mode, 'dhcp');
-});
-
-test('buildInstallPlanPayload não exporta 0.0.0.0 como gateway real para static', () => {
-  const draft = createValidDraft({
-    mgmtMode: 'static',
-    mgmtGateway: '0.0.0.0', // user might accidentally put this
-    serverIp: '10.0.0.10',
-    mgmtNetmask: '255.255.255.0',
-    mgmtDns: '1.1.1.1,8.8.8.8',
-    wanInterface: '',
-  });
-
-  const plan = buildInstallPlanPayload(draft);
-
-  // The schema validation will reject 0.0.0.0 as gateway for static,
-  // but let's check that the payload has the gateway
-  // Actually 0.0.0.0 is a valid IPv4 in the schema
-  assert.equal(plan.network.gateway, '0.0.0.0');
+  assert.doesNotThrow(() => validateInstallPlanPayload(plan));
 });
 
 test('validacao serverIp aceita 0.0.0.0 no formato (schema exige IPv4 valido)', () => {
@@ -475,82 +356,28 @@ test('serverIp valido no modo static: IP publico ou privado e aceito pelo regex'
   assert.equal(validation.fieldErrors.serverIp, undefined);
 });
 
-test('buildInstallPlanPayload usa serverIp como string sem sanitizacao (schema valida em tempo de execucao)', () => {
-  // O buildInstallPlanPayload apenas passa o valor; a validacao ocorre em validateStep/schema
+test('contract: buildInstallPlanV2 preserva features e exclui rede, identidade e secrets', () => {
   const draft = createValidDraft({
-    mgmtMode: 'static',
-    serverIp: '10.0.0.10',
-    mgmtGateway: '10.0.0.1',
-    mgmtNetmask: '255.255.255.0',
-    mgmtDns: '1.1.1.1,8.8.8.8',
-    wanInterface: '',
-  });
-
-  const plan = buildInstallPlanPayload(draft);
-
-  assert.equal(plan.network.serverIp, '10.0.0.10');
-});
-
-test('buildInstallPlanPayload nao exporta 0.0.0.0 como serverIp real (sentinel so no schema backend)', () => {
-  // O schema aceita 0.0.0.0 como IPv4 valido, mas a UI nao deve permitir avancar com isso
-  const draft = createValidDraft({
-    mgmtMode: 'static',
-    serverIp: '0.0.0.0',
-    mgmtGateway: '10.0.0.1',
-    mgmtNetmask: '255.255.255.0',
-    mgmtDns: '1.1.1.1,8.8.8.8',
-    wanInterface: '',
-  });
-
-  const plan = buildInstallPlanPayload(draft);
-
-  assert.equal(plan.network.serverIp, '0.0.0.0');
-});
-
-test('WAN expand/collapse nao afeta campos de rede no payload', () => {
-  const draft1 = createValidDraft({ wanInterface: 'enp2s0', wanMode: 'dhcp' });
-  const plan1 = buildInstallPlanPayload(draft1);
-  assert.equal(plan1.network.wan.interface, 'enp2s0');
-  assert.equal(plan1.network.wan.mode, 'dhcp');
-
-  const draft2 = createValidDraft({ wanInterface: '', wanMode: 'dhcp' });
-  const plan2 = buildInstallPlanPayload(draft2);
-  assert.equal(plan2.network.wan.interface, '');
-  assert.equal(plan2.network.wan.mode, 'dhcp');
-});
-
-test('contract: buildInstallPlanPayload preserva fields de contract e exclui senhas', () => {
-  const draft = createValidDraft({
-    selectedFeatures: ['ai.ollama', 'remote.openssh'],
-    adminAuthorizedKeys: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI test\nssh-rsa AAAAB3... test2\n',
+    selectedFeatures: ['storage.srv-data', 'ai.ollama', 'remote.openssh'],
+    adminAuthorizedKeys: '[REDACTED]',
     targetRemoteAccessEnabled: true,
-    adminPassword: 'SuperSecretPassword123!',
-    adminPasswordConfirm: 'SuperSecretPassword123!',
-    adminEmail: 'admin@kryonix.local',
+    adminPassword: '[REDACTED]',
+    adminPasswordConfirm: '[REDACTED]',
+    adminEmail: 'admin@example.invalid',
     adminUid: 1000,
   });
 
   const plan = buildInstallPlanPayload(draft);
 
-  // Features agrupadas sob domain com short keys (backend espera domain.shortKey)
-  assert.ok(plan.features.ai['ollama'], 'Feature de IA deve estar presente sob domain ai');
-  assert.ok(plan.features.remote['openssh'], 'Feature de openssh deve estar presente sob domain remote');
-
-  // authorizedKeys processado e preservado
-  assert.equal(plan.admin.authorizedKeys.length, 2, 'Deve ter processado 2 chaves SSH');
-  assert.equal(plan.admin.authorizedKeys[0], 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI test');
-
-  // Controle de acesso
-  assert.equal(plan.targetRemoteAccess.enabled, true, 'Remote access deve estar enabled');
-
-  // Dados do usuário informativos
-  assert.equal(plan.admin.email, 'admin@kryonix.local');
-  assert.equal(plan.admin.uid, 1000);
-
-  // SECURITY: Senha NÃO deve estar no payload de plano
-  assert.equal(plan.admin.adminPassword, undefined, 'Senha admin nao pode estar no plan');
-  assert.equal(plan.admin.password, undefined, 'Senha admin nao pode estar no plan');
-  assert.equal(plan.adminPassword, undefined, 'Senha admin nao pode estar no plan');
+  assert.deepEqual(Object.keys(plan).sort(), ['features', 'isThinkServer', 'repository', 'storage', 'version']);
+  assert.equal(plan.features.storage['srv-data'], true);
+  assert.equal(plan.features.ai.ollama, true);
+  assert.equal(plan.features.remote.openssh, true);
+  assert.equal(plan.network, undefined);
+  assert.equal(plan.locale, undefined);
+  assert.equal(plan.admin, undefined);
+  assert.equal(plan.targetRemoteAccess, undefined);
+  assert.equal(plan.adminPassword, undefined);
 });
 
 test('contract: buildInstallSecretsPayload isola senhas corretamente', () => {

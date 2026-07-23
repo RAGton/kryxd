@@ -1,0 +1,49 @@
+{
+  "version": 2,
+  "isThinkServer": false,
+  "repository": {
+    "coreUrl": "https://github.com/RAGton/kryonix",
+    "upstreamUrl": "https://github.com/RAGton/Kryonixos.git",
+    "downstreamUrl": "https://github.com/RAGton/kryonixos",
+    "branch": "main"
+  },
+  "storage": {
+    "topology": "single",
+    "systemDisks": [
+      "/dev/sda"
+    ],
+    "dataDisks": [],
+    "root": {
+      "filesystem": "btrfs",
+      "encryption": "none"
+    },
+    "data": null,
+    "raidLevel": null,
+    "manualPartitions": [],
+    "zfs": null,
+    "btrfs": null
+  },
+  "features": {
+    "system": {},
+    "user": {},
+    "storage": {
+      "srv-data": true
+    },
+    "security": {},
+    "remote": {},
+    "ai": {
+      "ollama": true
+    },
+    "server": {},
+    "desktop": {},
+    "dev": {},
+    "mcp": {},
+    "virtualization": {},
+    "network": {},
+    "observability": {},
+    "shell": {},
+    "terminal": {},
+    "editor": {},
+    "obsidian": {}
+  }
+}

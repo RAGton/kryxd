@@ -1,4 +1,4 @@
-use axum::{http::StatusCode, routing::get, Json, Router};
+use axum::{Json, Router, http::StatusCode, routing::get};
 use serde::Serialize;
 use serde_json::Value;
 use std::sync::Arc;
@@ -86,7 +86,8 @@ async fn get_topology(
 
     nodes.sort_by(|left, right| left.node_name.cmp(&right.node_name));
     for node in &mut nodes {
-        node.storages.sort_by(|left, right| left.name.cmp(&right.name));
+        node.storages
+            .sort_by(|left, right| left.name.cmp(&right.name));
         node.vms.sort_by(|left, right| left.name.cmp(&right.name));
         node.cts.sort_by(|left, right| left.name.cmp(&right.name));
     }
@@ -250,7 +251,10 @@ fn storage_pool_name(pool: &Value) -> Option<String> {
 }
 
 fn name_from_incus_path(path: &str) -> Option<String> {
-    path.rsplit('/').next().filter(|name| !name.is_empty()).map(ToOwned::to_owned)
+    path.rsplit('/')
+        .next()
+        .filter(|name| !name.is_empty())
+        .map(ToOwned::to_owned)
 }
 
 fn pool_locations(pool: &Value, nodes: &[NodeTree]) -> Vec<String> {

@@ -8,7 +8,11 @@ use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use axum::{Json, http::StatusCode, routing::{get, post}};
+use axum::{
+    Json,
+    http::StatusCode,
+    routing::{get, post},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -233,7 +237,11 @@ fn mock_ceph_status() -> CephClusterStatus {
         quorum: CephQuorumStatus {
             mon_total: 3,
             mon_in_quorum: 3,
-            quorum_names: vec!["mon-a".to_string(), "mon-b".to_string(), "mon-c".to_string()],
+            quorum_names: vec![
+                "mon-a".to_string(),
+                "mon-b".to_string(),
+                "mon-c".to_string(),
+            ],
             monitors: vec![
                 CephMonitor {
                     name: "mon-a".to_string(),
@@ -457,7 +465,9 @@ fn validate_dataset(value: &str) -> Result<(), String> {
         return Err("source_pool is required".to_string());
     }
     if value.contains('@') || value.contains("..") || value.starts_with('/') {
-        return Err("source_pool must be a ZFS dataset path, not a snapshot or filesystem path".to_string());
+        return Err(
+            "source_pool must be a ZFS dataset path, not a snapshot or filesystem path".to_string(),
+        );
     }
     if !value
         .chars()
@@ -658,9 +668,12 @@ mod tests {
         }))
         .expect("valid pool metadata");
 
-        apply_resources(&mut pool, &json!({
-            "space": { "total": 1024, "used": 128 }
-        }));
+        apply_resources(
+            &mut pool,
+            &json!({
+                "space": { "total": 1024, "used": 128 }
+            }),
+        );
 
         assert_eq!(pool.name, "default");
         assert_eq!(pool.driver, "zfs");
@@ -683,7 +696,10 @@ mod tests {
         assert_eq!(plan.ssh_key_path, "/run/secrets/syncoid_key");
         assert!(plan.nix_config.contains("services.sanoid"));
         assert!(plan.nix_config.contains("services.syncoid"));
-        assert!(plan.nix_config.contains("sshKey = \"/run/secrets/syncoid_key\";"));
+        assert!(
+            plan.nix_config
+                .contains("sshKey = \"/run/secrets/syncoid_key\";")
+        );
         assert!(!plan.nix_config.contains("BEGIN OPENSSH"));
     }
 
