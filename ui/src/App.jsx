@@ -420,6 +420,9 @@ export default function App() {
 
   const role = session?.role || identity?.role || 'Core';
   const isCore = role === 'Core' || role === 'ThinkServer';
+  const canUseKcp = session?.capabilities ? session.capabilities.kcp === true : isCore;
+  const canUseKve = session?.capabilities ? session.capabilities.kve === true : isCore;
+  const kcpHome = canUseKcp ? '/kcp/datacenter/summary' : '/desktop';
 
   return (
     <BrowserRouter>
@@ -434,15 +437,15 @@ export default function App() {
           }} />}
         />
 
-        <Route path="/" element={<ProtectedRedirect session={session} to={isCore ? '/kcp/datacenter/summary' : '/desktop'} />} />
-        <Route path="/fleet" element={<ProtectedRedirect session={session} to="/kcp/datacenter/cluster" />} />
-        <Route path="/storage" element={<ProtectedRedirect session={session} to="/kcp/datacenter/storage" />} />
-        <Route path="/virt" element={<ProtectedRedirect session={session} to="/kcp/datacenter/summary" />} />
+        <Route path="/" element={<ProtectedRedirect session={session} to={kcpHome} />} />
+        <Route path="/fleet" element={<ProtectedRedirect session={session} to={canUseKcp ? '/kcp/datacenter/cluster' : '/desktop'} />} />
+        <Route path="/storage" element={<ProtectedRedirect session={session} to={canUseKcp ? '/kcp/datacenter/storage' : '/desktop'} />} />
+        <Route path="/virt" element={<ProtectedRedirect session={session} to={canUseKcp ? '/kcp/datacenter/summary' : '/desktop'} />} />
         <Route path="/local-settings" element={<ProtectedLocalSettings session={session} />} />
         <Route path="/desktop" element={<ControlCenterHostLayout identity={identity} session={session}><DesktopSummary session={session} /></ControlCenterHostLayout>} />
         <Route path="/desktop/terminal" element={<ControlCenterHostLayout identity={identity} session={session}><TerminalConsole /></ControlCenterHostLayout>} />
 
-        {isCore && (
+        {canUseKcp && (
           <Route
             path="/kcp"
             element={
@@ -496,7 +499,7 @@ export default function App() {
           </Route>
         )}
 
-        <Route path="*" element={<Navigate to={isCore ? '/' : '/desktop'} replace />} />
+        <Route path="*" element={<Navigate to={canUseKcp ? '/' : '/desktop'} replace />} />
       </Routes>
     </BrowserRouter>
   );
