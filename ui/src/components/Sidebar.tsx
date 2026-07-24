@@ -32,6 +32,20 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+interface HostCapabilities {
+  server?: boolean;
+  node?: boolean;
+  cluster?: boolean;
+  kcp?: boolean;
+  kve?: boolean;
+}
+
+type MenuItem = {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+};
+
 interface SidebarProps {
   currentView: ViewType;
   onViewChange: (view: ViewType) => void;
@@ -42,6 +56,7 @@ interface SidebarProps {
   setThinkServerActive?: (active: boolean) => void;
   hideResourceTree?: boolean;
   desktopMode?: boolean;
+  capabilities?: HostCapabilities;
 }
 
 const ResourceTree: React.FC<{
@@ -123,8 +138,12 @@ const Sidebar: React.FC<SidebarProps> = ({
   thinkServerActive = false,
   setThinkServerActive,
   hideResourceTree = false,
-  desktopMode = false
+  desktopMode = false,
+  capabilities
 }) => {
+  const canManageServer = capabilities?.server === true;
+  const canUseKcp = canManageServer && capabilities?.kcp === true;
+  const canUseKve = canManageServer && capabilities?.kve === true;
   const [selectedNodeId, setSelectedNodeId] = useState<string>('dc-01');
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, node: any } | null>(null);
 
@@ -219,7 +238,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     });
   };
 
-  const menuItems = (desktopMode
+  const menuItems: MenuItem[] = (desktopMode
     ? [
         { id: 'dashboard', label: 'Visão geral', icon: LayoutDashboard },
         { id: 'terminal', label: 'Terminal', icon: Terminal },
@@ -227,13 +246,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         { id: 'settings', label: 'Configurações', icon: Settings },
       ]
     : [
-        { id: 'dashboard', label: 'Resumo', icon: LayoutDashboard },
-        { id: 'users', label: 'Usuários', icon: Users },
-        { id: 'storage', label: 'Storage', icon: Database },
-        { id: 'logs', label: 'Logs', icon: FileText },
-        { id: 'api-hub', label: 'Contratos API', icon: Network },
-        { id: 'settings', label: 'Configurações', icon: Settings },
-      ]);
+        canUseKcp && { id: 'dashboard', label: 'Resumo', icon: LayoutDashboard },
+        canUseKcp && { id: 'users', label: 'Usuários', icon: Users },
+        canUseKve && { id: 'storage', label: 'Storage', icon: Database },
+        canUseKcp && { id: 'logs', label: 'Logs', icon: FileText },
+        canUseKcp && { id: 'api-hub', label: 'Contratos API', icon: Network },
+        canUseKcp && { id: 'settings', label: 'Configurações', icon: Settings },
+      ].filter((item): item is MenuItem => Boolean(item)));
 
   const currentActiveTree = thinkServerActive ? netbootTree : resourceTree;
 
@@ -251,8 +270,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             <span className="font-bold text-sm tracking-tight text-white uppercase italic">
               {desktopMode ? 'Kryonix Control Center' : thinkServerActive ? (
                 <>KRYONIX <span className="text-kve-accent font-bold">NODE</span></>
-              ) : (
+              ) : canUseKcp ? (
                 <>KRYONIX <span className="text-[10px] font-normal text-slate-500">NODE</span></>
+              ) : (
+                'KRYONIX'
               )}
             </span>
           </div>
@@ -267,7 +288,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       <div className="flex-1 overflow-hidden flex flex-col">
         {/* Resource Tree */}
-        {!collapsed && !hideResourceTree && (
+        {!collapsed && !hideResourceTree && canUseKcp && (
           <div className="flex-1 overflow-y-auto py-2 custom-scrollbar border-b border-kve-border border-opacity-30">
             <h3 className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-600 mb-2">
               {thinkServerActive ? 'Infra Centralizada' : 'Recursos'}
@@ -300,7 +321,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           )}
           
           {/* Node Server tab shortcut if active */}
-          {thinkServerActive && (
+          {canUseKcp && thinkServerActive && (
             <button
               onClick={() => onViewChange('node-server')}
               className={cn(
