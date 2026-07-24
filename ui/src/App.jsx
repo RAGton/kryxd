@@ -14,7 +14,7 @@ import Storage from './pages/kcp/Storage.jsx';
 import LocalSettings from './pages/kcp/LocalSettings.jsx';
 import KcpTerminal from './components/kcp/console/KcpTerminal.jsx';
 import TerminalConsole from './components/TerminalConsole.tsx';
-import { getCephOsds, getCephStatus, getSession, getStoragePools } from './lib/api.js';
+import { getCapabilities, getCephOsds, getCephStatus, getSession, getStoragePools, resolveHostCapabilities } from './lib/api.js';
 
 function ContextPlaceholder({ title, description }) {
   return (
@@ -370,6 +370,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [identity, setIdentity] = useState(null);
   const [session, setSession] = useState(null);
+  const [capabilities, setCapabilities] = useState(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
@@ -377,15 +378,19 @@ export default function App() {
 
     async function loadBootstrap() {
       try {
-        const [identityData, sessionData] = await Promise.all([
+        const [identityData, sessionData, capabilityRegistry] = await Promise.all([
           fetch('/api/v1/system/identity')
             .then((res) => (res.ok ? res.json() : null))
             .catch(() => null),
           getSession().catch(() => null),
+          getCapabilities().catch(() => null),
         ]);
         if (!alive) return;
+        const hostRole = sessionData?.role || identityData?.role;
+        const resolvedCapabilities = resolveHostCapabilities(capabilityRegistry, hostRole);
         setIdentity(identityData);
-        setSession(sessionData);
+        setSession(sessionData ? { ...sessionData, capabilities: resolvedCapabilities } : sessionData);
+        setCapabilities(resolvedCapabilities);
         setError(false);
       } catch {
         if (!alive) return;
@@ -421,7 +426,12 @@ export default function App() {
       <Routes>
         <Route
           path="/login"
-          element={session?.authenticated ? <Navigate to="/" replace /> : <Login onLogin={setSession} />}
+          element={session?.authenticated ? <Navigate to="/" replace /> : <Login onLogin={(nextSession) => {
+            const resolvedCapabilities = resolveHostCapabilities(nextSession?.capabilities?.registry, nextSession?.role || identity?.role);
+            const authenticatedSession = { ...nextSession, capabilities: resolvedCapabilities };
+            setSession(authenticatedSession);
+            setCapabilities(resolvedCapabilities);
+          }} />}
         />
 
         <Route path="/" element={<ProtectedRedirect session={session} to={isCore ? '/kcp/datacenter/summary' : '/desktop'} />} />

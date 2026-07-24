@@ -21,6 +21,58 @@ export async function loginGateway(credentials) {
   });
 }
 
+export async function getCapabilities() {
+  return requestJson('/api/v2/capabilities');
+}
+
+const SERVER_ROLES = new Set(['Core', 'ThinkServer', 'Node']);
+const CLUSTER_ROLES = new Set(['Core', 'ThinkServer']);
+const ACTIVE_CAPABILITY_STATUSES = new Set(['ready', 'partial']);
+
+function explicitCapabilityFlag(payload, names) {
+  const containers = [payload?.hostCapabilities, payload?.capabilityFlags, payload?.flags]
+    .filter((value) => value && typeof value === 'object' && !Array.isArray(value));
+
+  for (const container of containers) {
+    for (const name of names) {
+      const value = container[name];
+      if (typeof value === 'boolean') return value;
+      if (value && typeof value === 'object') {
+        if (typeof value.enabled === 'boolean') return value.enabled;
+        if (typeof value.status === 'string') {
+          return ACTIVE_CAPABILITY_STATUSES.has(value.status.toLowerCase());
+        }
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function registrySupports(registry, ids) {
+  if (!Array.isArray(registry?.capabilities)) return false;
+  return ids.some((id) => {
+    const capability = registry.capabilities.find((item) => item?.id === id);
+    return ACTIVE_CAPABILITY_STATUSES.has(String(capability?.status || '').toLowerCase());
+  });
+}
+
+export function resolveHostCapabilities(registry, role) {
+  const isServer = SERVER_ROLES.has(role);
+  const isCluster = CLUSTER_ROLES.has(role);
+  const explicitServer = explicitCapabilityFlag(registry, ['server', 'node', 'cluster']);
+  const explicitKcp = explicitCapabilityFlag(registry, ['kcp', 'cluster', 'datacenter']);
+  const explicitKve = explicitCapabilityFlag(registry, ['kve', 'incus', 'virtualization']);
+
+  return {
+    registry: registry || null,
+    server: explicitServer ?? isServer,
+    node: explicitCapabilityFlag(registry, ['node']) ?? role === 'Node',
+    cluster: explicitCapabilityFlag(registry, ['cluster', 'datacenter']) ?? isCluster,
+    kcp: explicitKcp ?? isServer,
+    kve: explicitKve ?? (isServer && registrySupports(registry, ['virtualization.libvirt', 'virtualization.podman'])),
+  };
+}
 export async function getSession() {
   return requestJson('/api/v1/auth/session');
 }
