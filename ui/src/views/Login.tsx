@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 
 import logoImg from '../assets/logo.png';
+import { getCapabilities, resolveHostCapabilities } from '../lib/api.js';
+
 
 interface LoginProps {
   onLogin: (session?: unknown) => void;
@@ -130,6 +132,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
 
       const session = await response.json();
+      const capabilityRegistry = await getCapabilities().catch(() => null);
+      const authenticatedSession = {
+        ...session,
+        capabilities: resolveHostCapabilities(capabilityRegistry, session?.role || identity?.role),
+      };
       localStorage.setItem('kve_operational_scope', effectiveScope);
       localStorage.setItem(
         'kve_requested_capabilities',
@@ -144,7 +151,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       } else {
         localStorage.removeItem('kve_remote_ip');
       }
-      onLogin(session);
+      onLogin(authenticatedSession);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha de autenticação neste host Kryonix.');
       setIsLoading(false);
