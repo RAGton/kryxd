@@ -454,6 +454,17 @@
       "status": "partial"
     },
     {
+      "id": "virtualization.incus",
+      "wireKey": "incus",
+      "level": "system",
+      "domain": "virtualization",
+      "name": "KVE — Kryonix Virtualization Engine (Incus)",
+      "requires": ["storage.srv-data"],
+      "conflicts": ["virtualization.libvirt"],
+      "status": "ready",
+      "reason": "KVE: backend Incus (kryonix.features.virtualization.incus)"
+    },
+    {
       "id": "virtualization.podman",
       "wireKey": "podman",
       "level": "system",
