@@ -10,7 +10,10 @@
 
 rustPlatform.buildRustPackage {
   pname = "kryxd";
-  version = "0.1.0";
+  # version mantida em sincronia com Cargo.toml (V69a).
+  # v0.2.2 = bump deste package.nix para casar com manifest bump 0.2.1 (V66b)
+  # sem isso, buildRustPackage gera derivacao kryxd-0.1.0 fantasma.
+  version = "0.2.1";
 
   src = lib.cleanSource ../.;
 
