@@ -9,6 +9,7 @@ pub mod install;
 pub mod storage;
 pub mod system;
 pub mod v1;
+pub mod v2;
 pub mod virt;
 
 use std::sync::Arc;
@@ -33,5 +34,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .nest("/cluster", cluster::router())
         .nest("/console", console::router())
         .nest("/storage", storage::router())
+        .nest("/kve", v2::kve::router())
+        .nest("/think", v2::think::router())
         .merge(system::router())
 }
