@@ -325,7 +325,6 @@ mod tests {
     #[test]
     fn canonical_registry_has_expected_shape() {
         let registry = capability_registry().unwrap();
-        assert_eq!(registry.capabilities.len(), 42);
         assert_eq!(
             registry.capabilities.len(),
             registry
@@ -334,6 +333,23 @@ mod tests {
                 .map(|c| &c.id)
                 .collect::<BTreeSet<_>>()
                 .len()
+        );
+
+        // Drift confirmado em Gate 1: registry agora tem 43 capabilities
+        // (virtualization.incus adicionada). Gate 1.5 ancora o número e
+        // valida semanticamente a capability crítica do KVE.
+        assert_eq!(registry.capabilities.len(), 43);
+
+        let incus = get_capability("virtualization.incus")
+            .expect("virtualization.incus deve existir no registry");
+
+        assert_eq!(incus.status, CapabilityStatus::Ready);
+        assert!(incus.requires.iter().any(|id| id == "storage.srv-data"));
+        assert!(
+            incus
+                .conflicts
+                .iter()
+                .any(|id| id == "virtualization.libvirt")
         );
     }
 
