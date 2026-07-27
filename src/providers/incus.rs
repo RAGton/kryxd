@@ -498,10 +498,7 @@ mod tests {
 
     #[test]
     fn classify_http_status() {
-        let err = classify_error(
-            "Incus API returned HTTP 500: internal error",
-            "/tmp/x.sock",
-        );
+        let err = classify_error("Incus API returned HTTP 500: internal error", "/tmp/x.sock");
         match err {
             IncusError::HttpStatus { status, body } => {
                 assert_eq!(status, 500);
