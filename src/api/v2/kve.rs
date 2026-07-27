@@ -90,8 +90,7 @@ mod tests {
 
     #[tokio::test]
     async fn path_get_kve_instances_returns_stub_200() {
-        let app = axum::Router::new()
-            .route("/instances", get(list_instances));
+        let app = axum::Router::new().route("/instances", get(list_instances));
 
         let res = app
             .oneshot(Request::get("/instances").body(Body::empty()).unwrap())
@@ -107,8 +106,7 @@ mod tests {
 
     #[tokio::test]
     async fn path_get_kve_storage_returns_stub_200() {
-        let app = axum::Router::new()
-            .route("/storage", get(list_storage));
+        let app = axum::Router::new().route("/storage", get(list_storage));
 
         let res = app
             .oneshot(Request::get("/storage").body(Body::empty()).unwrap())
@@ -128,11 +126,14 @@ mod tests {
     /// este teste falha imediatamente.
     #[tokio::test]
     async fn path_get_kve_kve_instances_returns_404() {
-        let app = axum::Router::new()
-            .route("/kve/instances", get(list_instances));
+        let app = axum::Router::new().route("/kve/instances", get(list_instances));
 
         let res = app
-            .oneshot(Request::get("/kve/kve/instances").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::get("/kve/kve/instances")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 

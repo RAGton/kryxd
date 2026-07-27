@@ -56,36 +56,39 @@ pub async fn get_capabilities() -> Result<Json<CapabilitiesResponse>, StatusCode
 fn enrich_with_runtime_checks(
     caps: &[kryx::domain::CapabilityDefinition],
 ) -> Vec<kryx::domain::CapabilityDefinition> {
-    caps.iter().cloned().map(|mut c| {
-        match c.id.as_str() {
-            "virtualization.incus" => {
-                let socket_exists = std::path::Path::new(INCUS_SOCKET_PATH).exists();
-                let service_active = std::process::Command::new("systemctl")
-                    .args(["is-active", "--quiet", "incus.service"])
-                    .status()
-                    .map(|s| s.success())
-                    .unwrap_or(false);
-                if socket_exists && service_active {
-                    c.status = kryx::domain::CapabilityStatus::Ready;
-                    c.reason = Some(
-                        "KVE: Incus daemon active (unix.socket + incus.service OK)".into(),
-                    );
-                } else if !socket_exists && !service_active {
-                    c.status = kryx::domain::CapabilityStatus::Stub;
-                    c.reason = Some("KVE: Incus daemon not active".into());
-                } else {
-                    // Estado inconsistente (socket exists mas service down, ou vice-versa)
-                    c.status = kryx::domain::CapabilityStatus::Partial;
-                    c.reason = Some(format!(
-                        "KVE: inconsistente (socket={}, service={})",
-                        socket_exists, service_active
-                    ));
+    caps.iter()
+        .cloned()
+        .map(|mut c| {
+            match c.id.as_str() {
+                "virtualization.incus" => {
+                    let socket_exists = std::path::Path::new(INCUS_SOCKET_PATH).exists();
+                    let service_active = std::process::Command::new("systemctl")
+                        .args(["is-active", "--quiet", "incus.service"])
+                        .status()
+                        .map(|s| s.success())
+                        .unwrap_or(false);
+                    if socket_exists && service_active {
+                        c.status = kryx::domain::CapabilityStatus::Ready;
+                        c.reason = Some(
+                            "KVE: Incus daemon active (unix.socket + incus.service OK)".into(),
+                        );
+                    } else if !socket_exists && !service_active {
+                        c.status = kryx::domain::CapabilityStatus::Stub;
+                        c.reason = Some("KVE: Incus daemon not active".into());
+                    } else {
+                        // Estado inconsistente (socket exists mas service down, ou vice-versa)
+                        c.status = kryx::domain::CapabilityStatus::Partial;
+                        c.reason = Some(format!(
+                            "KVE: inconsistente (socket={}, service={})",
+                            socket_exists, service_active
+                        ));
+                    }
                 }
+                _ => {}
             }
-            _ => {}
-        }
-        c
-    }).collect()
+            c
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -104,15 +107,21 @@ mod tests {
                 && capability.status == kryx::domain::CapabilityStatus::Unsupported
         }));
         // KVE: virtualization.incus deve existir e ter status Ready/Stub/Partial
-        let kve = first.capabilities.iter()
+        let kve = first
+            .capabilities
+            .iter()
             .find(|c| c.id == "virtualization.incus")
             .expect("virtualization.incus deve existir no registry");
-        assert!(matches!(
-            kve.status,
-            kryx::domain::CapabilityStatus::Ready
-                | kryx::domain::CapabilityStatus::Stub
-                | kryx::domain::CapabilityStatus::Partial
-        ), "KVE status deve ser Ready/Stub/Partial (achou: {:?})", kve.status);
+        assert!(
+            matches!(
+                kve.status,
+                kryx::domain::CapabilityStatus::Ready
+                    | kryx::domain::CapabilityStatus::Stub
+                    | kryx::domain::CapabilityStatus::Partial
+            ),
+            "KVE status deve ser Ready/Stub/Partial (achou: {:?})",
+            kve.status
+        );
         assert_eq!(kve.domain, kryx::domain::CapabilityDomain::Virtualization);
         let json = serde_json::to_string(&first).unwrap();
         for secret in ["password", "secret", "token", "privateKey"] {
