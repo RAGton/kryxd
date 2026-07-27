@@ -6,7 +6,10 @@
 //! - nunca retornar lista vazia fingindo Incus funcionando;
 //! - propagar erros estruturados em vez de panic.
 
-use kryx::domain::{KveErrorBody, KveHealth, VirtualInstance, VirtualStorage};
+use kryx::domain::{
+    KveErrorBody, KveHealth, KveImage, KveImageKind, KveImageRemote, VirtualInstance,
+    VirtualStorage,
+};
 
 use crate::providers::{IncusError, IncusProvider};
 
@@ -56,6 +59,101 @@ impl KveService {
     /// Lista storage pools.
     pub async fn list_storage(&self) -> Result<Vec<VirtualStorage>, KveErrorBody> {
         self.provider.list_storage().await.map_err(translate)
+    }
+
+    /// Lista remotes de imagens configurados no client Incus local.
+    ///
+    /// Sincrono: le `~/.config/incus/config.yml`. Nao fala com o daemon.
+    pub fn list_image_remotes(&self) -> Vec<KveImageRemote> {
+        self.provider.list_image_remotes()
+    }
+
+    /// Lista imagens Incus disponiveis, opcionalmente filtradas.
+    ///
+    /// Filtros sao aplicados apos a resposta do daemon. O daemon
+    /// Incus nao expoe query params para `/1.0/images`, entao
+    /// filtrar client-side e honesto (sem fingir "filtro do servidor").
+    ///
+    /// `query` e uma substring case-insensitive que combina contra
+    /// fingerprint, aliases, os, release e description.
+    pub async fn list_images(
+        &self,
+        filter: &ImageFilter<'_>,
+    ) -> Result<Vec<KveImage>, KveErrorBody> {
+        let all = self.provider.list_images().await.map_err(translate)?;
+        Ok(all.into_iter().filter(|img| filter.matches(img)).collect())
+    }
+
+    /// Busca uma imagem especifica pelo fingerprint.
+    ///
+    /// 404 do daemon e traduzido para KveErrorBody com codigo
+    /// `incus_invalid_response` (ate diferenciarmos um codigo
+    /// proprio para "nao encontrado" no slice de auth).
+    pub async fn get_image(&self, fingerprint: &str) -> Result<KveImage, KveErrorBody> {
+        self.provider.get_image(fingerprint).await.map_err(translate)
+    }
+}
+
+/// Filtros opcionais para `list_images`.
+///
+/// Todos os campos sao `None` quando nao ha filtro. A semantica
+/// de cada campo:
+/// - `remote`: igual exato ao campo `remote` da imagem.
+/// - `kind`: igual exato ao `KveImageKind`.
+/// - `architecture`: igual exato (case-sensitive, formato Incus
+///   como `x86_64` ou `aarch64`).
+/// - `query`: substring case-insensitive em fingerprint, alias,
+///   os, release e description.
+#[derive(Debug, Default, Clone)]
+pub struct ImageFilter<'a> {
+    pub remote: Option<&'a str>,
+    pub kind: Option<KveImageKind>,
+    pub architecture: Option<&'a str>,
+    pub query: Option<&'a str>,
+}
+
+impl<'a> ImageFilter<'a> {
+    pub fn matches(&self, img: &KveImage) -> bool {
+        if let Some(remote) = self.remote {
+            if img.remote != remote {
+                return false;
+            }
+        }
+        if let Some(kind) = self.kind {
+            if img.kind != kind {
+                return false;
+            }
+        }
+        if let Some(arch) = self.architecture {
+            if img.architecture.as_deref() != Some(arch) {
+                return false;
+            }
+        }
+        if let Some(query) = self.query {
+            let needle = query.to_lowercase();
+            let mut haystack = String::new();
+            haystack.push_str(&img.fingerprint.to_lowercase());
+            for alias in &img.aliases {
+                haystack.push('\n');
+                haystack.push_str(&alias.to_lowercase());
+            }
+            if let Some(os) = &img.os {
+                haystack.push('\n');
+                haystack.push_str(&os.to_lowercase());
+            }
+            if let Some(release) = &img.release {
+                haystack.push('\n');
+                haystack.push_str(&release.to_lowercase());
+            }
+            if let Some(desc) = &img.description {
+                haystack.push('\n');
+                haystack.push_str(&desc.to_lowercase());
+            }
+            if !haystack.contains(&needle) {
+                return false;
+            }
+        }
+        true
     }
 }
 
