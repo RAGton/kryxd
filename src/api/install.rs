@@ -927,6 +927,13 @@ mod tests {
             installer_token: TEST_INSTALLER_TOKEN.into(),
             runtime_mode: crate::state::RuntimeMode::LiveInstaller,
             install_service: Arc::new(InstallService::new(store)),
+            kve_service: crate::services::KveService::new(crate::providers::IncusProvider::new(
+                crate::providers::IncusConfig {
+                    socket: std::path::PathBuf::from("/tmp/does-not-exist.sock"),
+                    timeout: std::time::Duration::from_millis(50),
+                    max_response_bytes: 1024,
+                },
+            )),
         });
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await

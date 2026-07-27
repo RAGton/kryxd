@@ -1,9 +1,12 @@
 //! Serviços de infraestrutura derivados do contrato de domínio v2.
 
+pub mod kve;
 pub mod migration;
 pub mod partitioner;
 pub mod security;
 pub mod target_tree;
+
+pub use kve::KveService;
 
 #[cfg(test)]
 mod tests {

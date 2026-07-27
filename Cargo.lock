@@ -887,6 +887,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "thiserror 1.0.69",
  "tokio",
  "tokio-tungstenite",
  "tower 0.4.13",
