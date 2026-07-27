@@ -34,17 +34,9 @@ pub async fn put_json(path: &str, body: &Value) -> Result<IncusResponse, String>
 
 /// Variante que aceita socket e timeout configuráveis. Usada pelo
 /// `crate::providers::incus::IncusProvider`.
-pub async fn get_json_with_socket(
-    socket: PathBuf,
-    path: &str,
-) -> Result<IncusResponse, String> {
+pub async fn get_json_with_socket(socket: PathBuf, path: &str) -> Result<IncusResponse, String> {
     let fut = request_json_to_socket(&socket, "GET", path, None);
-    match timeout(
-        Duration::from_millis(DEFAULT_INCUS_TIMEOUT_MS),
-        fut,
-    )
-    .await
-    {
+    match timeout(Duration::from_millis(DEFAULT_INCUS_TIMEOUT_MS), fut).await {
         Ok(res) => res,
         Err(_) => Err(format!(
             "timeout após {DEFAULT_INCUS_TIMEOUT_MS}ms aguardando Incus"

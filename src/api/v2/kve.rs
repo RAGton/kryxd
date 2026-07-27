@@ -185,7 +185,10 @@ mod tests {
             storage: vec![],
         };
         let json = serde_json::to_value(&resp).unwrap();
-        assert!(json.get("datasets").is_none(), "campo legado `datasets` deve sumir");
+        assert!(
+            json.get("datasets").is_none(),
+            "campo legado `datasets` deve sumir"
+        );
         assert!(json["storage"].is_array());
     }
 }

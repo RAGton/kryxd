@@ -119,9 +119,18 @@ mod tests {
     #[test]
     fn translate_maps_codes() {
         let cases = [
-            (IncusError::SocketUnavailable("/x".into()), "incus_unavailable"),
-            (IncusError::Timeout(Duration::from_millis(1)), "incus_timeout"),
-            (IncusError::InvalidResponse("bad".into()), "incus_invalid_response"),
+            (
+                IncusError::SocketUnavailable("/x".into()),
+                "incus_unavailable",
+            ),
+            (
+                IncusError::Timeout(Duration::from_millis(1)),
+                "incus_timeout",
+            ),
+            (
+                IncusError::InvalidResponse("bad".into()),
+                "incus_invalid_response",
+            ),
             (
                 IncusError::HttpStatus {
                     status: 500,

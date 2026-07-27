@@ -70,15 +70,21 @@ impl IncusConfig {
     /// Constrói a config a partir de env vars + defaults.
     pub fn from_env() -> Self {
         let socket = env_socket();
-        let timeout = Duration::from_millis(env::var("KRYXD_INCUS_TIMEOUT_MS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(default_timeout_ms()));
+        let timeout = Duration::from_millis(
+            env::var("KRYXD_INCUS_TIMEOUT_MS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(default_timeout_ms()),
+        );
         let max_response_bytes = env::var("KRYXD_INCUS_MAX_BYTES")
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(default_max_bytes());
-        Self { socket, timeout, max_response_bytes }
+        Self {
+            socket,
+            timeout,
+            max_response_bytes,
+        }
     }
 
     pub fn socket_path(&self) -> &std::path::Path {
@@ -158,12 +164,9 @@ impl IncusProvider {
             })
             .await?;
 
-        let entries = res
-            .metadata
-            .as_array()
-            .ok_or_else(|| IncusError::InvalidResponse(
-                "/1.0/instances metadata is not an array".into(),
-            ))?;
+        let entries = res.metadata.as_array().ok_or_else(|| {
+            IncusError::InvalidResponse("/1.0/instances metadata is not an array".into())
+        })?;
 
         let mut out = Vec::with_capacity(entries.len());
         for entry in entries {
@@ -188,9 +191,9 @@ impl IncusProvider {
         let names = res
             .metadata
             .as_array()
-            .ok_or_else(|| IncusError::InvalidResponse(
-                "/1.0/storage_pools metadata is not an array".into(),
-            ))?
+            .ok_or_else(|| {
+                IncusError::InvalidResponse("/1.0/storage_pools metadata is not an array".into())
+            })?
             .iter()
             .filter_map(|v| v.as_str().map(ToOwned::to_owned))
             .collect::<Vec<_>>();
@@ -292,7 +295,10 @@ fn parse_instance(entry: &Value) -> Result<VirtualInstance, IncusError> {
         .ok_or_else(|| IncusError::InvalidResponse("instance missing name".into()))?
         .to_string();
 
-    let kind_str = entry.get("type").and_then(Value::as_str).unwrap_or("container");
+    let kind_str = entry
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or("container");
     let kind = match kind_str {
         "container" => InstanceKind::Container,
         "virtual-machine" | "vm" => InstanceKind::VirtualMachine,
@@ -387,7 +393,10 @@ mod tests {
 
     #[test]
     fn default_socket_is_well_known_path() {
-        assert_eq!(default_socket(), PathBuf::from("/var/lib/incus/unix.socket"));
+        assert_eq!(
+            default_socket(),
+            PathBuf::from("/var/lib/incus/unix.socket")
+        );
     }
 
     #[test]
