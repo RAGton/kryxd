@@ -1,13 +1,13 @@
 pub mod api;
-pub mod middleware;
-pub mod state;
 mod auth;
 mod detection;
 mod disk;
 pub mod domain;
 mod executor;
+pub mod middleware;
 mod network;
 pub mod services;
+pub mod state;
 use network::apply_network;
 mod profiles;
 mod source;
@@ -303,7 +303,7 @@ async fn main() {
         Ok(identity) => {
             println!("Detected InstalledHost mode. Identity: {:?}", identity);
             state::RuntimeMode::InstalledHost(identity)
-        },
+        }
         Err(_) => {
             println!("No valid identity found. Falling back to LiveInstaller mode.");
             state::RuntimeMode::LiveInstaller
@@ -328,7 +328,10 @@ async fn main() {
         .route("/disk/apply", post(disk_apply_endpoint))
         .route("/install/finalize", post(install_finalize_endpoint))
         .route("/api/partition", post(partition_endpoint))
-        .layer(axum::middleware::from_fn_with_state(state.clone(), middleware::installer_guard::installer_guard));
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            middleware::installer_guard::installer_guard,
+        ));
 
     let legacy_api = Router::new()
         .route("/health", get(health))
