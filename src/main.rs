@@ -49,6 +49,8 @@ pub struct AppState {
     pub runtime_mode: state::RuntimeMode,
     /// Casos de uso e stores isolados da API v2.
     pub install_service: Arc<api::install::InstallService>,
+    /// Serviço KVE — leitura de Incus (health, instances, storage).
+    pub kve_service: services::KveService,
 }
 
 // ── Common error type ─────────────────────────────────────────────────────────
@@ -320,6 +322,7 @@ async fn main() {
         installer_token,
         runtime_mode,
         install_service: Arc::new(api::install::InstallService::default()),
+        kve_service: services::KveService::new(providers::IncusProvider::from_env()),
     });
 
     let destructive_api = Router::new()

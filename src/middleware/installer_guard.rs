@@ -50,6 +50,13 @@ mod tests {
             installer_token: "test".into(),
             runtime_mode: mode,
             install_service: Arc::new(crate::api::install::InstallService::default()),
+            kve_service: crate::services::KveService::new(
+                crate::providers::IncusProvider::new(crate::providers::IncusConfig {
+                    socket: std::path::PathBuf::from("/tmp/does-not-exist.sock"),
+                    timeout: std::time::Duration::from_millis(50),
+                    max_response_bytes: 1024,
+                }),
+            ),
         })
     }
 
