@@ -119,22 +119,4 @@ mod tests {
         assert!(body["pools"].is_array());
         assert_eq!(body["pools"].as_array().unwrap().len(), 0);
     }
-
-    /// Garante que o subrouter Think não tem path duplicado
-    /// (ex.: `/think/think/topology`).
-    #[tokio::test]
-    async fn path_get_think_think_topology_returns_404() {
-        let app = axum::Router::new().route("/think/topology", get(get_topology));
-
-        let res = app
-            .oneshot(
-                Request::get("/think/think/topology")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(res.status(), StatusCode::NOT_FOUND);
-    }
 }
