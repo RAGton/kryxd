@@ -7,7 +7,7 @@
 //! - limite de bytes na resposta;
 //! - tradução de erros HTTP/Incus em `IncusError` estruturado;
 //! - parsing de `GET /1.0/instances` em `Vec<VirtualInstance>`;
-//! - parsing de `GET /1.0/storage_pools` em `Vec<VirtualStorage>`.
+//! - parsing de `GET /1.0/storage-pools` em `Vec<VirtualStorage>`.
 
 use std::{env, path::PathBuf, time::Duration};
 
@@ -180,23 +180,25 @@ impl IncusProvider {
         Ok(out)
     }
 
-    /// `GET /1.0/storage_pools` — lista storage pools.
+    /// `GET /1.0/storage-pools` — lista storage pools.
     pub async fn list_storage(&self) -> Result<Vec<VirtualStorage>, IncusError> {
         let res = self
             .call(|socket| async move {
-                incus::get_json_with_socket(socket, "/1.0/storage_pools").await
+                incus::get_json_with_socket(socket, "/1.0/storage-pools").await
             })
             .await?;
 
-        let names = res
+        let names: Vec<String> = res
             .metadata
             .as_array()
             .ok_or_else(|| {
-                IncusError::InvalidResponse("/1.0/storage_pools metadata is not an array".into())
+                IncusError::InvalidResponse("/1.0/storage-pools metadata is not an array".into())
             })?
             .iter()
-            .filter_map(|v| v.as_str().map(ToOwned::to_owned))
-            .collect::<Vec<_>>();
+            .filter_map(|v| v.as_str())
+            .map(|path| path.rsplit('/').next().unwrap_or("").to_string())
+            .filter(|n| !n.is_empty())
+            .collect();
 
         let mut out = Vec::with_capacity(names.len());
         for name in names {
@@ -211,7 +213,7 @@ impl IncusProvider {
     }
 
     async fn storage_pool_detail(&self, name: &str) -> Result<VirtualStorage, IncusError> {
-        let path = format!("/1.0/storage_pools/{}", incus::encode_path_segment(name));
+        let path = format!("/1.0/storage-pools/{}", incus::encode_path_segment(name));
         let res = self
             .call(|socket| {
                 let path = path.clone();
