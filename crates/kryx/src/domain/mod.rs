@@ -5,3 +5,6 @@ pub use config::*;
 pub mod identity;
 pub use identity::*;
 pub mod manifest;
+pub use manifest::*;
+pub mod virtualization;
+pub use virtualization::*;
