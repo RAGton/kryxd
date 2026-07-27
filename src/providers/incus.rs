@@ -139,17 +139,17 @@ impl IncusProvider {
             .await?;
 
         let mut health = KveHealth {
-            status: "ready".into(),
-            source: "incus".into(),
+            status: "ready".to_string(),
+            source: "incus".to_string(),
             socket: Some(self.config.socket.display().to_string()),
         };
 
         if let Some(api_version) = res.metadata.get("api").and_then(Value::as_str) {
             // Incus 1.0+ responde com {"api":"1.0","api_extensions":[...]}
             if api_version.starts_with('1') {
-                health.status = "ready".into();
+                health.status = "ready".to_string();
             } else {
-                health.status = "unknown".into();
+                health.status = "unknown".to_string();
             }
         }
 
@@ -264,13 +264,13 @@ impl IncusProvider {
             .await
             .map_err(|_| IncusError::Timeout(self.config.timeout))?;
 
-        result.map_err(|msg| classify_error(&msg, self.config.socket.display().to_string()))
+        result.map_err(|msg| classify_error(&msg, &self.config.socket.display().to_string()))
     }
 }
 
-fn classify_error(msg: &str, socket: String) -> IncusError {
+fn classify_error(msg: &str, socket: &str) -> IncusError {
     if msg.starts_with("failed to connect to ") {
-        return IncusError::SocketUnavailable(socket);
+        return IncusError::SocketUnavailable(socket.to_string());
     }
     if let Some(rest) = msg.strip_prefix("Incus API returned HTTP ") {
         // formato: "Incus API returned HTTP 500: <body>"
@@ -282,12 +282,12 @@ fn classify_error(msg: &str, socket: String) -> IncusError {
                 };
             }
         }
-        return IncusError::InvalidResponse(msg.into());
+        return IncusError::InvalidResponse(msg.to_string());
     }
     if msg.contains("failed to parse Incus JSON") || msg.contains("malformed Incus HTTP") {
-        return IncusError::InvalidResponse(msg.into());
+        return IncusError::InvalidResponse(msg.to_string());
     }
-    IncusError::InvalidResponse(msg.into())
+    IncusError::InvalidResponse(msg.to_string())
 }
 
 fn parse_instance(entry: &Value) -> Result<VirtualInstance, IncusError> {
@@ -490,7 +490,7 @@ mod tests {
     fn classify_socket_unavailable() {
         let err = classify_error(
             "failed to connect to /tmp/x.sock: no such file",
-            "/tmp/x.sock".into(),
+            "/tmp/x.sock",
         );
         assert!(matches!(err, IncusError::SocketUnavailable(_)));
         assert_eq!(err.code(), "incus_unavailable");
@@ -500,7 +500,7 @@ mod tests {
     fn classify_http_status() {
         let err = classify_error(
             "Incus API returned HTTP 500: internal error",
-            "/tmp/x.sock".into(),
+            "/tmp/x.sock",
         );
         match err {
             IncusError::HttpStatus { status, body } => {

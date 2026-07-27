@@ -149,7 +149,7 @@ mod tests {
     fn unreachable_filter_logic_consistent_with_domain() {
         // Pequeno teste de invariante: se um provider retornasse uma lista
         // mista (CT + VM), o filtro binário sempre as separa sem overlap.
-        let all = vec![
+        let all = [
             VirtualInstance {
                 name: "ct".into(),
                 kind: InstanceKind::Container,
@@ -173,13 +173,13 @@ mod tests {
         ];
         let ct: Vec<_> = all
             .iter()
-            .cloned()
             .filter(|i| matches!(i.kind, InstanceKind::Container))
+            .cloned()
             .collect();
         let vm: Vec<_> = all
             .iter()
-            .cloned()
             .filter(|i| matches!(i.kind, InstanceKind::VirtualMachine))
+            .cloned()
             .collect();
         assert_eq!(ct.len(), 1);
         assert_eq!(vm.len(), 1);
