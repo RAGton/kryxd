@@ -16,7 +16,7 @@ use kryx::domain::{KveErrorBody, VirtualInstance, VirtualStorage};
 use serde::Serialize;
 use std::sync::Arc;
 
-use crate::AppState;
+use crate::{AppState, services::KveService};
 
 #[derive(Serialize)]
 pub struct InstancesResponse {
