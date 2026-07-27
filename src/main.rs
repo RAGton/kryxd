@@ -6,6 +6,7 @@ pub mod domain;
 mod executor;
 pub mod middleware;
 mod network;
+pub mod providers;
 pub mod services;
 pub mod state;
 use network::apply_network;

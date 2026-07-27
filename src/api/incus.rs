@@ -1,10 +1,17 @@
 use serde_json::Value;
-use std::{env, path::PathBuf};
+use std::{env, path::PathBuf, time::Duration};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::UnixStream,
+    time::timeout,
 };
 use url::form_urlencoded::byte_serialize;
+
+/// Bytes lidos por vez do socket.
+const READ_CHUNK: usize = 16 * 1024;
+/// Timeout default (em ms) para requests Incus quando socket explícito é
+/// usado (e.g. pelo `IncusProvider`).
+pub const DEFAULT_INCUS_TIMEOUT_MS: u64 = 5_000;
 
 #[derive(Clone, Debug)]
 pub struct IncusResponse {
@@ -25,13 +32,42 @@ pub async fn put_json(path: &str, body: &Value) -> Result<IncusResponse, String>
     request_json("PUT", path, Some(body)).await
 }
 
+/// Variante que aceita socket e timeout configuráveis. Usada pelo
+/// `crate::providers::incus::IncusProvider`.
+pub async fn get_json_with_socket(
+    socket: PathBuf,
+    path: &str,
+) -> Result<IncusResponse, String> {
+    let fut = request_json_to_socket(&socket, "GET", path, None);
+    match timeout(
+        Duration::from_millis(DEFAULT_INCUS_TIMEOUT_MS),
+        fut,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(_) => Err(format!(
+            "timeout após {DEFAULT_INCUS_TIMEOUT_MS}ms aguardando Incus"
+        )),
+    }
+}
+
 async fn request_json(
     method: &str,
     path: &str,
     body: Option<&Value>,
 ) -> Result<IncusResponse, String> {
     let socket = incus_socket_path();
-    let mut stream = UnixStream::connect(&socket)
+    request_json_to_socket(&socket, method, path, body).await
+}
+
+async fn request_json_to_socket(
+    socket: &std::path::Path,
+    method: &str,
+    path: &str,
+    body: Option<&Value>,
+) -> Result<IncusResponse, String> {
+    let mut stream = UnixStream::connect(socket)
         .await
         .map_err(|e| format!("failed to connect to {}: {e}", socket.display()))?;
 
@@ -58,10 +94,16 @@ async fn request_json(
         .map_err(|e| format!("failed to write Incus request: {e}"))?;
 
     let mut response = Vec::new();
-    stream
-        .read_to_end(&mut response)
-        .await
-        .map_err(|e| format!("failed to read Incus response: {e}"))?;
+    let mut buf = [0u8; READ_CHUNK];
+    loop {
+        match stream.read(&mut buf).await {
+            Ok(0) => break,
+            Ok(n) => {
+                response.extend_from_slice(&buf[..n]);
+            }
+            Err(e) => return Err(format!("failed to read Incus response: {e}")),
+        }
+    }
 
     parse_http_json(&response)
 }
