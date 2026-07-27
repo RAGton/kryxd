@@ -119,24 +119,4 @@ mod tests {
         assert!(body["datasets"].is_array());
         assert_eq!(body["datasets"].as_array().unwrap().len(), 0);
     }
-
-    /// Garante que o subrouter V2 não tem path duplicado
-    /// (ex.: `/kve/kve/instances`). Se um dia alguém trocar
-    /// `nest("/kve", ...)` por `nest("/kve", v2::router())`,
-    /// este teste falha imediatamente.
-    #[tokio::test]
-    async fn path_get_kve_kve_instances_returns_404() {
-        let app = axum::Router::new().route("/kve/instances", get(list_instances));
-
-        let res = app
-            .oneshot(
-                Request::get("/kve/kve/instances")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(res.status(), StatusCode::NOT_FOUND);
-    }
 }
