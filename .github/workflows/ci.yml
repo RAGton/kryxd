@@ -57,10 +57,17 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install OpenSSL headers
+      - name: Install native build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libssl-dev pkg-config
+          sudo apt-get install --yes --no-install-recommends \
+            libclang-dev \
+            libpam0g-dev \
+            llvm \
+            pkg-config \
+            libssl-dev
+
+          echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> "$GITHUB_ENV"
 
       - name: cargo fmt
         run: cargo fmt --all -- --check
