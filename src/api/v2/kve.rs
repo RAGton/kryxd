@@ -50,28 +50,92 @@ pub fn router() -> Router<Arc<AppState>> {
 
 #[cfg(test)]
 mod tests {
+    //! Stubs V2 são puros (zero argumentos, zero `State<Arc<AppState>>`).
+    //! Não precisam de `AppState::default_for_tests()`: basta chamar o
+    //! handler diretamente (Opção A) e/ou montar o subrouter como
+    //! `Router<()>` para validar path + status (Opção B).
+
     use super::*;
-    use axum::body::to_bytes;
-    use axum::http::Request;
+    use axum::body::{Body, to_bytes};
+    use axum::http::{Request, StatusCode};
+    use axum::routing::get;
     use tower::ServiceExt;
 
-    // Os stubs V2 não consomem AppState, mas Router<S=Arc<AppState>> não
-    // implementa tower::Service direto. O construtor real (broadcast senders,
-    // RwLocks, reqwest::Client) é caro para unit tests. Marcamos os testes
-    // com `#[ignore]` até criarmos `AppState::default_for_tests()` na
-    // próxima fase, e usamos `Router::with_state(Arc::new(...))` quando
-    // tivermos um construtor de teste. Por enquanto, o smoke-test de fato
-    // é o `cargo run` manual + curl em runtime, documentado no log do Vault.
+    // ---------- Opção A: handler direto ----------
 
     #[tokio::test]
-    #[ignore = "needs AppState::default_for_tests() — tracked in vault log"]
-    async fn list_instances_returns_stub_shape() {
-        let _ = Request::get("/instances").body(axum::body::Body::empty());
+    async fn list_instances_returns_explicit_stub() {
+        let Json(response) = list_instances().await;
+
+        assert_eq!(response.status, "stub");
+        assert_eq!(response.source, "incus:lista-vazia");
+        assert!(response.instances.is_empty());
     }
 
     #[tokio::test]
-    #[ignore = "needs AppState::default_for_tests() — tracked in vault log"]
-    async fn list_storage_returns_stub_shape() {
-        let _ = Request::get("/storage").body(axum::body::Body::empty());
+    async fn list_storage_returns_explicit_stub() {
+        let Json(response) = list_storage().await;
+
+        assert_eq!(response.status, "stub");
+        assert_eq!(response.source, "zfs:stub");
+        assert!(response.datasets.is_empty());
+    }
+
+    // ---------- Opção B: subrouter como Router<()>, oneshot HTTP ----------
+
+    async fn body_json(body: Body) -> serde_json::Value {
+        let bytes = to_bytes(body, 4096).await.unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    #[tokio::test]
+    async fn path_get_kve_instances_returns_stub_200() {
+        let app = axum::Router::new()
+            .route("/instances", get(list_instances));
+
+        let res = app
+            .oneshot(Request::get("/instances").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = body_json(res.into_body()).await;
+        assert_eq!(body["status"], "stub");
+        assert!(body["instances"].is_array());
+        assert_eq!(body["instances"].as_array().unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn path_get_kve_storage_returns_stub_200() {
+        let app = axum::Router::new()
+            .route("/storage", get(list_storage));
+
+        let res = app
+            .oneshot(Request::get("/storage").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = body_json(res.into_body()).await;
+        assert_eq!(body["status"], "stub");
+        assert!(body["datasets"].is_array());
+        assert_eq!(body["datasets"].as_array().unwrap().len(), 0);
+    }
+
+    /// Garante que o subrouter V2 não tem path duplicado
+    /// (ex.: `/kve/kve/instances`). Se um dia alguém trocar
+    /// `nest("/kve", ...)` por `nest("/kve", v2::router())`,
+    /// este teste falha imediatamente.
+    #[tokio::test]
+    async fn path_get_kve_kve_instances_returns_404() {
+        let app = axum::Router::new()
+            .route("/kve/instances", get(list_instances));
+
+        let res = app
+            .oneshot(Request::get("/kve/kve/instances").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
     }
 }
