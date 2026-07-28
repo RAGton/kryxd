@@ -1,6 +1,7 @@
 //! Serviços de infraestrutura derivados do contrato de domínio v2.
 
 pub mod kve;
+pub mod media_storage;
 pub mod migration;
 pub mod partitioner;
 pub mod security;
