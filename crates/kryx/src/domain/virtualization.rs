@@ -261,3 +261,83 @@ impl IsoMedia {
         }
     }
 }
+
+/// Formato de arquivo de um disco de VM.
+///
+/// Identifica o formato do arquivo importado (raw/qcow2/vmdk/vhd/vhdx),
+/// NAO o tamanho logico reportado pelo hypervisor. A identificacao
+/// confia em magic bytes do arquivo, nao apenas na extensao.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum KveVirtualDiskFormat {
+    /// Imagem crua (sem metadados de formato).
+    Raw,
+    /// QEMU Copy-On-Write v2.
+    Qcow2,
+    /// VMware Virtual Machine Disk.
+    Vmdk,
+    /// Virtual Hard Disk (Microsoft, legacy).
+    Vhd,
+    /// Virtual Hard Disk v2 (Microsoft).
+    Vhdx,
+}
+
+/// Disco completo de VM importado localmente.
+///
+/// Diferente de `KveImage`, este tipo representa um disco pronto
+/// para ser anexado a uma VM (via libvirt/Incus) sem passar pelo
+/// fluxo de imagens Incus. `physical_size_bytes` e o tamanho do
+/// arquivo; `virtual_size_bytes` e o tamanho logico reportado pelo
+/// header do disco (pode ser maior que o arquivo em formatos
+/// sparse como qcow2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct VirtualDiskImage {
+    pub id: String,
+    pub name: String,
+    pub filename: String,
+    pub format: KveVirtualDiskFormat,
+    pub storage_id: String,
+    pub physical_size_bytes: u64,
+    /// Tamanho logico reportado pelo header. None se o formato nao
+    /// tem header (raw) ou se nao foi possivel extrair.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub virtual_size_bytes: Option<u64>,
+    pub sha256: String,
+    pub origin: KveMediaOrigin,
+    /// Presente apenas quando `origin == KveMediaOrigin::Url`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
+}
+
+impl VirtualDiskImage {
+    /// Construtor para uso em testes e fixtures.
+    pub fn for_test(
+        id: &str,
+        name: &str,
+        filename: &str,
+        format: KveVirtualDiskFormat,
+        storage_id: &str,
+        physical_size_bytes: u64,
+        virtual_size_bytes: Option<u64>,
+        sha256: &str,
+        origin: KveMediaOrigin,
+    ) -> Self {
+        let origin_url = matches!(origin, KveMediaOrigin::Url).then(|| "https://example.invalid/disk".to_string());
+        Self {
+            id: id.to_string(),
+            name: name.to_string(),
+            filename: filename.to_string(),
+            format,
+            storage_id: storage_id.to_string(),
+            physical_size_bytes,
+            virtual_size_bytes,
+            sha256: sha256.to_string(),
+            origin,
+            origin_url,
+            created_at: None,
+        }
+    }
+}
