@@ -193,31 +193,228 @@ fn validate_filename(filename: &str) -> Result<(), MediaStorageError> {
 /// root, checa prefixo. Não usa canonicalize() porque o arquivo
 /// final pode não existir ainda.
 fn ensure_within_root(candidate: &Path, root: &Path) -> Result<(), MediaStorageError> {
-    let mut normalized = PathBuf::new();
-    let mut saw_parent = false;
-    for component in candidate.components() {
-        match component {
-            std::path::Component::ParentDir => {
-                saw_parent = true;
+    // Normaliza ambos: remove CurDir, detecta ParentDir, colapsa.
+    let normalize = |p: &Path| -> Option<PathBuf> {
+        let mut out = PathBuf::new();
+        for component in p.components() {
+            match component {
+                std::path::Component::ParentDir => {
+                    // Tenta subir; se nao ha nada para subir, o path
+                    // escapa do absoluto inicial.
+                    if !out.pop() {
+                        return None;
+                    }
+                }
+                std::path::Component::Normal(c) => out.push(c),
+                std::path::Component::CurDir => {}
+                _ => {}
             }
-            std::path::Component::Normal(c) => {
-                normalized.push(c);
-            }
-            std::path::Component::CurDir => {}
-            _ => {}
         }
-    }
-    if saw_parent && !normalized.starts_with(root) {
-        return Err(MediaStorageError::PathTraversal {
-            resolved: candidate.to_path_buf(),
-            root: root.to_path_buf(),
-        });
-    }
-    if !normalized.starts_with(root) {
+        Some(out)
+    };
+
+    let root_norm = normalize(root).ok_or_else(|| MediaStorageError::PathTraversal {
+        resolved: candidate.to_path_buf(),
+        root: root.to_path_buf(),
+    })?;
+    let cand_norm = normalize(candidate).ok_or_else(|| MediaStorageError::PathTraversal {
+        resolved: candidate.to_path_buf(),
+        root: root.to_path_buf(),
+    })?;
+
+    if !cand_norm.starts_with(&root_norm) {
         return Err(MediaStorageError::PathTraversal {
             resolved: candidate.to_path_buf(),
             root: root.to_path_buf(),
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tmp_dir(suffix: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("kryxd-storage-test-{}-{}", suffix, Uuid::new_v4()))
+    }
+
+    #[tokio::test]
+    async fn rejects_invalid_storage_id() {
+        let root = tmp_dir("reject-id");
+        let r = DirectoryStorage::new(MediaStorageConfig {
+            id: String::new(),
+            root_path: root.clone(),
+            max_bytes: 1024,
+        })
+        .await;
+        assert!(matches!(r, Err(MediaStorageError::InvalidStorageId(_))));
+
+        let r = DirectoryStorage::new(MediaStorageConfig {
+            id: "with/slash".into(),
+            root_path: root,
+            max_bytes: 1024,
+        })
+        .await;
+        assert!(matches!(r, Err(MediaStorageError::InvalidStorageId(_))));
+    }
+
+    #[tokio::test]
+    async fn creates_root_path_on_construction() {
+        let root = tmp_dir("create-root");
+        let storage = DirectoryStorage::new(MediaStorageConfig {
+            id: "kryonix-isos".into(),
+            root_path: root.clone(),
+            max_bytes: 1024,
+        })
+        .await
+        .unwrap();
+        assert!(root.is_dir());
+        assert_eq!(storage.id(), "kryonix-isos");
+        assert_eq!(storage.root_path(), root.as_path());
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn path_for_rejects_traversal_and_bad_filenames() {
+        let root = tmp_dir("path-traversal");
+        let storage = DirectoryStorage::new(MediaStorageConfig::unbounded(
+            "kryonix-disks",
+            root.clone(),
+        ))
+        .await
+        .unwrap();
+
+        assert!(matches!(
+            storage.path_for(".."),
+            Err(MediaStorageError::InvalidFilename(_))
+        ));
+        assert!(matches!(
+            storage.path_for("../etc/passwd"),
+            Err(MediaStorageError::InvalidFilename(_))
+        ));
+        assert!(matches!(
+            storage.path_for("sub/file.iso"),
+            Err(MediaStorageError::InvalidFilename(_))
+        ));
+        assert!(matches!(
+            storage.path_for(".hidden"),
+            Err(MediaStorageError::InvalidFilename(_))
+        ));
+        assert!(matches!(
+            storage.path_for(""),
+            Err(MediaStorageError::InvalidFilename(_))
+        ));
+
+        // Nome valido retorna path final dentro do root.
+        let p = storage.path_for("debian-13.iso").unwrap();
+        assert!(p.starts_with(&root));
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn stage_commit_writes_file_atomically() {
+        let root = tmp_dir("stage-commit");
+        let storage = DirectoryStorage::new(MediaStorageConfig::unbounded(
+            "kryonix-isos",
+            root.clone(),
+        ))
+        .await
+        .unwrap();
+
+        let handle = storage.stage("debian-13.iso").await.unwrap();
+        assert!(handle.staging_path.exists());
+        assert!(!handle.final_path.exists());
+
+        let payload = b"hello world from kryxd";
+        let f = DirectoryStorage::open_append(&handle).await.unwrap();
+        use tokio::io::AsyncWriteExt;
+        let mut w = tokio::io::BufWriter::new(f);
+        w.write_all(payload).await.unwrap();
+        w.flush().await.unwrap();
+
+        let final_path = storage.commit(handle).await.unwrap();
+        assert!(final_path.exists());
+        let read_back = tokio::fs::read(&final_path).await.unwrap();
+        assert_eq!(read_back, payload);
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn abort_removes_staging_without_creating_final() {
+        let root = tmp_dir("abort");
+        let storage = DirectoryStorage::new(MediaStorageConfig::unbounded(
+            "kryonix-isos",
+            root.clone(),
+        ))
+        .await
+        .unwrap();
+
+        let handle = storage.stage("to-be-aborted.iso").await.unwrap();
+        let staging_path = handle.staging_path.clone();
+        let final_path = handle.final_path.clone();
+        assert!(staging_path.exists());
+
+        storage.abort(handle).await.unwrap();
+        assert!(!staging_path.exists());
+        assert!(!final_path.exists());
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn commit_rejects_file_larger_than_max_bytes() {
+        let root = tmp_dir("max-bytes");
+        let storage = DirectoryStorage::new(MediaStorageConfig {
+            id: "kryonix-isos".into(),
+            root_path: root.clone(),
+            max_bytes: 4,
+        })
+        .await
+        .unwrap();
+
+        let handle = storage.stage("big.iso").await.unwrap();
+        let payload = b"this is definitely larger than 4 bytes";
+        let f = DirectoryStorage::open_append(&handle).await.unwrap();
+        use tokio::io::AsyncWriteExt;
+        let mut w = tokio::io::BufWriter::new(f);
+        w.write_all(payload).await.unwrap();
+        w.flush().await.unwrap();
+
+        let r = storage.commit(handle).await;
+        assert!(matches!(r, Err(MediaStorageError::SizeExceeded { .. })));
+
+        // O staging foi removido antes de falhar.
+        let mut count = 0;
+        for entry in std::fs::read_dir(&root).unwrap() {
+            let entry = entry.unwrap();
+            count += 1;
+            let _ = entry.file_name();
+        }
+        assert_eq!(count, 0, "esperava sem arquivos apos commit falho");
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
+
+    #[tokio::test]
+    async fn abort_is_idempotent_on_missing_staging() {
+        let root = tmp_dir("abort-missing");
+        let storage = DirectoryStorage::new(MediaStorageConfig::unbounded(
+            "kryonix-isos",
+            root.clone(),
+        ))
+        .await
+        .unwrap();
+
+        let handle = storage.stage("never-written.iso").await.unwrap();
+        tokio::fs::remove_file(&handle.staging_path).await.unwrap();
+
+        // abort() nao pode falhar com NotFound; deve ser idempotente.
+        storage.abort(handle).await.unwrap();
+
+        let _ = tokio::fs::remove_dir_all(&root).await;
+    }
 }
