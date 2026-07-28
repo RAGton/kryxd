@@ -6,6 +6,7 @@
 //! breaking changes no contrato HTTP.
 
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Tipo de instância Incus.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -340,6 +341,53 @@ impl VirtualDiskImage {
             created_at: None,
         }
     }
+}
+
+/// Configuracao de um backend de storage para midias locais.
+///
+/// `id` e a referencia logica usada em `IsoMedia::storage_id` e
+/// `VirtualDiskImage::storage_id`. NAO e um path: e o nome que o
+/// usuario consulta para escolher onde guardar a midia.
+///
+/// `root_path` e o diretorio onde arquivos finais serao colocados.
+/// Toda escrita resolvida deve permanecer dentro deste diretorio;
+/// violacoes sao tratadas como erro de programacao (path traversal).
+///
+/// `max_bytes` e o limite superior do tamanho de arquivo aceito.
+/// A aplicacao e responsabilidade do backend, nao do dominio.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct MediaStorageConfig {
+    pub id: String,
+    pub root_path: PathBuf,
+    pub max_bytes: u64,
+}
+
+impl MediaStorageConfig {
+    /// Constroi a partir de um id e root_path, sem limite explicito.
+    /// Usado em testes e em paths que nao tem cota definida.
+    pub fn unbounded(id: &str, root_path: PathBuf) -> Self {
+        Self {
+            id: id.to_string(),
+            root_path,
+            max_bytes: u64::MAX,
+        }
+    }
+}
+
+/// Validate o `id` de um storage: somente caracteres seguros em
+/// nomes de arquivo, sem separadores, sem `..`, sem bytes nulos.
+///
+/// Esta funcao e o criterio canonico usado tanto para validar o
+/// `id` de `MediaStorageConfig` quanto o `storage_id` recebido em
+/// `IsoMedia::storage_id` e `VirtualDiskImage::storage_id`.
+pub fn is_valid_storage_id(id: &str) -> bool {
+    if id.is_empty() || id.len() > 64 {
+        return false;
+    }
+    id.bytes().all(|b| {
+        b.is_ascii_alphanumeric() || b == b'_' || b == b'-' || b == b'.'
+    })
 }
 
 #[cfg(test)]
