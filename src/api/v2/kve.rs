@@ -11,9 +11,16 @@
 //! - `GET /api/v2/kve/storage`    → 200 { status, source, storage[] }
 //!                                  ou 503 KveErrorBody
 
-use axum::{Json, Router, extract::State, http::StatusCode, routing::get};
-use kryx::domain::{KveErrorBody, VirtualInstance, VirtualStorage};
-use serde::Serialize;
+use axum::{
+    Json, Router,
+    extract::{Path, Query, State},
+    http::StatusCode,
+    routing::get,
+};
+use kryx::domain::{
+    KveErrorBody, KveImage, KveImageKind, KveImageRemote, VirtualInstance, VirtualStorage,
+};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::{AppState, services::KveService};
@@ -30,6 +37,51 @@ pub struct StorageResponse {
     pub storage: Vec<VirtualStorage>,
     pub source: &'static str,
     pub status: &'static str,
+}
+
+/// Resposta de `GET /api/v2/kve/image-remotes`.
+#[derive(Serialize)]
+pub struct ImageRemotesResponse {
+    pub remotes: Vec<KveImageRemote>,
+    pub source: &'static str,
+}
+
+/// Resposta de `GET /api/v2/kve/images`.
+#[derive(Serialize)]
+pub struct ImagesResponse {
+    pub images: Vec<KveImage>,
+    pub source: &'static str,
+    pub status: &'static str,
+    pub filters: ImageFilterEcho,
+}
+
+/// Echo dos filtros aplicados pelo caller, para clareza na UI.
+#[derive(Serialize, Default)]
+pub struct ImageFilterEcho {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remote: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<KveImageKind>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub architecture: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+}
+
+/// Query string aceita por `GET /api/v2/kve/images`.
+///
+/// Todos os campos sao opcionais. `kind` aceita os valores
+/// kebab-case `container`, `virtual-machine`.
+#[derive(Debug, Deserialize)]
+pub struct ImageListQuery {
+    #[serde(default)]
+    pub remote: Option<String>,
+    #[serde(default)]
+    pub kind: Option<String>,
+    #[serde(default)]
+    pub architecture: Option<String>,
+    #[serde(default)]
+    pub query: Option<String>,
 }
 
 /// Tipo do erro HTTP estruturado retornado pelos handlers quando
@@ -77,11 +129,116 @@ pub async fn list_storage(
     }))
 }
 
+/// `GET /api/v2/kve/image-remotes`
+///
+/// Lista remotes configurados no client Incus local. Sincrono:
+/// le `~/.config/incus/config.yml`. Nao fala com o daemon.
+pub async fn list_image_remotes(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<ImageRemotesResponse>, KveHttpError> {
+    let remotes = state.kve_service.list_image_remotes();
+    Ok(Json(ImageRemotesResponse {
+        remotes,
+        source: "client-config",
+    }))
+}
+
+/// `GET /api/v2/kve/images?remote=&kind=&architecture=&query=`
+///
+/// Lista imagens Incus disponiveis, filtradas client-side.
+/// `kind` aceita `container` ou `virtual-machine` (kebab-case).
+/// Valores invalidos em `kind` retornam 400.
+pub async fn list_images(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<ImageListQuery>,
+) -> Result<Json<ImagesResponse>, (StatusCode, Json<KveErrorBody>)> {
+    // Validacao de kind no boundary HTTP.
+    let kind = match q.kind.as_deref() {
+        None => None,
+        Some("container") => Some(KveImageKind::Container),
+        Some("virtual-machine") => Some(KveImageKind::VirtualMachine),
+        Some(other) => {
+            let body = KveErrorBody {
+                status: "invalid-filter",
+                code: "invalid_kind".into(),
+                message: format!(
+                    "kind '{other}' nao reconhecido; valores aceitos: 'container', 'virtual-machine'"
+                ),
+                source: None,
+            };
+            return Err((StatusCode::BAD_REQUEST, Json(body)));
+        }
+    };
+
+    let filter = crate::services::kve::ImageFilter {
+        remote: q.remote.as_deref(),
+        kind,
+        architecture: q.architecture.as_deref(),
+        query: q.query.as_deref(),
+    };
+
+    let images = state
+        .kve_service
+        .list_images(&filter)
+        .await
+        .map_err(|err| (StatusCode::SERVICE_UNAVAILABLE, Json(err)))?;
+
+    Ok(Json(ImagesResponse {
+        images,
+        source: "incus",
+        status: "ready",
+        filters: ImageFilterEcho {
+            remote: q.remote,
+            kind,
+            architecture: q.architecture,
+            query: q.query,
+        },
+    }))
+}
+
+/// `GET /api/v2/kve/images/:fingerprint`
+///
+/// 404 estruturado quando a imagem nao existe no daemon.
+pub async fn get_image(
+    State(state): State<Arc<AppState>>,
+    Path(fingerprint): Path<String>,
+) -> Result<Json<KveImage>, (StatusCode, Json<KveErrorBody>)> {
+    if fingerprint.is_empty() || fingerprint.len() > 256 {
+        let body = KveErrorBody {
+            status: "invalid-fingerprint",
+            code: "invalid_fingerprint".into(),
+            message: "fingerprint invalido".into(),
+            source: None,
+        };
+        return Err((StatusCode::BAD_REQUEST, Json(body)));
+    }
+
+    match state.kve_service.get_image(&fingerprint).await {
+        Ok(img) => Ok(Json(img)),
+        Err(err) => {
+            // Daemon Incus devolve 404 quando a imagem nao existe.
+            // Quando o provider expõe isso como InvalidResponse,
+            // o handler mapeia para 404 + code 'incus_invalid_response'
+            // (ate diferenciarmos um code proprio para "not_found").
+            let lower = err.message.to_lowercase();
+            let status = if lower.contains("not found") {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::SERVICE_UNAVAILABLE
+            };
+            Err((status, Json(err)))
+        }
+    }
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/health", get(health))
         .route("/instances", get(list_instances))
         .route("/storage", get(list_storage))
+        .route("/image-remotes", get(list_image_remotes))
+        .route("/images", get(list_images))
+        .route("/images/:fingerprint", get(get_image))
 }
 
 #[cfg(test)]

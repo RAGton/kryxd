@@ -12,8 +12,8 @@
 use std::{env, path::PathBuf, time::Duration};
 
 use kryx::domain::{
-    InstanceKind, InstanceState, KveHealth, StorageDriver, StorageState, VirtualInstance,
-    VirtualStorage,
+    InstanceKind, InstanceState, KveHealth, KveImage, KveImageKind, KveImageRemote,
+    StorageDriver, StorageState, VirtualInstance, VirtualStorage,
 };
 use serde_json::Value;
 use thiserror::Error;
@@ -253,6 +253,80 @@ impl IncusProvider {
         })
     }
 
+    /// `GET /1.0/images?recursion=1` — lista imagens visíveis ao daemon.
+    ///
+    /// Apenas leitura. Imagens do remote `local` (servidas pelo daemon)
+    /// são retornadas com `remote = "local"`. Remotes adicionais
+    /// (ex.: `images:...`) requerem suporte a cross-server no daemon
+    /// e ficam fora deste escopo read-only.
+    pub async fn list_images(&self) -> Result<Vec<KveImage>, IncusError> {
+        let res = self
+            .call(|socket| async move {
+                incus::get_json_with_socket(socket, "/1.0/images?recursion=1").await
+            })
+            .await?;
+
+        let entries = res.metadata.as_array().ok_or_else(|| {
+            IncusError::InvalidResponse("/1.0/images metadata is not an array".into())
+        })?;
+
+        let mut out = Vec::with_capacity(entries.len());
+        for entry in entries {
+            match parse_image(entry, "local") {
+                Ok(img) => out.push(img),
+                Err(reason) => {
+                    let fp = entry
+                        .get("fingerprint")
+                        .and_then(Value::as_str)
+                        .unwrap_or("<unknown>");
+                    tracing::warn!(fingerprint = fp, %reason, "skipping malformed image");
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    /// `GET /1.0/images/{fingerprint}` — busca uma imagem específica.
+    pub async fn get_image(&self, fingerprint: &str) -> Result<KveImage, IncusError> {
+        let path = format!(
+            "/1.0/images/{}",
+            incus::encode_path_segment(fingerprint)
+        );
+        let res = self
+            .call(|socket| {
+                let path = path.clone();
+                async move { incus::get_json_with_socket(socket, &path).await }
+            })
+            .await?;
+
+        // Incus retorna 404 com raw.status_code == 404 quando o fingerprint
+        // nao existe. Mapeamos para erro estruturado.
+        if res.raw.get("status_code").and_then(Value::as_u64) == Some(404) {
+            return Err(IncusError::InvalidResponse(format!(
+                "image not found: {fingerprint}"
+            )));
+        }
+
+        parse_image(&res.metadata, "local").map_err(IncusError::InvalidResponse)
+    }
+
+    /// Lista remotes configurados no client Incus local.
+    ///
+    /// Origem: `~/.config/incus/config.yml` (formato client config).
+    /// O daemon Incus nao expoe remotes via API HTTP.
+    /// Se o config nao existir ou nao for legivel, retorna
+    /// apenas o remote `local` como fallback.
+    pub fn list_image_remotes(&self) -> Vec<KveImageRemote> {
+        parse_client_remotes().unwrap_or_else(|| {
+            vec![KveImageRemote {
+                name: "local".into(),
+                protocol: "incus".into(),
+                address: self.config.socket.display().to_string(),
+                public: false,
+            }]
+        })
+    }
+
     /// Wrapper que aplica timeout e traduz erros do cliente HTTP-over-Unix.
     async fn call<F, Fut>(&self, f: F) -> Result<incus::IncusResponse, IncusError>
     where
@@ -388,6 +462,151 @@ fn parse_storage_state(status: Option<&str>, used_by: Option<&Vec<Value>>) -> St
     }
 }
 
+/// Parse uma imagem da resposta Incus `/1.0/images?recursion=1`.
+///
+/// O top-level `type` (`"container"` ou `"virtual-machine"`) determina
+/// o `KveImageKind`. O sub-campo `properties.type` (`"squashfs"`,
+/// `"disk"` etc.) NAO e usado para classificacao: ele descreve o
+/// formato de empacotamento da imagem, nao o destino de uso.
+///
+/// ISOs nao sao classificadas como `Iso` aqui — esta funcao e
+/// estritamente para imagens Incus propriamente ditas. ISOs
+/// terao um caminho proprio de import em slice futuro.
+fn parse_image(entry: &Value, remote: &str) -> Result<KveImage, String> {
+    let fingerprint = entry
+        .get("fingerprint")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "missing fingerprint".to_string())?
+        .to_string();
+
+    let kind = match entry.get("type").and_then(Value::as_str) {
+        Some("container") => KveImageKind::Container,
+        Some("virtual-machine") => KveImageKind::VirtualMachine,
+        Some(other) => {
+            return Err(format!(
+                "unknown image type '{other}' for fingerprint {fingerprint}"
+            ));
+        }
+        None => return Err(format!("missing type for fingerprint {fingerprint}")),
+    };
+
+    let props = entry.get("properties");
+    let prop_str = |key: &str| -> Option<String> {
+        props
+            .and_then(|p| p.get(key))
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned)
+    };
+
+    let aliases = entry
+        .get("aliases")
+        .and_then(Value::as_array)
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|a| {
+                    a.get("name")
+                        .and_then(Value::as_str)
+                        .map(ToOwned::to_owned)
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    Ok(KveImage {
+        fingerprint,
+        aliases,
+        kind,
+        remote: remote.to_string(),
+        description: prop_str("description"),
+        os: prop_str("os"),
+        release: prop_str("release"),
+        architecture: entry
+            .get("architecture")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned),
+        variant: prop_str("variant"),
+        size_bytes: entry.get("size").and_then(Value::as_u64),
+        created_at: entry
+            .get("created_at")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned),
+        expires_at: entry
+            .get("expires_at")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned),
+    })
+}
+
+/// Le remotes do client config do Incus em `~/.config/incus/config.yml`.
+///
+/// Formato esperado (YAML simples):
+/// ```yaml
+/// remotes:
+///   images:
+///     protocol: simplestreams
+///     public: true
+///     addr: https://images.linuxcontainers.org
+/// ```
+///
+/// Retorna `None` se o arquivo nao existir ou nao puder ser parseado,
+/// sinalizando ao caller para usar o fallback `local`.
+fn parse_client_remotes() -> Option<Vec<KveImageRemote>> {
+    let home = env::var("HOME").ok()?;
+    let path = std::path::Path::new(&home).join(".config/incus/config.yml");
+    let content = std::fs::read_to_string(&path).ok()?;
+
+    let mut remotes = Vec::new();
+    let mut in_remotes = false;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if trimmed.starts_with("remotes:") {
+            in_remotes = true;
+            continue;
+        }
+        if !in_remotes {
+            continue;
+        }
+        // top-level remote key (2-space indent, ends with colon)
+        if line.starts_with("  ") && !line.starts_with("    ") && trimmed.ends_with(':') {
+            let name = trimmed.trim_end_matches(':').to_string();
+            remotes.push(KveImageRemote {
+                name,
+                protocol: String::new(),
+                address: String::new(),
+                public: false,
+            });
+            continue;
+        }
+        // sub-chaves do remote atual (4-space indent)
+        if line.starts_with("    ") {
+            if let Some(last) = remotes.last_mut() {
+                let (key, value) = trimmed.split_once(':')?;
+                let key = key.trim();
+                let value = value.trim();
+                match key {
+                    "protocol" => last.protocol = value.to_string(),
+                    "addr" => last.address = value.to_string(),
+                    "public" => last.public = value == "true",
+                    _ => {}
+                }
+            }
+        } else if !line.starts_with(' ') {
+            // Voltou para top-level (default-remote, aliases, defaults).
+            in_remotes = false;
+        }
+    }
+
+    if remotes.is_empty() {
+        None
+    } else {
+        Some(remotes)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -519,5 +738,116 @@ mod tests {
         );
         assert!(matches!(err, IncusError::InvalidResponse(_)));
         assert_eq!(err.code(), "incus_invalid_response");
+    }
+
+    // ===== parse_image =====
+
+    #[test]
+    fn parse_image_classifies_container_correctly() {
+        let entry = json!({
+            "fingerprint": "deadbeef00000000",
+            "type": "container",
+            "architecture": "x86_64",
+            "properties": {
+                "os": "Debian",
+                "release": "trixie",
+                "description": "Debian trixie amd64",
+                "architecture": "amd64"
+            },
+            "size": 105304756_i64,
+            "created_at": "2026-07-26T00:00:00Z",
+            "aliases": [
+                {"name": "debian/13"}
+            ]
+        });
+        let img = parse_image(&entry, "local").expect("parse ok");
+        assert_eq!(img.fingerprint, "deadbeef00000000");
+        assert_eq!(img.kind, KveImageKind::Container);
+        assert_eq!(img.os.as_deref(), Some("Debian"));
+        assert_eq!(img.release.as_deref(), Some("trixie"));
+        assert_eq!(img.aliases, vec!["debian/13".to_string()]);
+        assert_eq!(img.size_bytes, Some(105_304_756));
+        assert_eq!(img.remote, "local");
+    }
+
+    #[test]
+    fn parse_image_classifies_virtual_machine_correctly() {
+        let entry = json!({
+            "fingerprint": "cafebabe11111111",
+            "type": "virtual-machine",
+            "architecture": "x86_64",
+            "properties": {
+                "os": "Ubuntu",
+                "release": "jammy"
+            },
+            "size": 900_000_000_i64
+        });
+        let img = parse_image(&entry, "local").expect("parse ok");
+        assert_eq!(img.kind, KveImageKind::VirtualMachine);
+        assert_eq!(img.os.as_deref(), Some("Ubuntu"));
+    }
+
+    #[test]
+    fn parse_image_ignores_squashfs_in_properties_type() {
+        // properties.type == "squashfs" descreve o formato de
+        // empacotamento, NAO o destino de uso. Como o parser
+        // usa apenas o top-level 'type', a classificacao fica
+        // como Container. ISOs nao sao responsabilidade deste
+        // caminho (dominio separado IsoMedia).
+        let entry = json!({
+            "fingerprint": "abc123",
+            "type": "container",
+            "properties": {
+                "type": "squashfs",
+                "os": "Alpine"
+            }
+        });
+        let img = parse_image(&entry, "local").expect("parse ok");
+        assert_eq!(img.kind, KveImageKind::Container);
+    }
+
+    #[test]
+    fn parse_image_rejects_unknown_type() {
+        let entry = json!({
+            "fingerprint": "deadbeef",
+            "type": "tarball"
+        });
+        let err = parse_image(&entry, "local").expect_err("should fail");
+        assert!(err.contains("unknown image type 'tarball'"));
+    }
+
+    #[test]
+    fn parse_image_handles_empty_aliases() {
+        let entry = json!({
+            "fingerprint": "abc",
+            "type": "container",
+            "aliases": []
+        });
+        let img = parse_image(&entry, "local").expect("parse ok");
+        assert!(img.aliases.is_empty());
+    }
+
+    #[test]
+    fn parse_image_handles_missing_properties() {
+        let entry = json!({
+            "fingerprint": "abc",
+            "type": "container",
+            "architecture": "aarch64"
+        });
+        let img = parse_image(&entry, "local").expect("parse ok");
+        assert_eq!(img.architecture.as_deref(), Some("aarch64"));
+        assert!(img.os.is_none());
+        assert!(img.release.is_none());
+        assert!(img.description.is_none());
+        assert!(img.size_bytes.is_none());
+    }
+
+    #[test]
+    fn parse_image_fails_without_fingerprint() {
+        let entry = json!({
+            "type": "container"
+        });
+        let err = parse_image(&entry, "local").expect_err("should fail");
+        assert!(err.contains("missing fingerprint"));
     }
 }
