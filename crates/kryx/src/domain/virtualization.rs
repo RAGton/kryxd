@@ -192,3 +192,72 @@ impl KveImage {
         }
     }
 }
+
+/// Origem de uma midia local (ISO ou disco de VM).
+///
+/// Este enum e compartilhado por `IsoMedia` e `VirtualDiskImage`
+/// porque ambos podem vir de upload manual, URL externa ou
+/// importacao local. Nao inclui "remote Incus" porque midias
+/// Incus sao representadas por `KveImage`, nao por midia local.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum KveMediaOrigin {
+    /// Enviada manualmente pelo usuario (multipart upload).
+    Upload,
+    /// Baixada por URL externa.
+    Url,
+    /// Importada de fonte ja presente no host (filesystem, disco local).
+    LocalImport,
+}
+
+/// Midia ISO local sob gestao do KVE.
+///
+/// Nao e uma imagem Incus: aparece como opcao na criacao de VM
+/// ou em fluxo proprio de anexacao. `sha256` identifica o conteudo
+/// de forma estavel (id derivado). `storage_id` e referencia
+/// logica ao `MediaStorage` que a guarda (resolver no slice de
+/// storage, nao aqui).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct IsoMedia {
+    pub id: String,
+    pub name: String,
+    pub filename: String,
+    pub storage_id: String,
+    pub size_bytes: u64,
+    pub sha256: String,
+    pub origin: KveMediaOrigin,
+    /// Presente apenas quando `origin == KveMediaOrigin::Url`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
+}
+
+impl IsoMedia {
+    /// Construtor para uso em testes e fixtures.
+    ///
+    /// `origin_url` e derivado: presente apenas quando a origem e `Url`.
+    pub fn for_test(
+        id: &str,
+        name: &str,
+        filename: &str,
+        storage_id: &str,
+        size_bytes: u64,
+        sha256: &str,
+        origin: KveMediaOrigin,
+    ) -> Self {
+        let origin_url = matches!(origin, KveMediaOrigin::Url).then(|| "https://example.invalid/iso".to_string());
+        Self {
+            id: id.to_string(),
+            name: name.to_string(),
+            filename: filename.to_string(),
+            storage_id: storage_id.to_string(),
+            size_bytes,
+            sha256: sha256.to_string(),
+            origin,
+            origin_url,
+            created_at: None,
+        }
+    }
+}
