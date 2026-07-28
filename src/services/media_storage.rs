@@ -16,7 +16,7 @@
 
 use std::path::{Path, PathBuf};
 
-use kryx::domain::{is_valid_storage_id, MediaStorageConfig};
+use crate::storage::{is_valid_storage_id, MediaStorageConfig};
 use thiserror::Error;
 use tokio::fs;
 use uuid::Uuid;
