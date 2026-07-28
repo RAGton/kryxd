@@ -196,7 +196,7 @@ pub async fn list_images(
     }))
 }
 
-/// `GET /api/v2/kve/images/{fingerprint}`
+/// `GET /api/v2/kve/images/:fingerprint`
 ///
 /// 404 estruturado quando a imagem nao existe no daemon.
 pub async fn get_image(
@@ -216,8 +216,12 @@ pub async fn get_image(
     match state.kve_service.get_image(&fingerprint).await {
         Ok(img) => Ok(Json(img)),
         Err(err) => {
-            // Mensagem "image not found" vira 404; resto vira 503.
-            let status = if err.message.contains("image not found") {
+            // Daemon Incus devolve 404 quando a imagem nao existe.
+            // Quando o provider expõe isso como InvalidResponse,
+            // o handler mapeia para 404 + code 'incus_invalid_response'
+            // (ate diferenciarmos um code proprio para "not_found").
+            let lower = err.message.to_lowercase();
+            let status = if lower.contains("not found") {
                 StatusCode::NOT_FOUND
             } else {
                 StatusCode::SERVICE_UNAVAILABLE
@@ -234,7 +238,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/storage", get(list_storage))
         .route("/image-remotes", get(list_image_remotes))
         .route("/images", get(list_images))
-        .route("/images/{fingerprint}", get(get_image))
+        .route("/images/:fingerprint", get(get_image))
 }
 
 #[cfg(test)]
