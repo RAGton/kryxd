@@ -341,3 +341,223 @@ impl VirtualDiskImage {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ===== KveMediaOrigin =====
+
+    #[test]
+    fn media_origin_serializes_kebab_case() {
+        let cases = [
+            (KveMediaOrigin::Upload, "\"upload\""),
+            (KveMediaOrigin::Url, "\"url\""),
+            (KveMediaOrigin::LocalImport, "\"local-import\""),
+        ];
+        for (origin, expected_json) in cases {
+            let json = serde_json::to_string(&origin).unwrap();
+            assert_eq!(json, expected_json, "serialize {origin:?}");
+        }
+    }
+
+    #[test]
+    fn media_origin_round_trips_for_all_variants() {
+        for origin in [
+            KveMediaOrigin::Upload,
+            KveMediaOrigin::Url,
+            KveMediaOrigin::LocalImport,
+        ] {
+            let json = serde_json::to_string(&origin).unwrap();
+            let parsed: KveMediaOrigin = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed, origin);
+        }
+    }
+
+    // ===== KveVirtualDiskFormat =====
+
+    #[test]
+    fn virtual_disk_format_serializes_lowercase() {
+        let cases = [
+            (KveVirtualDiskFormat::Raw, "\"raw\""),
+            (KveVirtualDiskFormat::Qcow2, "\"qcow2\""),
+            (KveVirtualDiskFormat::Vmdk, "\"vmdk\""),
+            (KveVirtualDiskFormat::Vhd, "\"vhd\""),
+            (KveVirtualDiskFormat::Vhdx, "\"vhdx\""),
+        ];
+        for (fmt, expected_json) in cases {
+            let json = serde_json::to_string(&fmt).unwrap();
+            assert_eq!(json, expected_json, "serialize {fmt:?}");
+        }
+    }
+
+    #[test]
+    fn virtual_disk_format_round_trips_for_all_variants() {
+        for fmt in [
+            KveVirtualDiskFormat::Raw,
+            KveVirtualDiskFormat::Qcow2,
+            KveVirtualDiskFormat::Vmdk,
+            KveVirtualDiskFormat::Vhd,
+            KveVirtualDiskFormat::Vhdx,
+        ] {
+            let json = serde_json::to_string(&fmt).unwrap();
+            let parsed: KveVirtualDiskFormat = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed, fmt);
+        }
+    }
+
+    // ===== IsoMedia =====
+
+    #[test]
+    fn iso_media_round_trips_when_origin_is_url() {
+        let iso = IsoMedia::for_test(
+            "sha256:abc",
+            "debian-13-installer",
+            "debian-13-netinst.iso",
+            "kryonix-isos",
+            600_000_000,
+            "abc123def456",
+            KveMediaOrigin::Url,
+        );
+        let json = serde_json::to_string(&iso).unwrap();
+        let parsed: IsoMedia = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, iso);
+        assert!(json.contains("\"origin-url\":\"https://example.invalid/iso\""));
+    }
+
+    #[test]
+    fn iso_media_omits_origin_url_when_origin_is_upload() {
+        let iso = IsoMedia::for_test(
+            "sha256:abc",
+            "win11",
+            "win11.iso",
+            "kryonix-isos",
+            5_000_000_000,
+            "abc123",
+            KveMediaOrigin::Upload,
+        );
+        let json = serde_json::to_string(&iso).unwrap();
+        assert!(!json.contains("origin-url"));
+        assert!(!json.contains("origin_url"));
+        let parsed: IsoMedia = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, iso);
+    }
+
+    #[test]
+    fn iso_media_omits_origin_url_when_origin_is_local_import() {
+        let iso = IsoMedia::for_test(
+            "sha256:abc",
+            "ubuntu-server",
+            "ubuntu-24.04-server.iso",
+            "kryonix-isos",
+            3_500_000_000,
+            "deadbeef",
+            KveMediaOrigin::LocalImport,
+        );
+        let json = serde_json::to_string(&iso).unwrap();
+        assert!(!json.contains("origin-url"));
+        let parsed: IsoMedia = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, iso);
+    }
+
+    #[test]
+    fn iso_media_accepts_json_without_origin_url_field() {
+        // JSON produzido por um caller que omite origin_url deve
+        // deserializar com origin_url = None.
+        let json = r#"{
+            "id": "sha256:abc",
+            "name": "nixos",
+            "filename": "nixos-minimal.iso",
+            "storage-id": "kryonix-isos",
+            "size-bytes": 900000000,
+            "sha256": "abc",
+            "origin": "upload"
+        }"#;
+        let parsed: IsoMedia = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.origin, KveMediaOrigin::Upload);
+        assert!(parsed.origin_url.is_none());
+        assert!(parsed.created_at.is_none());
+    }
+
+    // ===== VirtualDiskImage =====
+
+    #[test]
+    fn virtual_disk_image_round_trips_qcow2_with_virtual_size() {
+        let disk = VirtualDiskImage::for_test(
+            "sha256:disk1",
+            "ubuntu-cloud",
+            "ubuntu-24.04.qcow2",
+            KveVirtualDiskFormat::Qcow2,
+            "kryonix-disks",
+            1_200_000_000,
+            Some(10_000_000_000),
+            "deadbeef",
+            KveMediaOrigin::Url,
+        );
+        let json = serde_json::to_string(&disk).unwrap();
+        let parsed: VirtualDiskImage = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, disk);
+        assert!(json.contains("\"format\":\"qcow2\""));
+        assert!(json.contains("\"virtual-size-bytes\":10000000000"));
+    }
+
+    #[test]
+    fn virtual_disk_image_omits_virtual_size_for_raw() {
+        let disk = VirtualDiskImage::for_test(
+            "sha256:raw1",
+            "debian-cloud",
+            "debian-12.raw",
+            KveVirtualDiskFormat::Raw,
+            "kryonix-disks",
+            2_000_000_000,
+            None,
+            "cafebabe",
+            KveMediaOrigin::Upload,
+        );
+        let json = serde_json::to_string(&disk).unwrap();
+        assert!(!json.contains("virtual-size-bytes"));
+        let parsed: VirtualDiskImage = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, disk);
+    }
+
+    // ===== Regressao: dominio Incus intacto =====
+
+    #[test]
+    fn kve_image_kind_continues_to_be_only_container_or_vm() {
+        // Confirmacao: variantes do enum nao mudaram.
+        // Serializa e deserializa para cada variante.
+        for kind in [KveImageKind::Container, KveImageKind::VirtualMachine] {
+            let json = serde_json::to_string(&kind).unwrap();
+            let parsed: KveImageKind = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed, kind);
+        }
+
+        // Garante que 'iso' NAO e uma variante valida de KveImageKind.
+        let err = serde_json::from_str::<KveImageKind>("\"iso\"").unwrap_err();
+        assert!(
+            err.to_string().contains("unknown variant") || err.to_string().contains("iso"),
+            "esperava erro de variante desconhecida, obteve: {err}"
+        );
+    }
+
+    #[test]
+    fn kve_image_round_trip_unchanged() {
+        let img = KveImage::for_test("abc123", KveImageKind::Container, "local");
+        let json = serde_json::to_string(&img).unwrap();
+        let parsed: KveImage = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, img);
+    }
+
+    #[test]
+    fn kve_image_remote_round_trip_unchanged() {
+        let remote = KveImageRemote {
+            name: "images".into(),
+            protocol: "simplestreams".into(),
+            address: "https://images.linuxcontainers.org".into(),
+            public: true,
+        };
+        let json = serde_json::to_string(&remote).unwrap();
+        let parsed: KveImageRemote = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, remote);
+    }
+}
