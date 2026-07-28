@@ -202,12 +202,37 @@ impl KveImage {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum KveMediaOrigin {
-    /// Enviada manualmente pelo usuario (multipart upload).
     Upload,
-    /// Baixada por URL externa.
     Url,
-    /// Importada de fonte ja presente no host (filesystem, disco local).
     LocalImport,
+}
+
+/// Identificador logico de um backend de storage.
+///
+/// Newtype transparente sobre `String`. Serializa e deserializa
+/// como a string crua (sem envelope), preservando compatibilidade
+/// de payload HTTP. Tipa o campo `storage_id` de `IsoMedia` e
+/// `VirtualDiskImage`, dando lugar a validacao centralizada
+/// quando multiplos storages surgirem no sistema.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct StorageId(pub String);
+
+impl StorageId {
+    /// Constroi a partir de uma string.
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
+
+    /// Acesso a string interna.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Construtor para uso em testes e fixtures.
+    pub fn for_test(id: &str) -> Self {
+        Self(id.to_string())
+    }
 }
 
 /// Midia ISO local sob gestao do KVE.
@@ -223,7 +248,7 @@ pub struct IsoMedia {
     pub id: String,
     pub name: String,
     pub filename: String,
-    pub storage_id: String,
+    pub storage_id: StorageId,
     pub size_bytes: u64,
     pub sha256: String,
     pub origin: KveMediaOrigin,
@@ -252,7 +277,7 @@ impl IsoMedia {
             id: id.to_string(),
             name: name.to_string(),
             filename: filename.to_string(),
-            storage_id: storage_id.to_string(),
+            storage_id: StorageId::for_test(storage_id),
             size_bytes,
             sha256: sha256.to_string(),
             origin,
@@ -297,7 +322,7 @@ pub struct VirtualDiskImage {
     pub name: String,
     pub filename: String,
     pub format: KveVirtualDiskFormat,
-    pub storage_id: String,
+    pub storage_id: StorageId,
     pub physical_size_bytes: u64,
     /// Tamanho logico reportado pelo header. None se o formato nao
     /// tem header (raw) ou se nao foi possivel extrair.
@@ -331,7 +356,7 @@ impl VirtualDiskImage {
             name: name.to_string(),
             filename: filename.to_string(),
             format,
-            storage_id: storage_id.to_string(),
+            storage_id: StorageId::for_test(storage_id),
             physical_size_bytes,
             virtual_size_bytes,
             sha256: sha256.to_string(),
@@ -559,5 +584,58 @@ mod tests {
         let json = serde_json::to_string(&remote).unwrap();
         let parsed: KveImageRemote = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, remote);
+    }
+
+    // ===== StorageId =====
+
+    #[test]
+    fn storage_id_serializes_as_plain_string() {
+        let id = StorageId::for_test("kryonix-isos");
+        let json = serde_json::to_string(&id).unwrap();
+        // Serialize como string crua, sem envelope de objeto.
+        assert_eq!(json, "\"kryonix-isos\"");
+    }
+
+    #[test]
+    fn storage_id_deserializes_from_plain_string() {
+        // Compatibilidade: payload externo vem com string crua.
+        let id: StorageId = serde_json::from_str("\"kryonix-disks\"").unwrap();
+        assert_eq!(id.as_str(), "kryonix-disks");
+    }
+
+    #[test]
+    fn storage_id_inside_iso_media_keeps_string_layout() {
+        // O JSON de IsoMedia usa "storage-id" (kebab-case via
+        // rename_all na struct) e o valor permanece string crua.
+        let iso = IsoMedia::for_test(
+            "sha256:abc",
+            "nixos",
+            "nixos-minimal.iso",
+            "kryonix-isos",
+            900_000_000,
+            "abc",
+            KveMediaOrigin::Upload,
+        );
+        let json = serde_json::to_string(&iso).unwrap();
+        assert!(json.contains("\"storage-id\":\"kryonix-isos\""), "json: {json}");
+        let parsed: IsoMedia = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.storage_id.as_str(), "kryonix-isos");
+    }
+
+    #[test]
+    fn iso_media_accepts_storage_id_from_string_payload() {
+        // Compatibilidade total: payload com "storage-id" como string
+        // (sem o tipo StorageId explicito) deve deserializar normalmente.
+        let json = r#"{
+            "id": "sha256:abc",
+            "name": "nixos",
+            "filename": "nixos-minimal.iso",
+            "storage-id": "kryonix-isos",
+            "size-bytes": 900000000,
+            "sha256": "abc",
+            "origin": "upload"
+        }"#;
+        let parsed: IsoMedia = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.storage_id.as_str(), "kryonix-isos");
     }
 }
