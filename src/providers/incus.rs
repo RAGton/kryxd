@@ -788,11 +788,12 @@ mod tests {
     }
 
     #[test]
-    fn parse_image_never_treats_squashfs_as_iso() {
+    fn parse_image_ignores_squashfs_in_properties_type() {
         // properties.type == "squashfs" descreve o formato de
-        // empacotamento, NAO o destino de uso. Uma imagem de
-        // container com rootfs squashfs deve ser classificada
-        // como Container, nunca como Iso.
+        // empacotamento, NAO o destino de uso. Como o parser
+        // usa apenas o top-level 'type', a classificacao fica
+        // como Container. ISOs nao sao responsabilidade deste
+        // caminho (dominio separado IsoMedia).
         let entry = json!({
             "fingerprint": "abc123",
             "type": "container",
@@ -803,7 +804,6 @@ mod tests {
         });
         let img = parse_image(&entry, "local").expect("parse ok");
         assert_eq!(img.kind, KveImageKind::Container);
-        assert_ne!(img.kind, KveImageKind::Iso);
     }
 
     #[test]

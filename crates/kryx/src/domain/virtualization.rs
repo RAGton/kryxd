@@ -116,10 +116,10 @@ impl KveErrorBody {
 
 /// Categoria de uma imagem Incus.
 ///
-/// Esta enum separação é intencional: uma ISO não é uma imagem
-/// pronta para `incus launch`. O backend expõe as três categorias,
-/// mas a UI e o kryx-cli devem filtrá-las antes de oferecer
-/// opções de criação.
+/// Apenas duas variantes sao reconhecidas: container e VM pronta.
+/// ISOs NAO sao imagens Incus e tem dominio proprio (IsoMedia);
+/// elas nunca devem aparecer aqui nem serem usadas como origem
+/// de `incus launch`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum KveImageKind {
@@ -127,8 +127,6 @@ pub enum KveImageKind {
     Container,
     /// Imagem pronta para VM (formato disk image).
     VirtualMachine,
-    /// ISO de instalação. Não deve aparecer como origem de `incus launch`.
-    Iso,
 }
 
 /// Remote de imagens visível para o kryxd.

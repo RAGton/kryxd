@@ -157,22 +157,13 @@ pub async fn list_images(
         None => None,
         Some("container") => Some(KveImageKind::Container),
         Some("virtual-machine") => Some(KveImageKind::VirtualMachine),
-        Some("iso") => {
-            // ISOs nao sao listadas aqui. Devolvemos 400 com
-            // mensagem clara para o cliente nao tentar filtrar.
-            let body = KveErrorBody {
-                status: "invalid-filter",
-                code: "iso_not_listed".into(),
-                message: "ISOs sao gerenciadas em outro endpoint".into(),
-                source: None,
-            };
-            return Err((StatusCode::BAD_REQUEST, Json(body)));
-        }
         Some(other) => {
             let body = KveErrorBody {
                 status: "invalid-filter",
                 code: "invalid_kind".into(),
-                message: format!("kind '{other}' nao reconhecido"),
+                message: format!(
+                    "kind '{other}' nao reconhecido; valores aceitos: 'container', 'virtual-machine'"
+                ),
                 source: None,
             };
             return Err((StatusCode::BAD_REQUEST, Json(body)));
