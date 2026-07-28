@@ -739,4 +739,115 @@ mod tests {
         assert!(matches!(err, IncusError::InvalidResponse(_)));
         assert_eq!(err.code(), "incus_invalid_response");
     }
+
+    // ===== parse_image =====
+
+    #[test]
+    fn parse_image_classifies_container_correctly() {
+        let entry = json!({
+            "fingerprint": "deadbeef00000000",
+            "type": "container",
+            "architecture": "x86_64",
+            "properties": {
+                "os": "Debian",
+                "release": "trixie",
+                "description": "Debian trixie amd64",
+                "architecture": "amd64"
+            },
+            "size": 105304756_i64,
+            "created_at": "2026-07-26T00:00:00Z",
+            "aliases": [
+                {"name": "debian/13"}
+            ]
+        });
+        let img = parse_image(&entry, "local").expect("parse ok");
+        assert_eq!(img.fingerprint, "deadbeef00000000");
+        assert_eq!(img.kind, KveImageKind::Container);
+        assert_eq!(img.os.as_deref(), Some("Debian"));
+        assert_eq!(img.release.as_deref(), Some("trixie"));
+        assert_eq!(img.aliases, vec!["debian/13".to_string()]);
+        assert_eq!(img.size_bytes, Some(105_304_756));
+        assert_eq!(img.remote, "local");
+    }
+
+    #[test]
+    fn parse_image_classifies_virtual_machine_correctly() {
+        let entry = json!({
+            "fingerprint": "cafebabe11111111",
+            "type": "virtual-machine",
+            "architecture": "x86_64",
+            "properties": {
+                "os": "Ubuntu",
+                "release": "jammy"
+            },
+            "size": 900_000_000_i64
+        });
+        let img = parse_image(&entry, "local").expect("parse ok");
+        assert_eq!(img.kind, KveImageKind::VirtualMachine);
+        assert_eq!(img.os.as_deref(), Some("Ubuntu"));
+    }
+
+    #[test]
+    fn parse_image_never_treats_squashfs_as_iso() {
+        // properties.type == "squashfs" descreve o formato de
+        // empacotamento, NAO o destino de uso. Uma imagem de
+        // container com rootfs squashfs deve ser classificada
+        // como Container, nunca como Iso.
+        let entry = json!({
+            "fingerprint": "abc123",
+            "type": "container",
+            "properties": {
+                "type": "squashfs",
+                "os": "Alpine"
+            }
+        });
+        let img = parse_image(&entry, "local").expect("parse ok");
+        assert_eq!(img.kind, KveImageKind::Container);
+        assert_ne!(img.kind, KveImageKind::Iso);
+    }
+
+    #[test]
+    fn parse_image_rejects_unknown_type() {
+        let entry = json!({
+            "fingerprint": "deadbeef",
+            "type": "tarball"
+        });
+        let err = parse_image(&entry, "local").expect_err("should fail");
+        assert!(err.contains("unknown image type 'tarball'"));
+    }
+
+    #[test]
+    fn parse_image_handles_empty_aliases() {
+        let entry = json!({
+            "fingerprint": "abc",
+            "type": "container",
+            "aliases": []
+        });
+        let img = parse_image(&entry, "local").expect("parse ok");
+        assert!(img.aliases.is_empty());
+    }
+
+    #[test]
+    fn parse_image_handles_missing_properties() {
+        let entry = json!({
+            "fingerprint": "abc",
+            "type": "container",
+            "architecture": "aarch64"
+        });
+        let img = parse_image(&entry, "local").expect("parse ok");
+        assert_eq!(img.architecture.as_deref(), Some("aarch64"));
+        assert!(img.os.is_none());
+        assert!(img.release.is_none());
+        assert!(img.description.is_none());
+        assert!(img.size_bytes.is_none());
+    }
+
+    #[test]
+    fn parse_image_fails_without_fingerprint() {
+        let entry = json!({
+            "type": "container"
+        });
+        let err = parse_image(&entry, "local").expect_err("should fail");
+        assert!(err.contains("missing fingerprint"));
+    }
 }
