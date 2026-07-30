@@ -50,6 +50,17 @@ pub struct RepositoryPlan {
     pub branch: String,
 }
 
+/// Configuração do Node Think Server (KCP).
+///
+/// `host_id` é obrigatório quando `enable` for `true` porque o módulo Nix
+/// `node.thinkServer.hostId` é exigido pelo importador de pools ZFS.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NodeThinkPlan {
+    pub enable: bool,
+    pub host_id: String,
+}
+
 /// Opções obrigatórias quando qualquer volume usa ZFS.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -199,6 +210,7 @@ pub struct InstallPlanV2 {
     #[serde(deserialize_with = "deserialize_version_two")]
     pub version: u8,
     pub is_think_server: bool,
+    pub node_think: Option<NodeThinkPlan>,
     pub repository: RepositoryPlan,
     pub storage: StoragePlan,
     pub features: BTreeMap<String, BTreeMap<String, bool>>,

@@ -8,9 +8,19 @@ pub fn generate_nix_config(plan: &InstallPlanV2) -> Result<String, String> {
     config.push_str("{ config, lib, ... }:\n");
     config.push_str("{\n");
 
-    // 2. Think Server
-    if plan.is_think_server {
-        config.push_str("  kryonix.thinkServer.enable = true;\n");
+    // 2. Node Think Server (KCP)
+    //
+    // A flag legada `plan.is_think_server` foi aposentada pelo tradutor.
+    // Toda a ativação agora vem de `plan.node_think`, que carrega o `hostId`
+    // obrigatório exigido por `node.thinkServer.hostId` no módulo Nix.
+    if let Some(think_plan) = &plan.node_think {
+        if think_plan.enable {
+            config.push_str("  node.thinkServer.enable = true;\n");
+            config.push_str(&format!(
+                "  node.thinkServer.hostId = \"{}\";\n",
+                think_plan.host_id
+            ));
+        }
     }
 
     // 3. Storage Topology
@@ -116,7 +126,11 @@ mod tests {
 
         let plan = InstallPlanV2 {
             version: 2,
-            is_think_server: true,
+            is_think_server: false,
+            node_think: Some(crate::domain::config::NodeThinkPlan {
+                enable: true,
+                host_id: "8425e349".to_string(),
+            }),
             repository: RepositoryPlan {
                 core_url: "url".to_string(),
                 upstream_url: "url".to_string(),
@@ -147,7 +161,9 @@ mod tests {
 
         let result = generate_nix_config(&plan).unwrap();
 
-        assert!(result.contains("kryonix.thinkServer.enable = true;"));
+        assert!(result.contains("node.thinkServer.enable = true;"));
+        assert!(result.contains("node.thinkServer.hostId = \"8425e349\";"));
+        assert!(!result.contains("kryonix.thinkServer"));
         assert!(result.contains("kryonix.storage.topology = \"split\";"));
         assert!(result.contains("kryonix.storage.systemDisks = [ \"/dev/sda\" ];"));
         assert!(result.contains("kryonix.storage.dataDisks = [ \"/dev/sdb\" ];"));
@@ -155,5 +171,78 @@ mod tests {
         assert!(result.contains("kryonix.storage.data.filesystem = \"zfs\";"));
         assert!(result.contains("kryonix.storage.zfs.userRefquota = \"100G\";"));
         assert!(result.contains("kryonix.features.server.containers = true;"));
+    }
+
+    #[test]
+    fn test_think_server_disabled_emits_nothing() {
+        let plan = InstallPlanV2 {
+            version: 2,
+            is_think_server: false,
+            node_think: Some(crate::domain::config::NodeThinkPlan {
+                enable: false,
+                host_id: "deadbeef".to_string(),
+            }),
+            repository: RepositoryPlan {
+                core_url: "url".to_string(),
+                upstream_url: "url".to_string(),
+                downstream_url: "url".to_string(),
+                branch: "main".to_string(),
+            },
+            storage: StoragePlan {
+                topology: Topology::Single,
+                system_disks: vec!["/dev/nvme0n1".to_string()],
+                data_disks: vec![],
+                root: Some(MountPlan {
+                    filesystem: FileSystem::Ext4,
+                    encryption: Encryption::None,
+                }),
+                data: None,
+                raid_level: None,
+                manual_partitions: vec![],
+                zfs: None,
+                btrfs: None,
+            },
+            features: BTreeMap::new(),
+        };
+
+        let result = generate_nix_config(&plan).unwrap();
+
+        assert!(!result.contains("node.thinkServer"));
+        assert!(!result.contains("kryonix.thinkServer"));
+    }
+
+    #[test]
+    fn test_node_think_absent_emits_nothing() {
+        let plan = InstallPlanV2 {
+            version: 2,
+            is_think_server: false,
+            node_think: None,
+            repository: RepositoryPlan {
+                core_url: "url".to_string(),
+                upstream_url: "url".to_string(),
+                downstream_url: "url".to_string(),
+                branch: "main".to_string(),
+            },
+            storage: StoragePlan {
+                topology: Topology::Single,
+                system_disks: vec!["/dev/nvme0n1".to_string()],
+                data_disks: vec![],
+                root: Some(MountPlan {
+                    filesystem: FileSystem::Ext4,
+                    encryption: Encryption::None,
+                }),
+                data: None,
+                raid_level: None,
+                manual_partitions: vec![],
+                zfs: None,
+                btrfs: None,
+            },
+            features: BTreeMap::new(),
+        };
+
+        let result = generate_nix_config(&plan).unwrap();
+
+        assert!(!result.contains("node.thinkServer"));
+        assert!(!result.contains("kryonix.thinkServer"));
     }
 }
