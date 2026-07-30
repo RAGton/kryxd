@@ -9,6 +9,7 @@ mod network;
 pub mod providers;
 pub mod services;
 pub mod state;
+pub mod storage;
 use network::apply_network;
 mod profiles;
 mod source;
