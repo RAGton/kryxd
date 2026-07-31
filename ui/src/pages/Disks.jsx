@@ -12,6 +12,7 @@ import {
   validateRaidSelection,
   validateSingleDiskLayout,
   validateSplitDiskLayout,
+  computeStorageValidation,
 } from '../utils/storagePlanner.js';
 import { 
   buildProposedLayout, 
@@ -740,18 +741,52 @@ export default function Disks({ wizard, uiState, onChange, validation }) {
   }, [destructiveConfirmed, uiState.destructiveConfirmed, onChange]);
 
   useEffect(() => {
-    if (loadingDisks) return;
-    const firstEligible  = eligibleDisks[0]?.path || '';
-    const patch = {};
+    if (loadingDisks || diskInventory.length === 0) return;
 
-    if (layoutMode === 'automatic') {
-      const nextSys = eligiblePaths.has(wizard.sysDisk) ? wizard.sysDisk : firstEligible;
-      if (wizard.sysDisk !== nextSys) patch.sysDisk = nextSys;
-      if (!arraysEqual(wizard.selectedDisks || [], nextSys ? [nextSys] : [])) patch.selectedDisks = nextSys ? [nextSys] : [];
+    const eligible = diskInventory.filter(d => d.eligible);
+    const eligibleSet = new Set(eligible.map(d => d.path));
+    const firstEligible = eligible[0]?.path || '';
+
+    const needsSysFix = (layoutMode === 'automatic' && !wizard.sysDisk && firstEligible) || (wizard.sysDisk && !eligibleSet.has(wizard.sysDisk));
+    const needsDataFix = wizard.dataDisk && !eligibleSet.has(wizard.dataDisk);
+    const needsRaidFix = (wizard.selectedDisks || []).some(p => !eligibleSet.has(p));
+
+    if (!needsSysFix && !needsDataFix && !needsRaidFix) return;
+
+    const patch = {};
+    if (needsSysFix) {
+      patch.sysDisk = firstEligible;
+      if (layoutMode === 'automatic') patch.selectedDisks = firstEligible ? [firstEligible] : [];
+    }
+    if (needsDataFix) patch.dataDisk = eligible.find(d => d.path !== (patch.sysDisk || wizard.sysDisk))?.path || '';
+    if (needsRaidFix) {
+      patch.selectedDisks = (wizard.selectedDisks || []).filter(p => eligibleSet.has(p));
     }
 
-    let storageIssues = [];
+    onChange(patch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [diskInventory]);
+
+  const storageValidation = useMemo(() => {
+    let raidMembers = [];
+    let raidLevel = 'raid0';
+    if (layoutMode === 'raid' && wizard.raidPlan?.devices) {
+      raidMembers = getSelectedDiskRecords(diskInventory, wizard.raidPlan.devices);
+      raidLevel = wizard.raidPlan.level || 'raid0';
+    }
     
+    return computeStorageValidation(
+      layoutMode, 
+      diskInventory, 
+      wizard.sysDisk, 
+      wizard.dataDisk, 
+      raidMembers, 
+      raidLevel
+    );
+  }, [layoutMode, diskInventory, wizard.sysDisk, wizard.dataDisk, wizard.raidPlan]);
+
+  const storageIssues = useMemo(() => {
+    let issues = [...(storageValidation?.blockingReasons || [])];
     const hasDisksSelected = 
       (layoutMode === 'automatic' && wizard.sysDisk) || 
       (layoutMode === 'raid' && wizard.raidPlan?.devices?.length > 0) ||
@@ -759,15 +794,16 @@ export default function Disks({ wizard, uiState, onChange, validation }) {
       (layoutMode === 'manual' && wizard.manualPartitions?.length > 0);
 
     if (hasDisksSelected && !destructiveConfirmed) {
-      storageIssues.push(t('storage.destructive.confirm'));
+      issues.push(t('storage.destructive.confirm'));
     }
 
-    if (!arraysEqual(storageIssues, uiState.storageBlockingIssues || [])) patch.storageBlockingIssues = storageIssues;
-    
-    if (Object.keys(patch).length > 0) onChange(patch);
-  }, [diskInventory, eligibleDisks, eligiblePaths, layoutMode, loadingDisks,
-      onChange, uiState.storageBlockingIssues, destructiveConfirmed,
-      wizard.sysDisk, wizard.raidPlan, wizard.lvmPlan, wizard.manualPartitions, wizard.selectedDisks, t]);
+    return issues;
+  }, [layoutMode, wizard.sysDisk, wizard.raidPlan, wizard.lvmPlan, wizard.manualPartitions, destructiveConfirmed, storageValidation, t]);
+
+  useEffect(() => {
+    if (arraysEqual(storageIssues, uiState.storageBlockingIssues || [])) return;
+    onChange({ storageBlockingIssues: storageIssues });
+  }, [storageIssues, uiState.storageBlockingIssues, onChange]);
 
   let affectedCapacity = 0;
   let affectedDisksText = '';

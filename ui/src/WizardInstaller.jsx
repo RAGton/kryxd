@@ -8,7 +8,6 @@ import Timezone from './pages/Timezone.jsx';
 import Network from './pages/Network.jsx';
 import Source from './pages/Source.jsx';
 import RemoteAccess from './pages/RemoteAccess.jsx';
-import HostSelection from './pages/HostSelection.jsx';
 import MachineProfile from './pages/MachineProfile.jsx';
 import SystemFeatures from './pages/SystemFeatures.jsx';
 import UserFeatures from './pages/UserFeatures.jsx';
@@ -61,10 +60,7 @@ const STEPS = [
   { id: 'source' },
   { id: 'timezone' },
   { id: 'network' },
-  { id: 'hostSelection' },
-  { id: 'profile' },
   { id: 'systemFeatures' },
-  { id: 'userFeatures' },
   { id: 'disks' },
   { id: 'users' },
   { id: 'summary' },
@@ -74,8 +70,8 @@ const STEPS = [
 const PHASES = [
   { id: 'prep', steps: ['welcome', 'eula', 'source'] },
   { id: 'localization', steps: ['timezone'] },
-  { id: 'network', steps: ['network', 'hostSelection'] },
-  { id: 'system', steps: ['profile', 'systemFeatures', 'userFeatures'] },
+  { id: 'network', steps: ['network'] },
+  { id: 'system', steps: ['systemFeatures'] },
   { id: 'storage', steps: ['disks'] },
   { id: 'users', steps: ['users'] },
   { id: 'summary', steps: ['summary', 'install'] }
@@ -293,8 +289,6 @@ export default function WizardInstaller() {
         return <Network {...pageProps} />;
       case 'remoteAccess':
         return <RemoteAccess {...pageProps} />;
-      case 'hostSelection':
-        return <HostSelection {...pageProps} />;
       case 'profile':
         return <MachineProfile {...pageProps} />;
       case 'systemFeatures':

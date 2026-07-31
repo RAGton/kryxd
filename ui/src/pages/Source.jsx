@@ -118,14 +118,16 @@ export default function Source({ wizard, uiState, onChange }) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 text-left">
         {/* Offline Card */}
-        <button
-          type="button"
-          className={`p-6 rounded-2xl border-2 transition-all backdrop-blur-sm ${
+        <div
+          role="button"
+          tabIndex={0}
+          className={`p-6 rounded-2xl border-2 transition-all backdrop-blur-sm cursor-pointer ${
             wizard.sourceKind === 'offline-defaults'
               ? 'border-accent-blue bg-accent-blue/10 dark:bg-accent-blue/20 shadow-lg shadow-accent-blue/10'
               : 'border-slate-200 dark:border-white/5 bg-white/5 backdrop-blur-md dark:bg-white/5 hover:border-slate-300 dark:hover:border-white/20'
           }`}
           onClick={() => onChange({ sourceKind: 'offline-defaults' })}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onChange({ sourceKind: 'offline-defaults' }); }}
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-bold text-slate-900 dark:text-white">{t('source.offline.title')}</h3>
@@ -133,12 +135,13 @@ export default function Source({ wizard, uiState, onChange }) {
           <p className="text-slate-500 dark:text-slate-400 text-sm">
             {t('source.offline.description')}
           </p>
-        </button>
+        </div>
 
         {/* User Repo Card */}
-        <button
-          type="button"
-          className={`p-6 rounded-2xl border-2 transition-all backdrop-blur-sm ${
+        <div
+          role="button"
+          tabIndex={0}
+          className={`p-6 rounded-2xl border-2 transition-all backdrop-blur-sm cursor-pointer ${
             wizard.sourceKind === 'github-user-repo'
               ? 'border-accent-blue bg-accent-blue/10 dark:bg-accent-blue/20 shadow-lg shadow-accent-blue/10'
               : 'border-slate-200 dark:border-white/5 bg-white/5 backdrop-blur-md dark:bg-white/5 hover:border-slate-300 dark:hover:border-white/20'
@@ -146,6 +149,13 @@ export default function Source({ wizard, uiState, onChange }) {
           onClick={() => {
             if (wizard.sourceKind !== 'github-user-repo') {
               onChange({ sourceKind: 'github-user-repo', githubSourceStatus: null, githubSourceError: null });
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              if (wizard.sourceKind !== 'github-user-repo') {
+                onChange({ sourceKind: 'github-user-repo', githubSourceStatus: null, githubSourceError: null });
+              }
             }
           }}
         >
@@ -190,12 +200,13 @@ export default function Source({ wizard, uiState, onChange }) {
               </div>
             </div>
           )}
-        </button>
+        </div>
 
         {/* Create Repo Card */}
-        <button
-          type="button"
-          className={`p-6 rounded-2xl border-2 transition-all backdrop-blur-sm ${
+        <div
+          role="button"
+          tabIndex={0}
+          className={`p-6 rounded-2xl border-2 transition-all backdrop-blur-sm cursor-pointer ${
             wizard.sourceKind === 'github-create-from-template'
               ? 'border-accent-blue bg-accent-blue/10 dark:bg-accent-blue/20 shadow-lg shadow-accent-blue/10'
               : 'border-slate-200 dark:border-white/5 bg-white/5 backdrop-blur-md dark:bg-white/5 hover:border-slate-300 dark:hover:border-white/20'
@@ -203,6 +214,13 @@ export default function Source({ wizard, uiState, onChange }) {
           onClick={() => {
             if (wizard.sourceKind !== 'github-create-from-template') {
               onChange({ sourceKind: 'github-create-from-template', githubSourceStatus: null, githubSourceError: null });
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              if (wizard.sourceKind !== 'github-create-from-template') {
+                onChange({ sourceKind: 'github-create-from-template', githubSourceStatus: null, githubSourceError: null });
+              }
             }
           }}
         >
@@ -273,17 +291,19 @@ export default function Source({ wizard, uiState, onChange }) {
               ) : null}
             </div>
           )}
-        </button>
+        </div>
 
         {/* Template Card */}
-        <button
-          type="button"
-          className={`p-6 rounded-2xl border-2 transition-all backdrop-blur-sm ${
+        <div
+          role="button"
+          tabIndex={0}
+          className={`p-6 rounded-2xl border-2 transition-all backdrop-blur-sm cursor-pointer ${
             wizard.sourceKind === 'template'
               ? 'border-slate-500 bg-black/5 backdrop-blur-md0/10 dark:bg-black/5 backdrop-blur-md0/20 shadow-lg'
               : 'border-slate-200 dark:border-white/5 bg-white/5 backdrop-blur-md dark:bg-white/5 hover:border-slate-300 dark:hover:border-white/20'
           }`}
           onClick={() => onChange({ sourceKind: 'template' })}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onChange({ sourceKind: 'template' }); }}
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-bold text-slate-900 dark:text-white">{t('source.template.title')}</h3>
@@ -294,7 +314,7 @@ export default function Source({ wizard, uiState, onChange }) {
           <div className="text-xs font-mono bg-black/5 backdrop-blur-md dark:bg-white/5 p-2 rounded text-slate-500 border border-slate-200 dark:border-white/5 truncate">
             {wizard.templateRepoUrl}
           </div>
-        </button>
+        </div>
       </div>
 
       {/* GitHub Source Status Panel for User Repo */}

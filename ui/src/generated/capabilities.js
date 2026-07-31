@@ -145,6 +145,31 @@ export const CAPABILITY_REGISTRY = {
       "status": "ready"
     },
     {
+      "id": "desktop.ai",
+      "wireKey": "ai",
+      "level": "system",
+      "domain": "desktop",
+      "name": "Desktop + IA (AI Workstation)",
+      "requires": [
+        "desktop.plasma",
+        "ai.ollama"
+      ],
+      "conflicts": [],
+      "status": "ready"
+    },
+    {
+      "id": "desktop.gamer",
+      "wireKey": "gamer",
+      "level": "system",
+      "domain": "desktop",
+      "name": "Desktop Gamer (High Performance)",
+      "requires": [
+        "desktop.plasma"
+      ],
+      "conflicts": [],
+      "status": "ready"
+    },
+    {
       "id": "desktop.plasma",
       "wireKey": "plasma",
       "level": "system",
@@ -160,6 +185,58 @@ export const CAPABILITY_REGISTRY = {
       "level": "system",
       "domain": "desktop",
       "name": "CUPS Printing",
+      "requires": [],
+      "conflicts": [],
+      "status": "ready"
+    },
+    {
+      "id": "gamer.steam",
+      "wireKey": "steam",
+      "level": "system",
+      "domain": "desktop",
+      "name": "Steam & Proton GE",
+      "requires": [
+        "desktop.plasma"
+      ],
+      "conflicts": [],
+      "status": "ready"
+    },
+    {
+      "id": "gamer.gamemode",
+      "wireKey": "gamemode",
+      "level": "system",
+      "domain": "desktop",
+      "name": "Feral GameMode",
+      "requires": [],
+      "conflicts": [],
+      "status": "ready"
+    },
+    {
+      "id": "gamer.mangohud",
+      "wireKey": "mangohud",
+      "level": "system",
+      "domain": "desktop",
+      "name": "MangoHud FPS Overlay",
+      "requires": [],
+      "conflicts": [],
+      "status": "ready"
+    },
+    {
+      "id": "gamer.proton",
+      "wireKey": "proton",
+      "level": "system",
+      "domain": "desktop",
+      "name": "Proton GE Custom Build",
+      "requires": [],
+      "conflicts": [],
+      "status": "ready"
+    },
+    {
+      "id": "gamer.controllers",
+      "wireKey": "controllers",
+      "level": "system",
+      "domain": "desktop",
+      "name": "Gamepad Controller Drivers",
       "requires": [],
       "conflicts": [],
       "status": "ready"
@@ -453,6 +530,21 @@ export const CAPABILITY_REGISTRY = {
       "requires": [],
       "conflicts": [],
       "status": "partial"
+    },
+    {
+      "id": "virtualization.incus",
+      "wireKey": "incus",
+      "level": "system",
+      "domain": "virtualization",
+      "name": "KVE — Kryonix Virtualization Engine (Incus)",
+      "requires": [
+        "storage.srv-data"
+      ],
+      "conflicts": [
+        "virtualization.libvirt"
+      ],
+      "status": "ready",
+      "reason": "KVE: backend Incus (kryonix.features.virtualization.incus)"
     },
     {
       "id": "virtualization.podman",

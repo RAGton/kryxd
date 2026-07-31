@@ -449,7 +449,7 @@ function buildValidationProjection(draft) {
       country: sanitizeString(draft.country),
       timezone: sanitizeString(draft.timeZone),
       locale: sanitizeString(draft.systemLocale),
-      keymap: sanitizeString(draft.consoleKeymap),
+      keymap: sanitizeString(draft.consoleKeymap) || sanitizeString(draft.keyMap),
     },
     network: {
       interface: sanitizeString(draft.mgmtInterface),
@@ -510,6 +510,7 @@ export function validateStep(stepId, draftInput, uiInput = {}) {
       }
       return result;
     case 'network':
+      if (!isValidHostname(draft.hostName)) addFieldError(result, 'hostName', 'Hostname inválido para um servidor Linux.');
       // Requisito de avanço: estar online OU ter escolhido modo offline explicitamente.
       if (!uiState.netConnected && !uiState.netOffline) {
         addBlockingIssue(result, 'Conecte-se à internet ou selecione "Continuar offline" para prosseguir.');

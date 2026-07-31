@@ -677,3 +677,21 @@ export function explainSrvDataReason(profileId, selectedFeatures) {
   if (reasons.length === 0) return 'nao ativado para este perfil';
   return reasons.join(' + ');
 }
+
+export function getDefaultFilesystems(layoutMode) {
+  if (layoutMode === 'raid') return { rootFs: 'btrfs', dataFs: 'btrfs' };
+  if (layoutMode === 'split') return { rootFs: 'btrfs', dataFs: 'btrfs' };
+  return { rootFs: 'btrfs', dataFs: 'btrfs' };
+}
+
+export function computeStorageValidation(layoutMode, diskInventory, sysDisk, dataDisk, raidMembers, raidLevel) {
+  switch (layoutMode) {
+    case 'raid':
+      return validateRaidSelection(raidMembers, raidLevel);
+    case 'split':
+      return validateSplitDiskLayout(diskInventory, sysDisk, dataDisk);
+    case 'single':
+    default:
+      return validateSingleDiskLayout(diskInventory, sysDisk);
+  }
+}

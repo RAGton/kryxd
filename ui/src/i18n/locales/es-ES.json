@@ -75,8 +75,8 @@
     "summary": "Instalación"
   },
   "welcome": {
-    "title": "Bienvenido a Kryonix Installer",
-    "subtitle": "Kryonix Installer le guiará en la preparación de la infraestructura. Defina su localización antes de proceder.",
+    "title": "Bienvenido a Kryonix",
+    "subtitle": "Defina su localización para comenzar la instalación.",
     "country": "1. País / Región",
     "language": "2. Idioma de la interfaz",
     "keyboard": "3. Distribución del teclado",

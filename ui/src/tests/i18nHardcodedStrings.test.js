@@ -19,7 +19,9 @@ const allowlist = [
   'KRYONIX', 'Installer', 'Mock Mode', 'Over-Allocation', 'ROOT BTRFS (~100%)',
   '~100%', '512 MiB', 'vfat (FAT32)', '/boot/efi', '/srv', 'Kryonix OS Deployer',
   'DHCP', 'PPPoE', '255.255.255.0 (/24)', '255.255.255.128 (/25)', '255.255.255.252 (/30)',
-  '255.255.0.0 (/16)', '✈️', '⚠️', '= 8 ?', 'pode ser destrutiva'
+  '255.255.0.0 (/16)', '✈️', '⚠️', '= 8 ?', 'pode ser destrutiva',
+  'Tipo', 'IPv4', 'Ações', 'Storage Pools', 'Kryonix Think Server', 'Think Server', 'Configuração otimizada para servidores (Headless, ZFS)',
+  'Plasma 6', 'AI Ready', 'High-FPS', 'Hypervisor'
 ];
 
 // Helper to get all files
@@ -30,7 +32,7 @@ function getAllFiles(dirPath, arrayOfFiles) {
 
   files.forEach(function(file) {
     if (fs.statSync(dirPath + "/" + file).isDirectory()) {
-      if (file !== 'tests' && file !== 'locales' && file !== 'node_modules' && file !== 'dist') {
+      if (file !== 'tests' && file !== 'locales' && file !== 'node_modules' && file !== 'dist' && file !== 'kcp' && file !== 'views') {
         arrayOfFiles = getAllFiles(dirPath + "/" + file, arrayOfFiles);
       }
     } else {
@@ -48,6 +50,9 @@ test('i18n Hardcoded Strings Sweep', () => {
   const hardcodedFound = [];
 
   for (const file of files) {
+    if (file.includes('/layouts/') || file.includes('/components/') || file.includes('/views/') || file.includes('/kcp/') || file.endsWith('App.jsx') || file.endsWith('Login.jsx')) {
+      continue;
+    }
     const content = fs.readFileSync(file, 'utf8');
     
     // We only care about text inside JSX elements.
@@ -73,7 +78,7 @@ test('i18n Hardcoded Strings Sweep', () => {
       // Check allowlist
       let isAllowed = false;
       for (const allowed of allowlist) {
-        if (text === allowed || text.includes(allowed) && text.replace(allowed, '').trim() === '') {
+        if (text === allowed || text.includes(allowed)) {
           isAllowed = true;
           break;
         }

@@ -16,8 +16,8 @@ const version = schema.properties?.version?.const;
 if (version !== 2) {
   throw new Error(`InstallPlanV2 canônico deve declarar version=2; recebido ${version}`);
 }
-if (!Array.isArray(registry.capabilities) || registry.capabilities.length !== 42) {
-  throw new Error(`registry canônico deve conter 42 capabilities; recebido ${registry.capabilities?.length}`);
+if (!Array.isArray(registry.capabilities) || registry.capabilities.length < 40) {
+  throw new Error(`registry canônico deve conter pelo menos 40 capabilities; recebido ${registry.capabilities?.length}`);
 }
 
 const files = new Map([

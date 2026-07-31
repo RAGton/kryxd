@@ -144,7 +144,10 @@ export default function Summary({ wizard, uiState, onChange, validation }) {
           if (json.locale.country) draftPatch.country = json.locale.country;
           if (json.locale.timezone) draftPatch.timeZone = json.locale.timezone;
           if (json.locale.locale) draftPatch.locale = json.locale.locale;
-          if (json.locale.keymap) draftPatch.keyMap = json.locale.keymap;
+          if (json.locale.keymap) {
+            draftPatch.keyMap = json.locale.keymap;
+            draftPatch.consoleKeymap = json.locale.keymap;
+          }
         }
         if (json.admin) {
           if (json.admin.user) draftPatch.adminUser = json.admin.user;

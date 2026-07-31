@@ -414,7 +414,8 @@ export default function App() {
     );
   }
 
-  if (!identity) {
+  const forceInstaller = import.meta.env.DEV && new URLSearchParams(window.location.search).has('installer');
+  if (!identity || forceInstaller) {
     return <WizardInstaller />;
   }
 

@@ -15,6 +15,7 @@ export default function KxCombobox({
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const containerRef = useRef(null);
+  const inputRef = useRef(null);
 
   // Close when clicking outside
   useEffect(() => {

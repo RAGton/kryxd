@@ -57,16 +57,8 @@ export default function Layout({
 
           {/* Main Content Area */}
           <main className="flex-1 flex flex-col min-w-0 bg-transparent overflow-hidden relative">
-            {/* Context Header */}
-            {(title || subtitle) && (
-              <div className="shrink-0 px-8 pt-8 pb-4">
-                {title && <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white mb-1">{title}</h2>}
-                {subtitle && <p className="text-slate-500 dark:text-text2 text-sm max-w-2xl">{subtitle}</p>}
-              </div>
-            )}
-            
             {/* Work Area */}
-            <div className="flex-1 px-8 pb-8 overflow-hidden flex flex-col relative min-h-0">
+            <div className="flex-1 p-8 overflow-hidden flex flex-col relative min-h-0">
               <div className="flex-1 overflow-hidden flex flex-col">
                 {children}
               </div>

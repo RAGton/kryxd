@@ -17,6 +17,7 @@ export const DRAFT_FIELD_NAMES = [
   'keyboardLayout',
   'keyboardVariant',
   'consoleKeymap',
+  'keyMap',
   'timeZone',
   'hostName',
   'mgmtInterface',
@@ -116,6 +117,7 @@ export const INITIAL_INSTALL_PLAN_DRAFT = {
   keyboardLayout: 'br',
   keyboardVariant: 'abnt2',
   consoleKeymap: 'br-abnt2',
+  keyMap: 'br-abnt2',
   timeZone: 'America/Cuiaba',
   hostName: 'kryonix-e2e',
   mgmtInterface: '',
@@ -222,11 +224,15 @@ function pickFields(source, defaults, allowedFields) {
 }
 
 export function createInstallPlanDraft(source = {}) {
-  return pickFields(source, INITIAL_INSTALL_PLAN_DRAFT, DRAFT_FIELD_NAMES);
+  const next = pickFields(source, INITIAL_INSTALL_PLAN_DRAFT, DRAFT_FIELD_NAMES);
+  if (source && DRAFT_FIELD_NAMES.every(k => source[k] === next[k])) return source;
+  return next;
 }
 
 export function extractUiTransientState(source = {}) {
-  return pickFields(source, INITIAL_UI_TRANSIENT_STATE, UI_TRANSIENT_FIELD_NAMES);
+  const next = pickFields(source, INITIAL_UI_TRANSIENT_STATE, UI_TRANSIENT_FIELD_NAMES);
+  if (source && UI_TRANSIENT_FIELD_NAMES.every(k => source[k] === next[k])) return source;
+  return next;
 }
 
 export function splitWizardPatch(patch = {}) {

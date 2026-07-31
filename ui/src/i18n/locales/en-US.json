@@ -75,8 +75,8 @@
     "summary": "Installation"
   },
   "welcome": {
-    "title": "Welcome to Kryonix Installer",
-    "subtitle": "The Kryonix Installer will guide you through infrastructure preparation. Set your localization before proceeding.",
+    "title": "Welcome to Kryonix",
+    "subtitle": "Set your localization to begin setup.",
     "country": "1. Country / Region",
     "language": "2. Interface Language",
     "keyboard": "3. Keyboard Layout",

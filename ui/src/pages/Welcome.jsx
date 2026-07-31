@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Globe, Languages, Keyboard } from 'lucide-react';
 import KxCombobox from '../components/KxCombobox.jsx';
 import EagleLogo from '../components/EagleLogo.jsx';
 import {
@@ -98,10 +99,10 @@ export default function Welcome({ wizard, onChange }) {
   }, [availableCountries]);
 
   const localeOptions = [
-  { id: 'pt-BR', label: 'Português do Brasil', desc: 'pt-BR' },
-  { id: 'en-US', label: 'English (United States)', desc: 'en-US' },
-  { id: 'es-ES', label: 'Español', desc: 'es-ES' }
-];
+    { id: 'pt-BR', label: 'Português do Brasil', desc: 'pt-BR' },
+    { id: 'en-US', label: 'English (United States)', desc: 'en-US' },
+    { id: 'es-ES', label: 'Español', desc: 'es-ES' }
+  ];
 
   const keymapOptions = useMemo(() => {
     return keymaps.map(keymap => ({
@@ -112,126 +113,109 @@ export default function Welcome({ wizard, onChange }) {
   }, [keymaps]);
 
   function applyCountry(value) {
+    const preset = countryPresets[value];
     onChange((previous) => ({
       country: value,
+      ...(preset
+        ? {
+            locale: preset.locale || previous.locale,
+            keyMap: preset.keyMap || previous.keyMap,
+            consoleKeymap: preset.keyMap || previous.consoleKeymap,
+            timeZone: preset.timeZone || previous.timeZone,
+            timeZonePin: null,
+            timeZoneLatitude: null,
+            timeZoneLongitude: null,
+            timeZoneCountryCode: '',
+          }
+        : {}),
     }));
   }
 
-  function applySuggestions() {
-    if (selectedPreset) {
-      onChange((previous) => ({
-        locale: selectedPreset.locale || previous.locale,
-        keyMap: selectedPreset.keyMap || previous.keyMap,
-        timeZone: selectedPreset.timeZone || previous.timeZone,
-        timeZonePin: null,
-        timeZoneLatitude: null,
-        timeZoneLongitude: null,
-        timeZoneCountryCode: '',
-      }));
-    }
-  }
-
   return (
-    <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto w-full px-4 text-center animate-fade-in-up pb-8 custom-scrollbar overflow-y-auto">
-      {/* Branding */}
-      <div className="mt-4 mb-10 flex flex-col items-center">
-        <div className="mb-4 bg-transparent">
-          <EagleLogo className="w-64 h-64 md:w-72 md:h-72" />
-        </div>
-        <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-slate-900 dark:text-white mb-4">
+    <div className="flex flex-col items-center justify-center h-full max-w-2xl mx-auto w-full px-4 text-center animate-fade-in-up pb-6 custom-scrollbar overflow-y-auto">
+      {/* Header */}
+      <div className="mt-2 mb-6 flex flex-col items-center">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wider uppercase bg-accent-blue/10 text-accent-blue border border-accent-blue/20 mb-3 backdrop-blur-md">
+          <Globe className="w-3.5 h-3.5" />
+          Kryonix OS
+        </span>
+        <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 dark:text-white mb-2">
           {t('welcome.title')}
         </h2>
-        <p className="text-base text-slate-500 dark:text-slate-400 max-w-lg font-medium">
+        <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 max-w-md font-medium leading-relaxed">
           {t('welcome.subtitle')}
         </p>
       </div>
 
-      {/* Detections */}
+      {/* Detections Banner */}
       {hasKryonix && (
-        <div className="mb-8 w-full max-w-lg rounded-2xl border border-accent-blue/20 bg-accent-blue/5 p-4 flex gap-4 text-left mx-auto">
-          <div className="mt-1"><EagleLogo className="w-5 h-5 text-accent-blue" /></div>
+        <div className="mb-6 w-full max-w-lg rounded-2xl border border-accent-blue/20 bg-accent-blue/5 p-4 flex gap-3 text-left mx-auto backdrop-blur-md">
+          <div className="mt-0.5"><EagleLogo className="w-5 h-5 text-accent-blue" /></div>
           <div>
-            <div className="text-sm font-bold text-accent-blue mb-1">
+            <div className="text-xs font-bold uppercase tracking-wider text-accent-blue mb-0.5">
               {t('welcome.infrastructureDetected')}
             </div>
-            <p className="text-sm text-slate-600 dark:text-text-secondary leading-relaxed" dangerouslySetInnerHTML={{ __html: t('welcome.infrastructureDetectedDesc', { hostname: `<span class="font-mono bg-white dark:bg-white/5 backdrop-blur-md px-1.5 py-0.5 rounded text-xs border border-slate-200 dark:border-white/10">${detections[0].hostname}</span>` }) }} />
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('welcome.infrastructureDetectedDesc', { hostname: `<span class="font-mono bg-white dark:bg-white/10 px-1.5 py-0.5 rounded text-[11px] border border-slate-200 dark:border-white/10">${detections[0].hostname}</span>` }) }} />
           </div>
         </div>
       )}
 
-      {/* Localization Selectors */}
-      <div className="w-full max-w-md flex flex-col mx-auto bg-white/20 dark:bg-white/5 border border-white/40 dark:border-white/10 rounded-3xl p-6 shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-2xl ring-1 ring-black/5 dark:ring-white/5">
-        <div className="flex flex-col gap-5 text-left">
-          <KxCombobox
-            label={t('welcome.country').replace(/^[1-3]\.\s*/, '')}
-            options={countryOptions}
-            value={wizard.country}
-            onChange={applyCountry}
-            placeholder={loading ? t('welcome.loading') : t('welcome.country').replace(/^[1-3]\.\s*/, '')}
-            disabled={loading}
-          />
-
-          <KxCombobox
-            label={t('welcome.language').replace(/^[1-3]\.\s*/, '')}
-            options={localeOptions}
-            value={wizard.uiLanguage}
-            onChange={(val) => onChange({ uiLanguage: val })}
-            placeholder={loading ? t('welcome.loading') : t('welcome.language').replace(/^[1-3]\.\s*/, '')}
-            disabled={loading}
-          />
-
-          <KxCombobox
-            label={t('welcome.keyboard').replace(/^[1-3]\.\s*/, '')}
-            options={keymapOptions}
-            value={wizard.keyMap}
-            onChange={(val) => onChange({ keyMap: normalizeKeymapDisplayValue(val) })}
-            placeholder={loading ? t('welcome.loading') : t('welcome.keyboard').replace(/^[1-3]\.\s*/, '')}
-            disabled={loading}
-          />
-        </div>
-
-        <div className="border-t border-slate-200/50 dark:border-white/10 mt-6 pt-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-            <div className="flex flex-col text-left">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">{t('welcome.timezone')}</span>
-              <span className="text-[13px] font-semibold text-slate-900 dark:text-white mt-1">{selectedPreset?.timeZone || wizard.timeZone || '—'}</span>
+      {/* Main Form Card */}
+      <div className="w-full max-w-lg bg-white/40 dark:bg-slate-900/40 border border-slate-200/80 dark:border-white/10 rounded-3xl p-6 md:p-8 shadow-[0_8px_32px_rgba(0,0,0,0.06)] backdrop-blur-2xl ring-1 ring-black/5 dark:ring-white/5 flex flex-col gap-6 text-left">
+        <div className="flex flex-col gap-5">
+          <div>
+            <div className="flex items-center gap-2 mb-1 text-slate-700 dark:text-slate-200 text-xs font-bold uppercase tracking-wider">
+              <Globe className="w-4 h-4 text-accent-blue" />
+              <span>{t('welcome.country').replace(/^[1-3]\.\s*/, '')}</span>
             </div>
-            <button
-              type="button"
-              className="btn-secondary whitespace-nowrap text-xs px-4 py-2 bg-white/30 dark:bg-white/10 hover:bg-white/5 backdrop-blur-md dark:hover:bg-white/20 border border-white/40 dark:border-white/10 shadow-sm backdrop-blur-md transition-all text-slate-800 dark:text-slate-200"
-              onClick={applySuggestions}
-              disabled={!selectedPreset}
-            >
-              {t('welcome.applySuggestions')}
-            </button>
+            <KxCombobox
+              options={countryOptions}
+              value={wizard.country}
+              onChange={applyCountry}
+              placeholder={loading ? t('welcome.loading') : t('welcome.country').replace(/^[1-3]\.\s*/, '')}
+              disabled={loading}
+            />
           </div>
-          {!selectedPreset && wizard.country && (
-            <div className="text-[11px] text-slate-500 mt-3 text-center">{t('welcome.noSuggestions') || "No default suggestions for the selected country."}</div>
-          )}
-        </div>
-      </div>
 
-      {/* Think Server Toggle */}
-      <div className="w-full max-w-md mx-auto mt-4 bg-white/20 dark:bg-white/5 border border-accent-blue/30 dark:border-accent-blue/20 rounded-2xl p-4 shadow-sm backdrop-blur-2xl ring-1 ring-black/5 dark:ring-white/5 flex items-center justify-between cursor-pointer hover:bg-white/30 dark:hover:bg-white/10 transition-colors" onClick={() => onChange({ isThinkServer: !wizard.isThinkServer })}>
-        <div className="flex flex-col text-left">
-          <span className="text-sm font-bold text-slate-900 dark:text-white">Instalar como Kryonix Think Server</span>
-          <span className="text-xs text-slate-500 dark:text-slate-400 mt-1">Configuração otimizada para servidores (Headless, ZFS)</span>
-        </div>
-        <div className="ml-4 flex-shrink-0">
-          <input 
-            type="checkbox" 
-            className="w-5 h-5 accent-accent-blue cursor-pointer"
-            checked={Boolean(wizard.isThinkServer)}
-            readOnly
-          />
+          <div>
+            <div className="flex items-center gap-2 mb-1 text-slate-700 dark:text-slate-200 text-xs font-bold uppercase tracking-wider">
+              <Languages className="w-4 h-4 text-accent-blue" />
+              <span>{t('welcome.language').replace(/^[1-3]\.\s*/, '')}</span>
+            </div>
+            <KxCombobox
+              options={localeOptions}
+              value={wizard.uiLanguage}
+              onChange={(val) => onChange({ uiLanguage: val })}
+              placeholder={loading ? t('welcome.loading') : t('welcome.language').replace(/^[1-3]\.\s*/, '')}
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-1 text-slate-700 dark:text-slate-200 text-xs font-bold uppercase tracking-wider">
+              <Keyboard className="w-4 h-4 text-accent-blue" />
+              <span>{t('welcome.keyboard').replace(/^[1-3]\.\s*/, '')}</span>
+            </div>
+            <KxCombobox
+              options={keymapOptions}
+              value={wizard.keyMap || wizard.consoleKeymap}
+              onChange={(val) => {
+                const normalized = normalizeKeymapDisplayValue(val);
+                onChange({ keyMap: normalized, consoleKeymap: normalized });
+              }}
+              placeholder={loading ? t('welcome.loading') : t('welcome.keyboard').replace(/^[1-3]\.\s*/, '')}
+              disabled={loading}
+            />
+          </div>
         </div>
       </div>
 
       {version && (
-        <div className="mt-12 text-[10px] text-slate-400 dark:text-slate-600 font-mono text-center">
+        <div className="mt-8 text-[10px] text-slate-400 dark:text-slate-500 font-mono text-center tracking-wider opacity-75">
           {version.KRYONIX_PRETTY_NAME} | {version.KRYONIX_REV?.substring(0, 8)} | {version.KRYONIX_BUILD_TIME}
         </div>
       )}
     </div>
   );
 }
+
