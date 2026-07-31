@@ -137,6 +137,7 @@ mod tests {
                 downstream_url: "url".to_string(),
                 branch: "main".to_string(),
             },
+            network: None,
             storage: StoragePlan {
                 topology: Topology::Split,
                 system_disks: vec!["/dev/sda".to_string()],
@@ -188,6 +189,7 @@ mod tests {
                 downstream_url: "url".to_string(),
                 branch: "main".to_string(),
             },
+            network: None,
             storage: StoragePlan {
                 topology: Topology::Single,
                 system_disks: vec!["/dev/nvme0n1".to_string()],
@@ -223,6 +225,7 @@ mod tests {
                 downstream_url: "url".to_string(),
                 branch: "main".to_string(),
             },
+            network: None,
             storage: StoragePlan {
                 topology: Topology::Single,
                 system_disks: vec!["/dev/nvme0n1".to_string()],
