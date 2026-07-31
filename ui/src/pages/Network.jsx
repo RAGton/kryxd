@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FieldError from '../components/FieldError.jsx';
 import { installerApi, getInstallerApiErrorMessage } from '../utils/installerApi.js';
 import {
@@ -25,13 +25,13 @@ import {
   Settings
 } from 'lucide-react';
 import {
-  sanitizeIp,
   netmaskToPrefix,
-  isUsableRemoteIp,
   formatIpv4Input,
   DEFAULT_DNS_LIST,
   DEFAULT_DNS_CSV,
 } from '../utils/network.js';
+import { useNetworkInterfaces } from '../hooks/useNetworkInterfaces.js';
+import { useNetworkStatus } from '../hooks/useNetworkStatus.js';
 
 function SummaryRow({ label, value, highlight }) {
   return (
@@ -44,13 +44,9 @@ function SummaryRow({ label, value, highlight }) {
 
 export default function Network({ wizard, onChange, validation }) {
   const { t } = useTranslation();
-  const [interfaces, setInterfaces] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [showWanAdvanced, setShowWanAdvanced] = useState(false);
 
-  // Connectivity
-  const [netStatus, setNetStatus] = useState(null);
+  // Wi-Fi (estado local de UI — não pertence ao wizardState)
   const [wifiList, setWifiList] = useState([]);
   const [wifiScanning, setWifiScanning] = useState(false);
   const [selectedWifiIface, setSelectedWifiIface] = useState('');
@@ -60,12 +56,24 @@ export default function Network({ wizard, onChange, validation }) {
   const [connecting, setConnecting] = useState(false);
   const [connectMsg, setConnectMsg] = useState('');
 
+  // Hooks de domínio (I/O + estado local)
+  const {
+    interfaces,
+    wifiIfaces,
+    ethIfaces,
+    ifaceNames,
+    loading,
+    error,
+    refreshInterfaces,
+  } = useNetworkInterfaces();
+
+  const {
+    netStatus,
+    checkConnectionStatus,
+  } = useNetworkStatus();
+
   const fieldErrors = validation?.fieldErrors || {};
   const warnings = validation?.warnings || [];
-
-  const ifaceNames = interfaces.map((i) => i.name).filter(Boolean);
-  const ethIfaces = interfaces.filter((i) => i.type === 'ethernet');
-  const wifiIfaces = interfaces.filter((i) => i.type === 'wifi');
 
   const hasWifi = wifiIfaces.length > 0;
   const wanEnabled = Boolean(wizard.wanInterface);
@@ -82,55 +90,58 @@ export default function Network({ wizard, onChange, validation }) {
     onChange({ mgmtDns: arr.join(',') });
   };
 
-  const refreshStatus = useCallback(async () => {
-    try {
-      const status = await installerApi.getNetworkStatus();
-      setNetStatus(status);
-      if (status.connected) {
-        onChange({ netConnected: true, netOffline: false });
-        if (status.ip && isUsableRemoteIp(status.ip)) {
-          onChange({ serverIp: sanitizeIp(status.ip) });
-        }
-      } else {
-        onChange({ netConnected: false });
-      }
-    } catch { /* ignora */ }
-  }, [onChange]);
+  // Set O(1) para verificar se um iface Wi-Fi existe na lista atual.
+  // Substitui `wifiIfaces.some(...)` O(N) que rodava em todo re-render.
+  const wifiNameSet = useMemo(
+    () => new Set(wifiIfaces.map((i) => i.name)),
+    [wifiIfaces]
+  );
 
-  const loadInterfaces = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const payload = await installerApi.getNetworkInterfaces();
-      const list = Array.isArray(payload?.interfaces) ? payload.interfaces : [];
-      setInterfaces(list);
+  // Refs estáveis para `onChange` e funções: permitem que o useEffect de
+  // bootstrap rode uma única vez (deps `[]`) sem disparar re-renders em
+  // cascata quando o pai recria os handlers.
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
-      const wifi = list.find(i => i.type === 'wifi');
+  // refreshStatusRef.current é uma função estável que:
+  //  - chama checkConnectionStatus (do hook)
+  //  - aplica o patch no wizardState via onChangeRef.current
+  // Isso permite que outros useCallbacks (ex: connectWifi) e o bootstrap
+  // chamem `refreshStatusRef.current?.()` sem criar dependência circular.
+  const refreshStatusRef = useRef(null);
+  refreshStatusRef.current = async () => {
+    await checkConnectionStatus((patch) => onChangeRef.current(patch));
+  };
+
+  // Bootstrap: roda exatamente uma vez no mount. Faz o fetch de interfaces
+  // e (em seguida) o check de status. Sem deps → sem re-execuções.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const list = await refreshInterfaces();
+      if (cancelled) return;
+
+      // Auto-selecionar primeira Wi-Fi (preservado do original).
+      const wifi = list.find((i) => i.type === 'wifi');
       if (wifi && !selectedWifiIface) {
         setSelectedWifiIface(wifi.name);
       }
 
+      // Patch wizardState: mgmtInterface default + netIfacesCount.
       const names = list.map((i) => i.name).filter(Boolean);
       const patch = { netIfacesCount: names.length };
       if (!wizard.mgmtInterface || !names.includes(wizard.mgmtInterface)) {
         patch.mgmtInterface = names[0] || '';
       }
-      onChange(patch);
-    } catch (nextError) {
-      setError(getInstallerApiErrorMessage(nextError, 'Falha ao carregar interfaces.'));
-    } finally {
-      setLoading(false);
-    }
-  }, [onChange, wizard.mgmtInterface, selectedWifiIface]);
+      onChangeRef.current(patch);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      await loadInterfaces();
-      if (!cancelled) await refreshStatus();
+      if (!cancelled) {
+        await refreshStatusRef.current?.();
+      }
     })();
     return () => { cancelled = true; };
-  }, [loadInterfaces, refreshStatus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const scanWifi = useCallback(async () => {
     if (!selectedWifiIface) return;
@@ -152,12 +163,13 @@ export default function Network({ wizard, onChange, validation }) {
   // Auto-scan WiFi networks as soon as a WiFi interface is selected.
   // Fix 2026-07-31: user reported "falta busca automática de rede" — the panel
   // should populate the network list without requiring a manual click on "Buscar".
+  // O(1): usa `wifiNameSet.has(...)` em vez de `wifiIfaces.some(...)`.
   useEffect(() => {
-    if (selectedWifiIface && wifiIfaces.some((i) => i.name === selectedWifiIface)) {
+    if (selectedWifiIface && wifiNameSet.has(selectedWifiIface)) {
       scanWifi();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedWifiIface]);
+  }, [selectedWifiIface, wifiNameSet]);
 
   const connectWifi = useCallback(async () => {
     if (!selectedWifiIface || !wifiSsid) return;
@@ -167,13 +179,13 @@ export default function Network({ wizard, onChange, validation }) {
       const result = await installerApi.connectWifi(selectedWifiIface, wifiSsid, wifiPassword);
       setConnectMsg(result?.message || 'Conectado.');
       setWifiPassword('');
-      await refreshStatus();
+      await refreshStatusRef.current?.();
     } catch (nextError) {
       setConnectMsg(getInstallerApiErrorMessage(nextError, 'Falha ao conectar.'));
     } finally {
       setConnecting(false);
     }
-  }, [selectedWifiIface, wifiSsid, wifiPassword, refreshStatus]);
+  }, [selectedWifiIface, wifiSsid, wifiPassword]);
 
   const continueOffline = () => {
     setWifiSsid('');
@@ -232,7 +244,7 @@ export default function Network({ wizard, onChange, validation }) {
           onChange({ netApplyError: t('network.backend_apply_error', { defaultValue: 'O backend não aplicou a configuração de rede (/network/apply).' }), netApplyBusy: false });
         }
       }
-      await refreshStatus();
+      await refreshStatusRef.current?.();
     } catch (err) {
       if (err instanceof TypeError && err.message.toLowerCase().includes('fetch')) {
         console.warn('[Network] Conexão HTTP caiu. Provavelmente o backend reiniciou a rede com sucesso.');
