@@ -30,6 +30,16 @@ const INSTALL_PLAN_SCHEMA = Object.freeze({
     },
     "features": {
       "$ref": "#/$defs/features"
+    },
+    "network": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/networkPlan"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "$defs": {
@@ -315,6 +325,165 @@ const INSTALL_PLAN_SCHEMA = Object.freeze({
       "patternProperties": {
         "^[A-Za-z0-9][A-Za-z0-9_-]*$": {
           "$ref": "#/$defs/featureSelection"
+        }
+      }
+    },
+    "managementNetwork": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "interface",
+        "mode",
+        "prefixLength",
+        "hostname"
+      ],
+      "properties": {
+        "interface": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "dhcp",
+            "static"
+          ]
+        },
+        "address": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "prefixLength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "gateway": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)$"
+          },
+          "uniqueItems": true
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "wanNetwork": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "interface",
+        "mode"
+      ],
+      "properties": {
+        "interface": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "dhcp",
+            "static",
+            "pppoe"
+          ]
+        },
+        "address": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "prefixLength": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gateway": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d|[01]?\\d?\\d)$"
+          },
+          "uniqueItems": true
+        },
+        "pppoeUser": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "networkPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "management"
+      ],
+      "properties": {
+        "management": {
+          "$ref": "#/$defs/managementNetwork"
+        },
+        "wan": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/wanNetwork"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     }
