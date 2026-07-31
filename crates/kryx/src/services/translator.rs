@@ -128,10 +128,7 @@ pub fn generate_nix_config(plan: &InstallPlanV2) -> Result<String, String> {
 /// a interface de management (LAN/PXE). Em DHCP, emite apenas o nome
 /// de host (o NixOS cuida do `dhcpcd` por padrão).
 fn emit_management_network(config: &mut String, mgmt: &crate::domain::config::ManagementNetwork) {
-    config.push_str(&format!(
-        "  networking.hostName = \"{}\";\n",
-        mgmt.hostname
-    ));
+    config.push_str(&format!("  networking.hostName = \"{}\";\n", mgmt.hostname));
 
     match mgmt.mode {
         NetworkMode::Dhcp => {
@@ -163,10 +160,7 @@ fn emit_management_network(config: &mut String, mgmt: &crate::domain::config::Ma
             }
 
             if let Some(gw) = &mgmt.gateway {
-                config.push_str(&format!(
-                    "  networking.defaultGateway = \"{}\";\n",
-                    gw
-                ));
+                config.push_str(&format!("  networking.defaultGateway = \"{}\";\n", gw));
             }
         }
     }
@@ -193,10 +187,7 @@ fn emit_wan_network(config: &mut String, wan: &crate::domain::config::WanNetwork
                 wan.interface, addr, prefix
             ));
             if let Some(gw) = &wan.gateway {
-                config.push_str(&format!(
-                    "  networking.defaultGateway = \"{}\";\n",
-                    gw
-                ));
+                config.push_str(&format!("  networking.defaultGateway = \"{}\";\n", gw));
             }
         }
         WanNetworkMode::Pppoe => {
@@ -474,7 +465,10 @@ mod tests {
         // Garantias negativas — o que NÃO pode estar presente
         assert!(!result.contains("networking.interfaces.enp2s0"));
         assert!(!result.contains("networking.interfaces.enp2s0.ipv4"));
-        assert!(!result.contains("password = "), "PPPoE password MUST NOT appear in Nix config");
+        assert!(
+            !result.contains("password = "),
+            "PPPoE password MUST NOT appear in Nix config"
+        );
         assert!(!result.contains("provedorSecret")); // qualquer placeholder de senha hipotético
     }
 

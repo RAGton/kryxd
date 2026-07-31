@@ -363,13 +363,20 @@ fn validate_network_plan(network: &NetworkPlan) -> Result<(), String> {
             let addr = network.management.address.as_deref().unwrap_or("").trim();
             let gw = network.management.gateway.as_deref().unwrap_or("").trim();
             if !is_valid_ipv4(addr) {
-                return Err("network.management.address must be a valid IPv4 in static mode".to_string());
+                return Err(
+                    "network.management.address must be a valid IPv4 in static mode".to_string(),
+                );
             }
             if !is_valid_ipv4(gw) {
-                return Err("network.management.gateway must be a valid IPv4 in static mode".to_string());
+                return Err(
+                    "network.management.gateway must be a valid IPv4 in static mode".to_string(),
+                );
             }
             if network.management.dns.is_empty() {
-                return Err("network.management.dns must contain at least one IPv4 in static mode".to_string());
+                return Err(
+                    "network.management.dns must contain at least one IPv4 in static mode"
+                        .to_string(),
+                );
             }
             for d in &network.management.dns {
                 if !is_valid_ipv4(d.trim()) {
@@ -384,7 +391,9 @@ fn validate_network_plan(network: &NetworkPlan) -> Result<(), String> {
             return Err("network.wan.interface must not be empty".to_string());
         }
         if wan.interface == network.management.interface {
-            return Err("network.wan.interface must differ from network.management.interface".to_string());
+            return Err(
+                "network.wan.interface must differ from network.management.interface".to_string(),
+            );
         }
         match wan.mode {
             WanNetworkMode::Dhcp => {}
@@ -393,16 +402,25 @@ fn validate_network_plan(network: &NetworkPlan) -> Result<(), String> {
                 let gw = wan.gateway.as_deref().unwrap_or("").trim();
                 let prefix = wan.prefix_length.unwrap_or(0);
                 if !is_valid_ipv4(addr) {
-                    return Err("network.wan.address must be a valid IPv4 in static mode".to_string());
+                    return Err(
+                        "network.wan.address must be a valid IPv4 in static mode".to_string()
+                    );
                 }
                 if !is_valid_ipv4(gw) {
-                    return Err("network.wan.gateway must be a valid IPv4 in static mode".to_string());
+                    return Err(
+                        "network.wan.gateway must be a valid IPv4 in static mode".to_string()
+                    );
                 }
                 if prefix == 0 || prefix > 32 {
-                    return Err("network.wan.prefixLength must be between 1 and 32 in static mode".to_string());
+                    return Err(
+                        "network.wan.prefixLength must be between 1 and 32 in static mode"
+                            .to_string(),
+                    );
                 }
                 if wan.dns.is_empty() {
-                    return Err("network.wan.dns must contain at least one IPv4 in static mode".to_string());
+                    return Err(
+                        "network.wan.dns must contain at least one IPv4 in static mode".to_string(),
+                    );
                 }
             }
             WanNetworkMode::Pppoe => {
@@ -601,7 +619,8 @@ mod tests {
 
     fn plan_with_network(network: serde_json::Value) -> serde_json::Value {
         let mut value = valid_plan_json();
-        value.as_object_mut()
+        value
+            .as_object_mut()
             .unwrap()
             .insert("network".to_string(), network);
         // O fixture base usa ZFS single; o bloco de rede é independente.
@@ -611,11 +630,10 @@ mod tests {
     #[test]
     fn deserializes_plan_with_dhcp_management_no_wan() {
         // Cenário 1 do KCR: LAN DHCP sem WAN — edge offline puro (sem uplink).
-        let plan: InstallPlanV2 =
-            serde_json::from_value(plan_with_network(serde_json::json!({
-                "management": network_management_dhcp_json()
-            })))
-            .unwrap();
+        let plan: InstallPlanV2 = serde_json::from_value(plan_with_network(serde_json::json!({
+            "management": network_management_dhcp_json()
+        })))
+        .unwrap();
 
         let network = plan.network.expect("network block must be present");
         assert!(network.wan.is_none());
@@ -630,16 +648,15 @@ mod tests {
     fn deserializes_plan_with_pppoe_wan_and_user() {
         // Cenário 2 do KCR: LAN DHCP + WAN PPPoE com user.
         // NOTA: a senha NÃO entra no plan (vem via InstallSecretsV2).
-        let plan: InstallPlanV2 =
-            serde_json::from_value(plan_with_network(serde_json::json!({
-                "management": network_management_dhcp_json(),
-                "wan": {
-                    "interface": "enp2s0",
-                    "mode": "pppoe",
-                    "pppoeUser": "cliente@provedor.net"
-                }
-            })))
-            .unwrap();
+        let plan: InstallPlanV2 = serde_json::from_value(plan_with_network(serde_json::json!({
+            "management": network_management_dhcp_json(),
+            "wan": {
+                "interface": "enp2s0",
+                "mode": "pppoe",
+                "pppoeUser": "cliente@provedor.net"
+            }
+        })))
+        .unwrap();
 
         let network = plan.network.expect("network block must be present");
         let wan = network.wan.expect("wan block must be present");
@@ -653,13 +670,14 @@ mod tests {
     #[test]
     fn rejects_pppoe_wan_without_user() {
         // Cenário 3 do KCR: WAN PPPoE sem pppoe_user → erro.
-        let result = serde_json::from_value::<InstallPlanV2>(plan_with_network(serde_json::json!({
-            "management": network_management_dhcp_json(),
-            "wan": {
-                "interface": "enp2s0",
-                "mode": "pppoe"
-            }
-        })));
+        let result =
+            serde_json::from_value::<InstallPlanV2>(plan_with_network(serde_json::json!({
+                "management": network_management_dhcp_json(),
+                "wan": {
+                    "interface": "enp2s0",
+                    "mode": "pppoe"
+                }
+            })));
 
         let err = result.unwrap_err().to_string();
         assert!(
@@ -671,16 +689,17 @@ mod tests {
     #[test]
     fn rejects_static_management_without_address() {
         // Cenário 4 do KCR: LAN Static sem IP address → erro.
-        let result = serde_json::from_value::<InstallPlanV2>(plan_with_network(serde_json::json!({
-            "management": {
-                "interface": "enp1s0",
-                "mode": "static",
-                "prefixLength": 24,
-                "hostname": "kryonix-static-01",
-                "gateway": "192.168.1.1",
-                "dns": ["1.1.1.1"]
-            }
-        })));
+        let result =
+            serde_json::from_value::<InstallPlanV2>(plan_with_network(serde_json::json!({
+                "management": {
+                    "interface": "enp1s0",
+                    "mode": "static",
+                    "prefixLength": 24,
+                    "hostname": "kryonix-static-01",
+                    "gateway": "192.168.1.1",
+                    "dns": ["1.1.1.1"]
+                }
+            })));
 
         let err = result.unwrap_err().to_string();
         assert!(
