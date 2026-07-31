@@ -79,13 +79,18 @@ test('draft gera InstallPlanV2 canonico sem vazar estado transitorio', () => {
 
   assert.equal(plan.version, 2);
   assert.equal(plan.isThinkServer, false);
-  assert.deepEqual(Object.keys(plan).sort(), ['features', 'isThinkServer', 'repository', 'storage', 'version']);
+  // KCR Etapa 3: network agora faz parte do payload canônico quando mgmtInterface set.
+  assert.deepEqual(Object.keys(plan).sort(), ['features', 'isThinkServer', 'network', 'repository', 'storage', 'version']);
   assert.equal(plan.repository.downstreamUrl, 'https://github.com/RAGton/kryonixos');
   assert.equal(plan.storage.topology, 'single');
   assert.deepEqual(plan.storage.systemDisks, ['/dev/sda']);
   assert.equal(plan.storage.root.filesystem, 'btrfs');
   assert.deepEqual(plan.features.system, {});
-  assert.equal(plan.network, undefined);
+  assert.equal(plan.network.management.interface, 'enp1s0');
+  assert.equal(plan.network.management.hostname, 'srv-rag');
+  assert.ok(plan.network.wan, 'wan block expected (createValidDraft set wanInterface)');
+  assert.equal(plan.network.wan.mode, 'static');
+  assert.equal(plan.network.wan.interface, 'enp2s0');
   assert.equal(plan.locale, undefined);
   assert.equal(plan.admin, undefined);
   assert.equal(plan.destructiveConfirmed, undefined);
@@ -369,11 +374,14 @@ test('contract: buildInstallPlanV2 preserva features e exclui rede, identidade e
 
   const plan = buildInstallPlanPayload(draft);
 
-  assert.deepEqual(Object.keys(plan).sort(), ['features', 'isThinkServer', 'repository', 'storage', 'version']);
+  // KCR Etapa 3: network agora faz parte do payload canônico.
+  assert.deepEqual(Object.keys(plan).sort(), ['features', 'isThinkServer', 'network', 'repository', 'storage', 'version']);
   assert.equal(plan.features.storage['srv-data'], true);
   assert.equal(plan.features.ai.ollama, true);
   assert.equal(plan.features.remote.openssh, true);
-  assert.equal(plan.network, undefined);
+  assert.ok(plan.network, 'network block expected (createValidDraft set mgmtInterface)');
+  // Senhas e secrets não podem vazar pro payload V2
+  assert.equal(plan.network.management.pppoePassword, undefined);
   assert.equal(plan.locale, undefined);
   assert.equal(plan.admin, undefined);
   assert.equal(plan.targetRemoteAccess, undefined);

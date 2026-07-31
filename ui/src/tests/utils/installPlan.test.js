@@ -48,11 +48,16 @@ describe('installPlan', () => {
       const payload = buildInstallPlanPayload(draft);
 
       assert.equal(payload.version, 2);
-      assert.deepEqual(Object.keys(payload).sort(), ['features', 'isThinkServer', 'repository', 'storage', 'version']);
+      assert.deepEqual(Object.keys(payload).sort(), ['features', 'isThinkServer', 'network', 'repository', 'storage', 'version']);
       assert.equal(payload.repository.branch, 'main');
       assert.deepEqual(payload.storage.systemDisks, ['/dev/sda']);
       assert.equal(payload.storage.topology, 'single');
-      assert.equal(payload.network, undefined);
+      // KCR Etapa 3: mgmtInterface='eth0' + hostName='kryonix-box' emite bloco network válido
+      assert.equal(payload.network.management.interface, 'eth0');
+      assert.equal(payload.network.management.mode, 'dhcp');
+      assert.equal(payload.network.management.hostname, 'kryonix-box');
+      assert.equal(payload.network.management.prefixLength, 24);
+      assert.equal(payload.network.wan, null);
       assert.equal(payload.locale, undefined);
       assert.equal(payload.admin, undefined);
     });
@@ -71,6 +76,82 @@ describe('installPlan', () => {
       const payload = buildInstallPlanPayload(draft);
       assert.equal(payload.features.storage['srv-data'], true);
       assert.deepEqual(payload.storage.data, null);
+    });
+
+    // ── KCR-2026-07-31-01 Etapa 3: tests do payload network ────────────────
+
+    it('KCR #8: includes network block when mgmtInterface is set', () => {
+      const draft = {
+        sourceKind: 'offline-defaults',
+        profileId: 'desktop',
+        sysDisk: '/dev/sda',
+        mgmtInterface: 'enp1s0',
+        mgmtMode: 'static',
+        serverIp: '192.168.1.10',
+        mgmtGateway: '192.168.1.1',
+        mgmtDns: '1.1.1.1,8.8.8.8',
+        hostName: 'kryonix-edge-01',
+        wanInterface: '',
+      };
+
+      const payload = buildInstallPlanPayload(draft);
+      assert.ok(payload.network, 'network block must be present');
+      assert.equal(payload.network.management.interface, 'enp1s0');
+      assert.equal(payload.network.management.mode, 'static');
+      assert.equal(payload.network.management.address, '192.168.1.10');
+      assert.equal(payload.network.management.gateway, '192.168.1.1');
+      assert.deepEqual(payload.network.management.dns, ['1.1.1.1', '8.8.8.8']);
+      assert.equal(payload.network.management.prefixLength, 24);
+      assert.equal(payload.network.management.hostname, 'kryonix-edge-01');
+      assert.equal(payload.network.wan, null);
+      // Senha PPPoE NÃO pode aparecer no payload — fica nos secrets
+      assert.equal(payload.network.management.pppoePassword, undefined);
+    });
+
+    it('KCR #9: excludes network block when mgmtInterface is empty (offline)', () => {
+      const draft = {
+        sourceKind: 'offline-defaults',
+        profileId: 'desktop',
+        sysDisk: '/dev/sda',
+        mgmtInterface: '',
+        mgmtMode: 'dhcp',
+        hostName: 'kryonix-offline',
+      };
+
+      const payload = buildInstallPlanPayload(draft);
+      // Edge offline puro → network: null (não emitir bloco é ok, mas null é mais explícito)
+      assert.equal(payload.network, null);
+    });
+
+    it('KCR #10: includes wan.pppoeUser (never pppoePassword in payload)', () => {
+      const draft = {
+        sourceKind: 'offline-defaults',
+        profileId: 'desktop',
+        sysDisk: '/dev/sda',
+        mgmtInterface: 'enp1s0',
+        mgmtMode: 'dhcp',
+        hostName: 'kryonix-pppoe-node',
+        wanInterface: 'enp2s0',
+        wanMode: 'pppoe',
+        pppoeUser: 'cliente@provedor.net',
+        pppoePassword: 'segredo-que-nao-deve-vazar',
+      };
+
+      const payload = buildInstallPlanPayload(draft);
+      assert.ok(payload.network);
+      assert.equal(payload.network.management.interface, 'enp1s0');
+      assert.ok(payload.network.wan, 'wan block must be present in pppoe mode');
+      assert.equal(payload.network.wan.interface, 'enp2s0');
+      assert.equal(payload.network.wan.mode, 'pppoe');
+      assert.equal(payload.network.wan.pppoeUser, 'cliente@provedor.net');
+      // CRÍTICO: senha NUNCA vai no payload. Vai via /api/v2/secrets.
+      assert.equal(payload.network.wan.pppoePassword, undefined);
+      assert.equal(payload.pppoePassword, undefined);
+      assert.equal(payload.network.management.pppoePassword, undefined);
+      // varredura: nenhuma chave do payload contém o valor da senha
+      const payloadStr = JSON.stringify(payload);
+      assert.equal(payloadStr.includes('segredo-que-nao-deve-vazar'), false,
+        'PPPoE password leaked into payload');
     });
   });
 

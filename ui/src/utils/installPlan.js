@@ -19,6 +19,73 @@ import {
 
 export { INSTALL_PLAN_VERSION };
 
+// ── Network plan (KCR-2026-07-31-01 Etapa 3) ───────────────────────────────────
+//
+// Constrói o bloco `network` que vai no payload V2 quando o wizard
+// configurou uma interface de management. Retorna `null` para edge offline
+// puro (sem mgmtInterface) ou quando o wizard ainda não tem hostname.
+//
+// Regra de ouro: a senha PPPoE NUNCA entra aqui. Flui via
+// `buildInstallSecretsPayload()` → /api/v2/secrets.
+export function buildNetworkPlan(draft) {
+  const iface = sanitizeString(draft.mgmtInterface);
+  const hostname = sanitizeString(draft.hostName);
+
+  if (!iface) return null;
+  if (!hostname) return null;
+
+  const management = {
+    interface: iface,
+    mode: sanitizeString(draft.mgmtMode) === 'static' ? 'static' : 'dhcp',
+    prefixLength: 24, // Compatível com o default usado na UI (Network.jsx:201).
+    hostname,
+    dns: [],
+  };
+
+  // Em modo static, address/gateway/dns são obrigatórios no schema.
+  // Mantemos null quando ausentes — o backend (validate_network_plan)
+  // rejeita o plano com erro de validação (não silenciamos).
+  if (management.mode === 'static') {
+    management.address = sanitizeString(draft.serverIp) || null;
+    management.gateway = sanitizeString(draft.mgmtGateway) || null;
+    management.dns = csvToArray(draft.mgmtDns || '');
+  }
+
+  const network = { management, wan: null };
+
+  // WAN é opcional. Quando `wanInterface` set, montamos o sub-bloco.
+  const wanIface = sanitizeString(draft.wanInterface);
+  if (wanIface && wanIface !== iface) {
+    const wanMode = sanitizeString(draft.wanMode);
+    if (wanMode === 'pppoe') {
+      const pppoeUser = sanitizeString(draft.pppoeUser);
+      // Schema exige pppoeUser em modo pppoe; sem user, NÃO emite wan
+      // (backend rejeitaria). Mantém o network consistente.
+      if (pppoeUser) {
+        network.wan = {
+          interface: wanIface,
+          mode: 'pppoe',
+          pppoeUser,
+        };
+      }
+    } else if (wanMode === 'static') {
+      network.wan = {
+        interface: wanIface,
+        mode: 'static',
+        address: sanitizeString(draft.wanAddress) || null,
+        prefixLength: null, // prefixLength semântico de Netmask dotted-decimal fica no backend
+        gateway: sanitizeString(draft.wanGateway) || null,
+        dns: csvToArray(draft.wanDns || ''),
+      };
+    } else {
+      // DHCP (default)
+      network.wan = { interface: wanIface, mode: 'dhcp' };
+    }
+  }
+
+  return network;
+}
+
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
 const validateSchema = ajv.compile(installPlanSchema);
@@ -269,6 +336,10 @@ export function buildInstallPlanPayload(draftInput) {
       downstreamUrl: repositoryUrl,
       branch: sanitizeString(draft.sourceBranch) || 'main',
     },
+    // KCR-2026-07-31-01 Etapa 3: bloco `network` opcional.
+    // Edge offline puro (sem mgmtInterface) emite `network: null` — o
+    // backend aceita plano sem esse campo.
+    network: buildNetworkPlan(draft),
     storage,
     features,
   };
