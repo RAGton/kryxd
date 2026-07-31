@@ -104,7 +104,12 @@
       "blockedLabel": "Bloqueado",
       "previewTitle": "Vista previa de particionamiento",
       "previewDesc": "El siguiente diseño se aplicará automáticamente al disco",
-      "reload": "↻ Actualizar lista"
+      "reload": "↻ Actualizar lista",
+      "singleDisk": "Disco único",
+      "splitDisks": "Discos separados",
+      "rootFs": "Sistema de archivos raíz",
+      "dataFs": "Sistema de archivos de datos",
+      "raidZpoolReco": "Recomendación: use RAID/Zpool para estos {{count}} discos elegibles."
     },
     "manual": {
       "title": "Particionamiento manual",

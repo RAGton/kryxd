@@ -200,6 +200,16 @@ function TabAutomatico({ wizard, eligibleDisks, partitions, onChange, onReload, 
   const { t } = useTranslation();
   const hasDisk = eligiblePaths.has(wizard.sysDisk);
   const blocked = diskInventory.filter(d => d.eligible === false);
+  const split = eligibleDisks.length >= 2 && eligibleDisks.length <= 3;
+  const rootOptions = split ? ['btrfs', 'zfs', 'ext4', 'xfs'] : ['btrfs', 'zfs'];
+  const FsSelect = ({ field, options, label }) => (
+    <label className="flex flex-col gap-1 text-xs text-slate-400">
+      {label}
+      <select className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white" value={wizard[field] || options[0]} onChange={e => onChange({ [field]: e.target.value })}>
+        {options.map(option => <option key={option} value={option}>{option.toUpperCase()}</option>)}
+      </select>
+    </label>
+  );
 
   return (
     <div className="p-4 space-y-6">
@@ -241,6 +251,10 @@ function TabAutomatico({ wizard, eligibleDisks, partitions, onChange, onReload, 
         )}
       </div>
 
+      {eligibleDisks.length === 1 && <div className="mt-4"><h4 className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">{t('storage.automatic.singleDisk', { defaultValue: 'Single Disk' })}</h4><FsSelect field="rootFs" options={rootOptions} label={t('storage.automatic.rootFs', { defaultValue: 'Filesystem raiz' })} /></div>}
+      {split && <div className="mt-4 space-y-3"><h4 className="text-xs font-bold uppercase tracking-widest text-slate-400">{t('storage.automatic.splitDisks', { defaultValue: 'Split Disks' })}</h4><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><FsSelect field="rootFs" options={rootOptions} label={t('storage.automatic.rootFs', { defaultValue: 'Filesystem raiz' })} /><FsSelect field="dataFs" options={['btrfs', 'zfs']} label={t('storage.automatic.dataFs', { defaultValue: 'Filesystem de dados' })} /></div></div>}
+      {eligibleDisks.length >= 4 && <div className="mt-4 rounded-xl border border-accent-blue/30 bg-accent-blue/10 p-4 text-sm font-bold text-accent-blue">{t('storage.automatic.raidZpoolReco', { defaultValue: `Recomendação: use RAID/Zpool para estes ${eligibleDisks.length} discos elegíveis.` })}</div>}
+
       {blocked.length > 0 && (
         <div>
           <div className="mb-3 mt-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
@@ -263,7 +277,7 @@ function TabAutomatico({ wizard, eligibleDisks, partitions, onChange, onReload, 
         <div className="pt-6 border-t border-white/5 mt-6 animate-fade-in">
           <h3 className="text-sm font-bold text-white mb-2">{t('storage.automatic.previewTitle')}</h3>
           <p className="text-xs text-slate-400 mb-4">{t('storage.automatic.previewDesc')} {wizard.sysDisk}.</p>
-          
+
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 mb-4">
             <div className="flex h-8 w-full rounded-md overflow-hidden border border-white/10 bg-black/40">
               <div className="w-[10%] bg-indigo-500/80 border-r border-black flex items-center justify-center">
@@ -274,7 +288,7 @@ function TabAutomatico({ wizard, eligibleDisks, partitions, onChange, onReload, 
               </div>
             </div>
           </div>
-          
+
           <div className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
             <table className="w-full text-left text-xs text-slate-300">
               <thead className="bg-white/5 uppercase tracking-wider text-[10px] font-bold text-slate-400">
@@ -828,9 +842,7 @@ export default function Disks({ wizard, uiState, onChange, validation }) {
 
   const tabLabels = [
     t('storage.tabs.automatic'),
-    t('storage.tabs.manual'),
-    t('storage.tabs.lvm'),
-    t('storage.tabs.raid')
+    t('storage.tabs.manual')
   ];
 
   return (

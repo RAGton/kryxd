@@ -104,7 +104,12 @@
       "blockedLabel": "Blocked",
       "previewTitle": "Partitioning Preview",
       "previewDesc": "The following layout will be automatically applied to disk",
-      "reload": "↻ Reload list"
+      "reload": "↻ Reload list",
+      "singleDisk": "Single Disk",
+      "splitDisks": "Split Disks",
+      "rootFs": "Root filesystem",
+      "dataFs": "Data filesystem",
+      "raidZpoolReco": "Recommendation: use RAID/Zpool for these {{count}} eligible disks."
     },
     "manual": {
       "title": "Manual partitioning",
