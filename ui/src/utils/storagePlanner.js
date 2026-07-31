@@ -261,9 +261,20 @@ function pushEligibilityIssue(blockingReasons, label, disk) {
   }
 }
 
-export function validateSingleDiskLayout(allDisks, systemDiskPath) {
+function validateFilesystems(layout, rootFs = 'btrfs', dataFs = 'btrfs') {
+  const blockingReasons = [];
+  const rootAllowed = layout === 'single' ? ['btrfs', 'zfs'] : ['btrfs', 'zfs', 'ext4', 'xfs'];
+  if (!rootAllowed.includes(rootFs)) blockingReasons.push(`Filesystem raiz invalido para layout ${layout}: ${rootFs}.`);
+  if ((layout === 'split' || layout === 'raid') && !['btrfs', 'zfs'].includes(dataFs)) {
+    blockingReasons.push('Partição de dados (/srv/data) requer filesystem com snapshots/subvolumes (btrfs ou zfs). ext4/xfs não suportam.');
+  }
+  return blockingReasons;
+}
+
+export function validateSingleDiskLayout(allDisks, systemDiskPath, rootFs = 'btrfs', dataFs = 'btrfs') {
   const blockingReasons = [];
   const warnings = [];
+  blockingReasons.push(...validateFilesystems('single', rootFs, dataFs));
   const systemPath = sanitizeString(systemDiskPath);
 
   if (!systemPath) {
@@ -283,9 +294,10 @@ export function validateSingleDiskLayout(allDisks, systemDiskPath) {
   };
 }
 
-export function validateSplitDiskLayout(allDisks, systemDiskPath, dataDiskPath) {
+export function validateSplitDiskLayout(allDisks, systemDiskPath, dataDiskPath, rootFs = 'btrfs', dataFs = 'btrfs') {
   const blockingReasons = [];
   const warnings = [];
+  blockingReasons.push(...validateFilesystems('split', rootFs, dataFs));
   const systemPath = sanitizeString(systemDiskPath);
   const dataPath = sanitizeString(dataDiskPath);
 
@@ -515,8 +527,9 @@ export function buildRaidPlanSummary(disks, raidLevel) {
   };
 }
 
-export function validateRaidSelection(disks, raidLevel) {
+export function validateRaidSelection(disks, raidLevel, rootFs = 'btrfs', dataFs = 'btrfs') {
   const summary = buildRaidPlanSummary(disks, raidLevel);
+  summary.blockingReasons.push(...validateFilesystems('raid', rootFs, dataFs));
   return {
     valid: summary.blockingReasons.length === 0,
     blockingReasons: summary.blockingReasons,
@@ -678,20 +691,19 @@ export function explainSrvDataReason(profileId, selectedFeatures) {
   return reasons.join(' + ');
 }
 
-export function getDefaultFilesystems(layoutMode) {
-  if (layoutMode === 'raid') return { rootFs: 'btrfs', dataFs: 'btrfs' };
-  if (layoutMode === 'split') return { rootFs: 'btrfs', dataFs: 'btrfs' };
-  return { rootFs: 'btrfs', dataFs: 'btrfs' };
+export function getDefaultFilesystems(layoutMode, overrides = {}) {
+  const defaults = { rootFs: 'btrfs', dataFs: 'btrfs' };
+  return { ...defaults, ...(layoutMode ? {} : {}), ...overrides };
 }
 
-export function computeStorageValidation(layoutMode, diskInventory, sysDisk, dataDisk, raidMembers, raidLevel) {
+export function computeStorageValidation(layoutMode, diskInventory, sysDisk, dataDisk, raidMembers, raidLevel, rootFs = 'btrfs', dataFs = 'btrfs') {
   switch (layoutMode) {
     case 'raid':
-      return validateRaidSelection(raidMembers, raidLevel);
+      return validateRaidSelection(raidMembers, raidLevel, rootFs, dataFs);
     case 'split':
-      return validateSplitDiskLayout(diskInventory, sysDisk, dataDisk);
+      return validateSplitDiskLayout(diskInventory, sysDisk, dataDisk, rootFs, dataFs);
     case 'single':
     default:
-      return validateSingleDiskLayout(diskInventory, sysDisk);
+      return validateSingleDiskLayout(diskInventory, sysDisk, rootFs, dataFs);
   }
 }
