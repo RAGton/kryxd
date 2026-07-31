@@ -1,21 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { installerApi } from '../utils/installerApi.js';
-
-function sanitizeIp(value) {
-  return String(value || '').split('/')[0].trim();
-}
-
-function isValidIp(raw) {
-  const ip = sanitizeIp(raw);
-  if (!ip) return false;
-  // Ignore loopback, link-local, and sentinel 0.0.0.0
-  if (ip === '0.0.0.0') return false;
-  if (ip.startsWith('127.')) return false;
-  if (ip.startsWith('169.254.')) return false;
-  // Accept any valid IPv4 (private or public)
-  return /^\d{1,3}(\.\d{1,3}){3}$/.test(ip);
-}
+import { sanitizeIp, isUsableRemoteIp } from '../utils/network.js';
 
 export default function RemoteAccess({ wizard, onChange }) {
   const { t } = useTranslation();
@@ -31,7 +17,7 @@ export default function RemoteAccess({ wizard, onChange }) {
       const status = await installerApi.getNetworkStatus();
       const ip = sanitizeIp(status?.ip || '');
 
-      if (ip && isValidIp(ip)) {
+      if (ip && isUsableRemoteIp(ip)) {
         setDetectedIp(ip);
         // Save detected IP to wizard so it's available for other screens
         onChange({ serverIp: ip });

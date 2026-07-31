@@ -29,30 +29,7 @@ import {
 } from './state/wizardState.js';
 
 // Converte máscara IPv4 dotted-decimal em prefix length (/N).
-// Default 24 quando a máscara é inválida — alinhado com o catálogo de
-// opções da página Network ("/24" como primeiro valor).
-function netmaskToPrefix(netmask) {
-  const normalized = (netmask || '').trim();
-  if (!normalized) return 24;
-  const parts = normalized.split('.');
-  if (parts.length !== 4) return 24;
-  let bits = 0;
-  let seenZero = false;
-  for (const part of parts) {
-    const octet = Number(part);
-    if (!Number.isInteger(octet) || octet < 0 || octet > 255) return 24;
-    for (let bit = 7; bit >= 0; bit -= 1) {
-      const current = (octet >> bit) & 1;
-      if (current === 1) {
-        if (seenZero) return 24;
-        bits += 1;
-      } else {
-        seenZero = true;
-      }
-    }
-  }
-  return bits;
-}
+// Single Source of Truth em ui/src/utils/network.js.
 
 const STEPS = [
   { id: 'welcome' },

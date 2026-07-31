@@ -1,5 +1,7 @@
 export const WIZARD_STORAGE_KEY = 'kryonix.installer.wizard.v1';
 
+import { DEFAULT_DNS_CSV } from '../utils/network.js';
+
 export const DRAFT_FIELD_NAMES = [
   'sourceKind',
   'sourceRepoUrl',
@@ -133,7 +135,7 @@ export const INITIAL_INSTALL_PLAN_DRAFT = {
   serverIp: '',
   mgmtNetmask: '255.255.255.0',
   mgmtGateway: '',
-  mgmtDns: '1.1.1.1,8.8.8.8',
+  mgmtDns: DEFAULT_DNS_CSV,
   httpPort: 8080,
   diskMode: 'one',
   diskProfile: 'single',

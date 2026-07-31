@@ -10,6 +10,12 @@ import { PROFILE_CATALOG } from '../data/profileCatalog.js';
 
 import { INSTALL_PLAN_VERSION } from '../generated/installPlanVersion.js';
 import { CAPABILITY_BY_ID } from '../generated/capabilities.js';
+import {
+  netmaskToPrefix,
+  normalizeDnsList,
+  isValidDnsList,
+  isValidIpv4 as sharedIsValidIpv4,
+} from './network.js';
 
 export { INSTALL_PLAN_VERSION };
 
@@ -40,56 +46,15 @@ function parseAuthorizedKeys(value) {
 }
 
 function sanitizeDnsList(value) {
-  return Array.from(
-    new Set(
-      csvToArray(value).filter((item) => ipv4Pattern.test(item)),
-    ),
-  );
+  return normalizeDnsList(value);
 }
 
 function hasOnlyValidDnsItems(value) {
-  const items = csvToArray(value);
-  return items.length > 0 && items.every((item) => ipv4Pattern.test(item));
-}
-
-function netmaskToPrefix(netmask) {
-  const normalized = sanitizeString(netmask);
-  if (!normalized) {
-    return null;
-  }
-
-  const parts = normalized.split('.');
-  if (parts.length !== 4) {
-    return null;
-  }
-
-  let bits = 0;
-  let seenZero = false;
-
-  for (const part of parts) {
-    const octet = Number(part);
-    if (!Number.isInteger(octet) || octet < 0 || octet > 255) {
-      return null;
-    }
-
-    for (let bit = 7; bit >= 0; bit -= 1) {
-      const current = (octet >> bit) & 1;
-      if (current === 1) {
-        if (seenZero) {
-          return null;
-        }
-        bits += 1;
-      } else {
-        seenZero = true;
-      }
-    }
-  }
-
-  return bits;
+  return isValidDnsList(value);
 }
 
 function isValidIpv4(value) {
-  return ipv4Pattern.test(sanitizeString(value));
+  return sharedIsValidIpv4(value);
 }
 
 function isValidHostname(value) {

@@ -2,86 +2,36 @@ import { useTranslation } from "react-i18next";
 import { useCallback, useEffect, useState } from 'react';
 import FieldError from '../components/FieldError.jsx';
 import { installerApi, getInstallerApiErrorMessage } from '../utils/installerApi.js';
-import { 
-  Network as NetworkIcon, 
-  Server, 
-  Globe, 
-  Wifi, 
-  WifiOff, 
-  Radio, 
-  Sliders, 
-  CheckCircle2, 
-  AlertTriangle, 
-  RefreshCw, 
-  Check, 
-  AlertCircle, 
-  Eye, 
-  EyeOff, 
-  Info, 
-  ShieldCheck, 
-  Terminal, 
-  Activity, 
-  ChevronDown, 
-  Settings 
+import {
+  Network as NetworkIcon,
+  Server,
+  Globe,
+  Wifi,
+  WifiOff,
+  Radio,
+  Sliders,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
+  Check,
+  AlertCircle,
+  Eye,
+  EyeOff,
+  Info,
+  ShieldCheck,
+  Terminal,
+  Activity,
+  ChevronDown,
+  Settings
 } from 'lucide-react';
-
-function sanitizeIp(value) {
-  return String(value || '').split('/')[0].trim();
-}
-
-function netmaskToPrefix(netmask) {
-  const parts = netmask.split('.').map(Number);
-  let prefix = 0;
-  for (const part of parts) {
-    let p = part;
-    while (p > 0) {
-      prefix += p & 1;
-      p >>= 1;
-    }
-  }
-  return prefix || 24;
-}
-
-function isUsableRemoteIp(value) {
-  const ip = sanitizeIp(value);
-  if (!ip) return false;
-  if (ip === '0.0.0.0') return false;
-  if (ip.startsWith('127.')) return false;
-  if (ip.startsWith('169.254.')) return false;
-  return /^\d{1,3}(\.\d{1,3}){3}$/.test(ip);
-}
-
-function formatIpv4Input(nextValue, previousValue = '') {
-  const raw = String(nextValue || '');
-  const previous = String(previousValue || '');
-  const isDeleting = raw.length < previous.length;
-  const cleaned = raw.replace(/[^\d.]/g, '');
-
-  const parts = cleaned
-    .split('.')
-    .slice(0, 4)
-    .map((part) => part.replace(/\D/g, '').slice(0, 3));
-
-  let formatted = parts
-    .filter((part, index) => part !== '' || index < parts.length - 1)
-    .join('.');
-
-  if (!isDeleting) {
-    const visibleParts = formatted.split('.');
-    const lastPart = visibleParts[visibleParts.length - 1] || '';
-    const endedWithDot = cleaned.endsWith('.');
-
-    if (endedWithDot && visibleParts.length < 4 && !formatted.endsWith('.')) {
-      formatted += '.';
-    } else if (!cleaned.includes('.') && lastPart.length === 3 && visibleParts.length < 4) {
-      formatted += '.';
-    } else if (cleaned.includes('.') && lastPart.length === 3 && visibleParts.length < 4 && !formatted.endsWith('.')) {
-      formatted += '.';
-    }
-  }
-
-  return formatted;
-}
+import {
+  sanitizeIp,
+  netmaskToPrefix,
+  isUsableRemoteIp,
+  formatIpv4Input,
+  DEFAULT_DNS_LIST,
+  DEFAULT_DNS_CSV,
+} from '../utils/network.js';
 
 function SummaryRow({ label, value, highlight }) {
   return (
@@ -248,7 +198,7 @@ export default function Network({ wizard, onChange, validation }) {
           address: '',
           prefix_length: 24,
           gateway: '',
-          dns: (wizard.mgmtDns || '1.1.1.1,8.8.8.8').split(',').map(d => d.trim()).filter(Boolean),
+          dns: (wizard.mgmtDns || DEFAULT_DNS_CSV).split(',').map(d => d.trim()).filter(Boolean),
         });
 
         if (applyResult?.applied && applyResult?.ip && applyResult.ip !== '0.0.0.0') {
@@ -260,7 +210,7 @@ export default function Network({ wizard, onChange, validation }) {
         const address = wizard.serverIp;
         const prefix = wizard.mgmtNetmask ? netmaskToPrefix(wizard.mgmtNetmask) : 24;
         const gateway = wizard.mgmtGateway;
-        const dns = wizard.mgmtDns || '1.1.1.1,8.8.8.8';
+        const dns = wizard.mgmtDns || DEFAULT_DNS_CSV;
 
         if (!address || !gateway) {
           onChange({ netApplyError: t('network.static_mode_error', { defaultValue: 'Modo estático: informe IP do servidor e gateway antes de aplicar.' }), netApplyBusy: false });

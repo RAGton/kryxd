@@ -1,15 +1,29 @@
 // Funções puras de rede do instalador.
-// Reutilizadas pelo wizard (App.jsx) e por buildInstallPlanPayload.
-// Sem dependência de React/DOM — mantém-se testável via node:test.
+// Single Source of Truth para helpers de IP/máscara/DNS.
+// Reutilizadas pelo wizard (Network.jsx, RemoteAccess.jsx, WizardInstaller.jsx)
+// e por buildInstallPlanPayload (installPlan.js).
+// Sem dependência de React/DOM — testável via node:test.
 
 const IPV4_PATTERN = /^((25[0-5]|2[0-4]\d|[01]?\d?\d)\.){3}(25[0-5]|2[0-4]\d|[01]?\d?\d)$/;
+
+// Lista padrão de servidores DNS. Usada como fallback no wizard e na
+// configuração inicial do plano. Centralizada aqui para evitar divergência
+// entre wizardState e UI.
+export const DEFAULT_DNS_LIST = Object.freeze(['1.1.1.1', '8.8.8.8']);
+export const DEFAULT_DNS_CSV = DEFAULT_DNS_LIST.join(',');
 
 function trim(value) {
   return String(value ?? '').trim();
 }
 
+// Remove sufixo CIDR (/24) e espaços. Útil para normalizar IPs que podem
+// chegar como "192.168.1.1/24" vindos do backend nmcli.
+export function sanitizeIp(value) {
+  return String(value ?? '').split('/')[0].trim();
+}
+
 export function isValidIpv4(value) {
-  return IPV4_PATTERN.test(trim(value));
+  return IPV4_PATTERN.test(sanitizeIp(value));
 }
 
 // Converte máscara dotted (255.255.255.0) em prefixo CIDR (24).
@@ -37,6 +51,55 @@ export function netmaskToPrefix(netmask) {
     }
   }
   return bits;
+}
+
+// IP é "remoto usável" quando:
+//   - É IPv4 válido
+//   - Não é loopback (127.0.0.0/8)
+//   - Não é link-local (169.254.0.0/16)
+//   - Não é "0.0.0.0" (placeholder do NetworkManager)
+export function isUsableRemoteIp(value) {
+  const ip = sanitizeIp(value);
+  if (!ip) return false;
+  if (ip === '0.0.0.0') return false;
+  if (ip.startsWith('127.')) return false;
+  if (ip.startsWith('169.254.')) return false;
+  return IPV4_PATTERN.test(ip);
+}
+
+// Formata um valor digitado como IPv4 parcial: aceita só dígitos e pontos,
+// limita a 4 octetos de até 3 dígitos, insere pontos automaticamente.
+// `previousValue` permite detectar deleção para não inserir pontos extras.
+export function formatIpv4Input(nextValue, previousValue = '') {
+  const raw = String(nextValue ?? '');
+  const previous = String(previousValue ?? '');
+  const isDeleting = raw.length < previous.length;
+  const cleaned = raw.replace(/[^\d.]/g, '');
+
+  const parts = cleaned
+    .split('.')
+    .slice(0, 4)
+    .map((part) => part.replace(/\D/g, '').slice(0, 3));
+
+  let formatted = parts
+    .filter((part, index) => part !== '' || index < parts.length - 1)
+    .join('.');
+
+  if (!isDeleting) {
+    const visibleParts = formatted.split('.');
+    const lastPart = visibleParts[visibleParts.length - 1] || '';
+    const endedWithDot = cleaned.endsWith('.');
+
+    if (endedWithDot && visibleParts.length < 4 && !formatted.endsWith('.')) {
+      formatted += '.';
+    } else if (!cleaned.includes('.') && lastPart.length === 3 && visibleParts.length < 4) {
+      formatted += '.';
+    } else if (cleaned.includes('.') && lastPart.length === 3 && visibleParts.length < 4 && !formatted.endsWith('.')) {
+      formatted += '.';
+    }
+  }
+
+  return formatted;
 }
 
 // Aceita string CSV, array ou null. Retorna array de IPv4 únicos.
