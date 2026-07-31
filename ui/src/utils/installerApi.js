@@ -86,22 +86,24 @@ const realInstallerApi = {
   getTimezones() { return Promise.resolve(['America/Cuiaba', 'America/Sao_Paulo']); },
   getTimezoneLocations() { return Promise.resolve({}); },
   // { interfaces: [{ name, type, state }] } — fonte de verdade = backend (nmcli)
-  getNetworkInterfaces() { return requestJson('/network/interfaces'); },
-  getNetworkStatus() { return requestJson('/network/status'); },
+  // Commit 1e94064+ moved these legacy paths under /api/v1/legacy/.
+  // Updated 2026-07-31 to match the new router layout.
+  getNetworkInterfaces() { return requestJson('/api/v1/legacy/network/interfaces'); },
+  getNetworkStatus() { return requestJson('/api/v1/legacy/network/status'); },
   applyNetwork(params) {
-    return requestJson('/network/apply', {
+    return requestJson('/api/v1/legacy/network/apply', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(params),
     });
   },
   scanWifi(iface) {
-    const path = iface ? `/network/wifi/scan?interface=${encodeURIComponent(iface)}` : '/network/wifi/scan';
+    const path = iface ? `/api/v1/legacy/network/wifi/scan?interface=${encodeURIComponent(iface)}` : '/api/v1/legacy/network/wifi/scan';
     return requestJson(path);
   },
   connectWifi(iface, ssid, password) {
     // SECURITY: senha apenas em memória/trânsito; nunca persistida nem logada
-    return requestJson('/network/wifi/connect', {
+    return requestJson('/api/v1/legacy/network/wifi/connect', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -111,9 +113,17 @@ const realInstallerApi = {
       }),
     });
   },
+  disconnectWifi(iface) {
+    // Adicionado 2026-07-31 — UI agora permite desconectar (antes soh conectava).
+    return requestJson('/api/v1/legacy/network/wifi/disconnect', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ interface: iface }),
+    });
+  },
 
   getHardware() {
-    return requestJson('/hardware');
+    return requestJson('/api/v1/legacy/hardware');
   },
 
   prepareGithubSource(repo, branch = 'main') {
@@ -142,7 +152,12 @@ const realInstallerApi = {
     });
   },
   getDisks() {
-    return requestJson('/api/disks').then(disks => disks.map(d => ({
+    // 2026-07-31: fix de contrato. O route `get_disks` foi nestado dentro de
+    // `legacy_api` no PR de REST v1/v2, então o path canônico virou
+    // `/api/v1/legacy/api/disks` (com o `api/` redundante por causa do prefixo
+    // herdado do `.nest("/legacy", legacy_api)`). O `/api/disks` na raiz retorna
+    // 404 (vai pro fallback da UI SPA).
+    return requestJson('/api/v1/legacy/api/disks').then(disks => disks.map(d => ({
       name: d.name,
       path: d.path || (d.name ? `/dev/${d.name}` : ''),
       model: d.model,

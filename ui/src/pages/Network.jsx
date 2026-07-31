@@ -199,6 +199,16 @@ export default function Network({ wizard, onChange, validation }) {
     }
   }, [selectedWifiIface]);
 
+  // Auto-scan WiFi networks as soon as a WiFi interface is selected.
+  // Fix 2026-07-31: user reported "falta busca automática de rede" — the panel
+  // should populate the network list without requiring a manual click on "Buscar".
+  useEffect(() => {
+    if (selectedWifiIface && wifiIfaces.some((i) => i.name === selectedWifiIface)) {
+      scanWifi();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedWifiIface]);
+
   const connectWifi = useCallback(async () => {
     if (!selectedWifiIface || !wifiSsid) return;
     setConnecting(true);
@@ -795,14 +805,16 @@ export default function Network({ wizard, onChange, validation }) {
             </div>
           )}
 
-          {/* Wi-Fi Setup Inline */}
-          {hasWifi && !wizard.netConnected && !wizard.netOffline && (
+          {/* Wi-Fi Setup Inline — sempre visível quando há iface WiFi.
+              Fix 2026-07-31: removida gate `!wizard.netConnected && !wizard.netOffline`
+              que escondia o painel mesmo com WiFi disponível. */}
+          {hasWifi && (
             <div className="mt-3.5 pt-3.5 border-t border-slate-200/60 dark:border-white/10 space-y-3">
               <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                 <Wifi className="w-3.5 h-3.5 text-accent-blue" />
                 <span>{t('network.wifi_detected', { defaultValue: 'Rede Wi-Fi disponível' })}</span>
               </div>
-              
+
               <div className="space-y-2">
                 <div className="flex gap-2">
                   <select
@@ -853,6 +865,11 @@ export default function Network({ wizard, onChange, validation }) {
                         </button>
                       </div>
                     )}
+                  </div>
+                )}
+                {wifiList.length === 0 && !wifiScanning && selectedWifiIface && (
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                    {t('network.scan_empty', { defaultValue: 'Nenhuma rede encontrada. Clique em "Buscar" para tentar novamente.' })}
                   </div>
                 )}
                 {connectMsg && <div className="text-xs text-accent-blue font-medium mt-1">{connectMsg}</div>}
