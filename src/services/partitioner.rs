@@ -842,7 +842,16 @@ fn btrfs_partition(mountpoint: &str, root_layout: bool, quota: Option<&str>) -> 
     };
     let quota_hook = quota
         .map(|limit| {
+            // KCR-BACKEND-2: explicit error handling.
+            // - `set -euo pipefail` aborts on any unhandled failure (incl. unset
+            //   vars, command errors, and pipe failures).
+            // - `btrfs quota enable` and `btrfs qgroup limit` no longer swallow
+            //   errors via `2>/dev/null || true`. If the kernel/disk does not
+            //   support quotas (or qgroups fail), the hook exits non-zero and
+            //   Disko aborts the install with a visible failure — preserving
+            //   the integrity of the Split topology's isolation guarantees.
             r#"postCreateHook = ''
+  set -euo pipefail
   quota_mount="$(mktemp -d)"
   quota_mounted=0
   cleanup_quota_mount() {
@@ -854,7 +863,7 @@ fn btrfs_partition(mountpoint: &str, root_layout: bool, quota: Option<&str>) -> 
   trap cleanup_quota_mount EXIT
   mount -o subvol=/ "$device" "$quota_mount"
   quota_mounted=1
-  btrfs quota enable "$quota_mount" 2>/dev/null || true
+  btrfs quota enable "$quota_mount"
   btrfs qgroup limit "__QUOTA__" "$quota_mount/@srv-data/home"
 '';"#
                 .replace("__QUOTA__", limit)

@@ -1081,6 +1081,8 @@ mod tests {
                 btrfs: None,
             },
             features: BTreeMap::new(),
+            network: None,
+            node_think: None,
         }
     }
 
