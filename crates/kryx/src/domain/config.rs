@@ -54,13 +54,21 @@ pub struct RepositoryPlan {
 
 /// Configuração do Node Think Server (KCP).
 ///
-/// `host_id` é obrigatório quando `enable` for `true` porque o módulo Nix
-/// `node.thinkServer.hostId` é exigido pelo importador de pools ZFS.
+/// `host_id` é estritamente condicional ao uso de ZFS: o importador Nix
+/// `node.thinkServer.hostId` só é exigido quando algum volume (root ou
+/// data) usa ZFS, pois o identificador evita importações incorretas em
+/// ambientes clusterizados/distribuídos. Para Btrfs, XFS ou Ext4, o campo
+/// é omitido e a diretriz `node.thinkServer.hostId` não é emitida.
+///
+/// Quando `enable` for `true`, a WAN torna-se obrigatória — o installer
+/// recusa o plano se `network.wan` for `None`. Esta invariante é
+/// validada em `validate_node_think_plan`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NodeThinkPlan {
     pub enable: bool,
-    pub host_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_id: Option<String>,
 }
 
 /// Opções obrigatórias quando qualquer volume usa ZFS.
@@ -318,6 +326,16 @@ impl TryFrom<InstallPlanV2Wire> for InstallPlanV2 {
     type Error = String;
 
     fn try_from(value: InstallPlanV2Wire) -> Result<Self, Self::Error> {
+        // Invariante: se Node Think estiver ativo, o storage deve ser
+        // validado antes da rede porque a regra de WAN depende de o
+        // hostId ter sido exigido pelo ZFS (decisão arquitetural do
+        // installer, ver validate_node_think_plan).
+        validate_node_think_plan(
+            value.node_think.as_ref(),
+            &value.storage,
+            value.network.as_ref(),
+        )?;
+
         if let Some(network) = &value.network {
             validate_network_plan(network)?;
         }
@@ -332,6 +350,79 @@ impl TryFrom<InstallPlanV2Wire> for InstallPlanV2 {
             features: value.features,
         })
     }
+}
+
+/// Valida as invariantes do bloco Node Think:
+///
+/// 1. **hostId condicional ao ZFS** — quando Node Think está ativo, o
+///    `hostId` só é exigido se algum volume (root ou data) usa ZFS.
+///    Para Btrfs/XFS/Ext4, o campo é opcional e fica `None`.
+///
+/// 2. **WAN obrigatória** — quando Node Think está ativo, a WAN
+///    (`network.wan`) é obrigatória. A presença é validada aqui;
+///    os campos do `WanNetwork` (mode, pppoe_user, etc.) são
+///    validados separadamente em `validate_network_plan`.
+///
+/// 3. **Edge offline (rede nula) com Node Think** — proibido: a
+///    WAN é parte da definição operacional do Think Server (uplink
+///    de cluster). Planos edge puro devem manter `nodeThink.enable =
+///    false`.
+///
+/// O `is_think_server` legado é ignorado aqui (compatibilidade);
+/// a unificação acontece no tradutor.
+fn validate_node_think_plan(
+    node_think: Option<&NodeThinkPlan>,
+    storage: &StoragePlan,
+    network: Option<&NetworkPlan>,
+) -> Result<(), String> {
+    let Some(think) = node_think else {
+        return Ok(());
+    };
+    if !think.enable {
+        return Ok(());
+    }
+
+    // (1) hostId condicional ao ZFS
+    let uses_zfs = storage
+        .root
+        .as_ref()
+        .is_some_and(|m| m.filesystem == FileSystem::Zfs)
+        || storage
+            .data
+            .as_ref()
+            .is_some_and(|m| m.filesystem == FileSystem::Zfs);
+
+    match (&think.host_id, uses_zfs) {
+        (None, true) => {
+            return Err(
+                "nodeThink.hostId is required when storage uses ZFS".to_string(),
+            );
+        }
+        (Some(id), _) if id.trim().is_empty() => {
+            return Err(
+                "nodeThink.hostId must not be empty when provided".to_string(),
+            );
+        }
+        _ => {}
+    }
+
+    // (2) WAN obrigatória
+    match network {
+        None => {
+            return Err(
+                "nodeThink.enable=true requires network.wan to be present".to_string(),
+            );
+        }
+        Some(net) if net.wan.is_none() => {
+            return Err(
+                "nodeThink.enable=true requires network.wan to be configured"
+                    .to_string(),
+            );
+        }
+        _ => {}
+    }
+
+    Ok(())
 }
 
 /// Pattern IPv4 (mesma forma do frontend `installPlan.js:20` e do AJV schema).
