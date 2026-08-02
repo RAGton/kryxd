@@ -564,6 +564,27 @@ fn validate_storage_contract(plan: &InstallPlanV2) -> Result<(), PartitionerErro
         ));
     }
 
+    // KCR-BACKEND-3: XFS project quotas.
+    // Espelha o invariante Btrfs: storage.xfs é obrigatório iff o volume
+    // de dados usa XFS, e user_prjquota deve ser uma size string válida.
+    let uses_xfs_data = plan
+        .storage
+        .data
+        .as_ref()
+        .is_some_and(|data| data.filesystem == FileSystem::Xfs);
+    if uses_xfs_data {
+        let xfs = plan.storage.xfs.as_ref().ok_or_else(|| {
+            PartitionerError::InvalidPlan(
+                "storage.xfs é obrigatório quando o volume de dados usa XFS".into(),
+            )
+        })?;
+        validate_refquota(&xfs.user_prjquota)?;
+    } else if plan.storage.xfs.is_some() {
+        return Err(PartitionerError::InvalidPlan(
+            "storage.xfs só pode ser definido quando o volume de dados usa XFS".into(),
+        ));
+    }
+
     selected_disk_paths(plan).map(|_| ())
 }
 
@@ -752,7 +773,13 @@ fn render_split(plan: &InstallPlanV2) -> Result<String, PartitionerError> {
                 .map(|btrfs| btrfs.user_qgroup_limit.as_str()),
         ),
         FileSystem::Ext4 => filesystem_partition("ext4", "/srv/data"),
-        FileSystem::Xfs => filesystem_partition("xfs", "/srv/data"),
+        FileSystem::Xfs => xfs_partition(
+            "/srv/data",
+            plan.storage
+                .xfs
+                .as_ref()
+                .map(|xfs| xfs.user_prjquota.as_str()),
+        ),
         FileSystem::Zfs => zfs_partition(),
     };
     let zpool = if data.filesystem == FileSystem::Zfs {
@@ -815,13 +842,81 @@ fn esp_partition() -> String {
 }
 
 fn filesystem_partition(format: &str, mountpoint: &str) -> String {
+    filesystem_partition_with_options(format, mountpoint, None)
+}
+
+/// Renderiza um `content` Disko para um filesystem genérico com opções de
+/// montagem opcionais. Quando `mount_options` contém strings, elas são
+/// emitidas como `mountOptions = [ ... ]` (ex: `["prjquota"]` para XFS).
+fn filesystem_partition_with_options(
+    format: &str,
+    mountpoint: &str,
+    mount_options: Option<&[&str]>,
+) -> String {
+    let mount_options_block = match mount_options {
+        Some(opts) if !opts.is_empty() => {
+            let quoted = opts
+                .iter()
+                .map(|opt| format!("\"{opt}\""))
+                .collect::<Vec<_>>()
+                .join(" ");
+            format!("\n  mountOptions = [ {} ];", quoted)
+        }
+        _ => String::new(),
+    };
     format!(
         r#"content = {{
   type = "filesystem";
   format = "{format}";
-  mountpoint = "{mountpoint}";
-}};"#
+  mountpoint = "{mountpoint}";{mount_options}
+}};"#,
+        mount_options = mount_options_block,
     )
+}
+
+/// Renderiza um volume XFS com `mountOptions = [ "prjquota" ]` e um
+/// `postCreateHook` que atribui um project ID (100) ao subdiretório
+/// persistente de usuários e aplica o hard limit via `xfs_quota`.
+///
+/// Referência XFS project quotas: `man xfs_quota` (8), seção PROJECT QUOTAS.
+/// O `projid` 100 é arbitrário mas estável — escolha do projeto Kryonix.
+/// O `postCreateHook` roda via `pkgs.exec` no Disko, com `set -euo pipefail`
+/// para falhar audivelmente em caso de erro.
+fn xfs_partition(mountpoint: &str, quota: Option<&str>) -> String {
+    let mount_options: Option<&[&str]> = quota.map(|_| &["prjquota"][..]);
+    let quota_hook = quota
+        .map(|limit| {
+            // O hook:
+            // 1. Cria o subdiretório persistente de usuários (se não existir).
+            // 2. Atribui projid=100 ao diretório (`xfs_quota project -s`).
+            // 3. Aplica soft+hard limit = LIMIT ao projid 100.
+            // Falhas abortam o install (set -euo pipefail).
+            r#"postCreateHook = ''
+  set -euo pipefail
+  target_dir="$mountpoint/home"
+  mkdir -p "$target_dir"
+  # Inicializa o projeto no diretório e aplica o limit.
+  xfs_quota -x -c "project -s -p $target_dir 100"
+  xfs_quota -x -c "limit -p bsoft=__QUOTA__ bhard=__QUOTA__ 100"
+'';"#
+                .replace("__QUOTA__", limit)
+        })
+        .unwrap_or_default();
+
+    let mut result = filesystem_partition_with_options("xfs", mountpoint, mount_options).replace(
+        "}};",
+        "};",
+    );
+
+    // Insere o postCreateHook (se houver) antes do fechamento do bloco `content`.
+    if !quota_hook.is_empty() {
+        result = result.replace(
+            "};",
+            &format!("\n  {}\n}};", quota_hook.trim_end_matches('\n')),
+        );
+    }
+
+    result
 }
 
 fn btrfs_partition(mountpoint: &str, root_layout: bool, quota: Option<&str>) -> String {

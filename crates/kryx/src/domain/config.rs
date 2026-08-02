@@ -98,6 +98,21 @@ pub struct BtrfsStoragePlan {
     pub user_qgroup_limit: String,
 }
 
+/// Opções obrigatórias quando o volume de dados usa XFS.
+///
+/// XFS não tem subvolumes nativos como Btrfs/ZFS — quotas são simuladas via
+/// **project quotas** (`prjquota`), que atribuem um ID de projeto numérico
+/// (32 bits) a um diretório. O hook `postCreateHook` em Disko aplica
+/// `xfs_quota -x -c "project -s -p <dir> <projid>"` e em seguida
+/// `xfs_quota -x -c "limit -p bsoft=<limit> bhard=<limit> <projid>"`
+/// para forçar o hard limit no diretório persistente de usuários.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct XfsStoragePlan {
+    /// Limite (soft e hard) aplicado ao diretório persistente de usuários via project quota.
+    pub user_prjquota: String,
+}
+
 /// Modo de configuração da interface de management (LAN/PXE).
 ///
 /// O instalador sempre exige essa interface; DHCP e Static são as únicas
@@ -191,6 +206,10 @@ pub struct StoragePlan {
     pub manual_partitions: Vec<String>,
     pub zfs: Option<ZfsStoragePlan>,
     pub btrfs: Option<BtrfsStoragePlan>,
+    /// Obrigatório quando `data.filesystem == Xfs`. Usado pelo renderer para
+    /// injetar `mountOptions = [ "prjquota" ]` e emitir o `postCreateHook`
+    /// que aplica `xfs_quota` no diretório persistente de usuários.
+    pub xfs: Option<XfsStoragePlan>,
 }
 
 #[derive(Deserialize)]
@@ -205,6 +224,7 @@ struct StoragePlanWire {
     manual_partitions: Vec<String>,
     zfs: Option<ZfsStoragePlan>,
     btrfs: Option<BtrfsStoragePlan>,
+    xfs: Option<XfsStoragePlan>,
 }
 
 impl TryFrom<StoragePlanWire> for StoragePlan {
@@ -223,6 +243,10 @@ impl TryFrom<StoragePlanWire> for StoragePlan {
             .data
             .as_ref()
             .is_some_and(|mount| mount.filesystem == FileSystem::Btrfs);
+        let uses_xfs_data = value
+            .data
+            .as_ref()
+            .is_some_and(|mount| mount.filesystem == FileSystem::Xfs);
 
         match (&value.zfs, uses_zfs) {
             (None, true) => {
@@ -260,6 +284,29 @@ impl TryFrom<StoragePlanWire> for StoragePlan {
             _ => {}
         }
 
+        // XFS project quotas: only valid when the data volume uses XFS.
+        // KCR-BACKEND-3 mirrors the Btrfs/Zfs invariant: storage.xfs must be
+        // present iff `data.filesystem == Xfs`, and the quota string must be
+        // a positive size with a recognized unit suffix.
+        match (&value.xfs, uses_xfs_data) {
+            (None, true) => {
+                return Err(
+                    "storage.xfs is required when the data filesystem uses XFS".to_string(),
+                );
+            }
+            (Some(_), false) => {
+                return Err(
+                    "storage.xfs is only valid when the data filesystem uses XFS".to_string(),
+                );
+            }
+            (Some(xfs), true) if !valid_storage_quota(&xfs.user_prjquota) => {
+                return Err(
+                    "storage.xfs.userPrjquota must use a positive size such as 100G".to_string(),
+                );
+            }
+            _ => {}
+        }
+
         Ok(Self {
             topology: value.topology,
             system_disks: value.system_disks,
@@ -270,6 +317,7 @@ impl TryFrom<StoragePlanWire> for StoragePlan {
             manual_partitions: value.manual_partitions,
             zfs: value.zfs,
             btrfs: value.btrfs,
+            xfs: value.xfs,
         })
     }
 }

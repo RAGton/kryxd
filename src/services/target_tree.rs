@@ -1079,6 +1079,7 @@ mod tests {
                     user_refquota: "100G".into(),
                 }),
                 btrfs: None,
+                xfs: None,
             },
             features: BTreeMap::new(),
             network: None,

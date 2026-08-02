@@ -217,6 +217,7 @@ mod tests {
                     user_refquota: "100G".to_string(),
                 }),
                 btrfs: None,
+                xfs: None,
             },
             features,
         };
@@ -269,6 +270,7 @@ mod tests {
                 manual_partitions: vec![],
                 zfs: None,
                 btrfs: None,
+                xfs: None,
             },
             features: BTreeMap::new(),
         };
@@ -305,6 +307,7 @@ mod tests {
                 manual_partitions: vec![],
                 zfs: None,
                 btrfs: None,
+                xfs: None,
             },
             features: BTreeMap::new(),
         };
@@ -380,6 +383,7 @@ mod tests {
                 manual_partitions: vec![],
                 zfs: None,
                 btrfs: None,
+                xfs: None,
             },
             features: BTreeMap::new(),
         }
