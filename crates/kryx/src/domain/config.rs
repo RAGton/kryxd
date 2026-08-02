@@ -1,6 +1,7 @@
 //! Contrato persistível do plano de instalação Kryonix v2.
 
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -54,15 +55,25 @@ pub struct RepositoryPlan {
 
 /// Configuração do Node Think Server (KCP).
 ///
-/// `host_id` é estritamente condicional ao uso de ZFS: o importador Nix
-/// `node.thinkServer.hostId` só é exigido quando algum volume (root ou
-/// data) usa ZFS, pois o identificador evita importações incorretas em
-/// ambientes clusterizados/distribuídos. Para Btrfs, XFS ou Ext4, o campo
-/// é omitido e a diretriz `node.thinkServer.hostId` não é emitida.
+/// `host_id` é **opcional** no schema e é resolvido pelo backend em
+/// tempo de validação quando o storage usa ZFS. A regra é:
 ///
-/// Quando `enable` for `true`, a WAN torna-se obrigatória — o installer
-/// recusa o plano se `network.wan` for `None`. Esta invariante é
-/// validada em `validate_node_think_plan`.
+/// 1. Se o usuário fornecer um `hostId` (Some), ele é aceito (após
+///    trim e validação de não-vazio).
+/// 2. Se o usuário omitir (None) **e** algum volume for ZFS, o
+///    backend auto-deriva o `hostId` a partir do
+///    `/etc/machine-id` (caminho NixOS padrão): primeiros 8 chars
+///    hex, lowercased. Isso elimina atrito de UX (zero-friction)
+///    e respeita o invariante ZFS — o NixOS já usa o machine-id
+///    como base do `hostId` via `nixos-generate-config`.
+/// 3. Se o `machine-id` não puder ser lido ou for inválido, o
+///    plano é rejeitado com mensagem explícita. O frontend pode
+///    então capturar o erro e oferecer fallback (input manual
+///    ou geração local).
+///
+/// Quando `enable` for `true`, a WAN torna-se obrigatória — o
+/// installer recusa o plano se `network.wan` for `None`. Esta
+/// invariante é validada em `validate_node_think_plan`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NodeThinkPlan {
@@ -330,20 +341,33 @@ impl TryFrom<InstallPlanV2Wire> for InstallPlanV2 {
         // validado antes da rede porque a regra de WAN depende de o
         // hostId ter sido exigido pelo ZFS (decisão arquitetural do
         // installer, ver validate_node_think_plan).
-        validate_node_think_plan(
+        //
+        // Auto-derivação do hostId: quando ausente e ZFS, lê o
+        // `/etc/machine-id` (NixOS padrão) e gera um ID de 8 chars
+        // hex lowercased. Zero-friction pro frontend.
+        let resolved_host_id = validate_node_think_plan(
             value.node_think.as_ref(),
             &value.storage,
             value.network.as_ref(),
+            Some(Path::new("/etc/machine-id")),
         )?;
 
         if let Some(network) = &value.network {
             validate_network_plan(network)?;
         }
 
+        // Aplica o hostId resolvido ao plano final. Se o usuário
+        // forneceu um valor, ele é preservado; se foi auto-derivado,
+        // injeta aqui. Edge offline (sem ZFS) → Some(None).
+        let mut node_think = value.node_think;
+        if let (Some(think), Some(resolved)) = (&mut node_think, resolved_host_id) {
+            think.host_id = Some(resolved);
+        }
+
         Ok(Self {
             version: value.version,
             is_think_server: value.is_think_server,
-            node_think: value.node_think,
+            node_think,
             repository: value.repository,
             network: value.network,
             storage: value.storage,
@@ -354,9 +378,14 @@ impl TryFrom<InstallPlanV2Wire> for InstallPlanV2 {
 
 /// Valida as invariantes do bloco Node Think:
 ///
-/// 1. **hostId condicional ao ZFS** — quando Node Think está ativo, o
-///    `hostId` só é exigido se algum volume (root ou data) usa ZFS.
-///    Para Btrfs/XFS/Ext4, o campo é opcional e fica `None`.
+/// 1. **hostId condicional ao ZFS** — quando Node Think está ativo:
+///    - Se o `hostId` é fornecido (Some), é aceito após trim.
+///    - Se ausente E o storage usa ZFS, é auto-derivado do
+///      `machine_id` (primeiros 8 chars hex, lowercased).
+///    - Se ausente E o storage NÃO usa ZFS, permanece None
+///      (Node Think local sem ZFS, hostId irrelevante).
+///    - Em caso de erro de leitura do `machine_id`, o plano é
+///      rejeitado com mensagem explícita.
 ///
 /// 2. **WAN obrigatória** — quando Node Think está ativo, a WAN
 ///    (`network.wan`) é obrigatória. A presença é validada aqui;
@@ -364,9 +393,14 @@ impl TryFrom<InstallPlanV2Wire> for InstallPlanV2 {
 ///    validados separadamente em `validate_network_plan`.
 ///
 /// 3. **Edge offline (rede nula) com Node Think** — proibido: a
-///    WAN é parte da definição operacional do Think Server (uplink
-///    de cluster). Planos edge puro devem manter `nodeThink.enable =
-///    false`.
+///    WAN é parte da definição operacional do Think Server
+///    (uplink de cluster). Planos edge puro devem manter
+///    `nodeThink.enable = false`.
+///
+/// Retorna o `hostId` resolvido (Some) ou o original (None) para
+/// que o caller possa atualizar o plano. A função NÃO muta
+/// `node_think` em lugar — devolve o valor pra ser aplicado
+/// fora.
 ///
 /// O `is_think_server` legado é ignorado aqui (compatibilidade);
 /// a unificação acontece no tradutor.
@@ -374,15 +408,16 @@ fn validate_node_think_plan(
     node_think: Option<&NodeThinkPlan>,
     storage: &StoragePlan,
     network: Option<&NetworkPlan>,
-) -> Result<(), String> {
+    machine_id_source: Option<&Path>,
+) -> Result<Option<String>, String> {
     let Some(think) = node_think else {
-        return Ok(());
+        return Ok(None);
     };
     if !think.enable {
-        return Ok(());
+        return Ok(None);
     }
 
-    // (1) hostId condicional ao ZFS
+    // (1) hostId condicional ao ZFS — com auto-derivação
     let uses_zfs = storage
         .root
         .as_ref()
@@ -392,15 +427,29 @@ fn validate_node_think_plan(
             .as_ref()
             .is_some_and(|m| m.filesystem == FileSystem::Zfs);
 
-    match (&think.host_id, uses_zfs) {
-        (None, true) => {
-            return Err("nodeThink.hostId is required when storage uses ZFS".to_string());
-        }
+    let resolved_host_id = match (&think.host_id, uses_zfs) {
         (Some(id), _) if id.trim().is_empty() => {
             return Err("nodeThink.hostId must not be empty when provided".to_string());
         }
-        _ => {}
-    }
+        (Some(id), _) => {
+            // User forneceu hostId explicitamente — aceita após trim
+            let trimmed = id.trim().to_string();
+            Some(trimmed)
+        }
+        (None, true) => {
+            // ZFS sem hostId explícito — auto-deriva do machine-id
+            let source = machine_id_source.ok_or_else(|| {
+                "nodeThink.hostId is required when storage uses ZFS and no machine-id source was provided"
+                    .to_string()
+            })?;
+            let derived = derive_host_id_from_machine_id(source)?;
+            Some(derived)
+        }
+        (None, false) => {
+            // Node Think sem ZFS — hostId irrelevante
+            None
+        }
+    };
 
     // (2) WAN obrigatória
     match network {
@@ -413,7 +462,49 @@ fn validate_node_think_plan(
         _ => {}
     }
 
-    Ok(())
+    Ok(resolved_host_id)
+}
+
+/// Lê o `machine-id` do caminho NixOS padrão e deriva um `hostId`
+/// de 8 chars hex (32-bit), lowercased.
+///
+/// Regras:
+/// - O arquivo deve existir e ser legível.
+/// - O conteúdo deve ter pelo menos 32 chars (formato padrão
+///   UUID de 32 hex sem hífens, mas aceita com hífens).
+/// - Pega os primeiros 8 chars hex **válidos** (A-F, 0-9).
+/// - O resultado não pode ser "00000000" (NixOS rejeita
+///   `hostId=0` que é o mesmo que não-set).
+fn derive_host_id_from_machine_id(path: &Path) -> Result<String, String> {
+    let raw = std::fs::read_to_string(path)
+        .map_err(|e| format!("failed to read machine-id from {}: {}", path.display(), e))?;
+    let trimmed = raw.trim();
+
+    // Filtra só os primeiros 8 chars hex válidos
+    let hex_chars: String = trimmed
+        .chars()
+        .filter(|c| c.is_ascii_hexdigit())
+        .take(8)
+        .collect();
+
+    if hex_chars.len() < 8 {
+        return Err(format!(
+            "machine-id at {} has only {} hex chars (need 8)",
+            path.display(),
+            hex_chars.len()
+        ));
+    }
+
+    // Lowercase e check de zeros
+    let lower = hex_chars.to_lowercase();
+    if lower.chars().all(|c| c == '0') {
+        return Err(format!(
+            "machine-id at {} is all zeros (hostId=0 is invalid)",
+            path.display()
+        ));
+    }
+
+    Ok(lower)
 }
 
 /// Pattern IPv4 (mesma forma do frontend `installPlan.js:20` e do AJV schema).
@@ -906,8 +997,11 @@ mod tests {
     }
 
     #[test]
-    fn node_think_zfs_without_host_id_is_rejected() {
-        // Cenário 3 da Frente 1: Node Think + ZFS sem hostId -> rejeitado.
+    fn node_think_zfs_auto_generates_host_id_from_machine_id() {
+        // Cenário 3 da Frente 1 (atualizado): Node Think + ZFS sem hostId
+        // agora é ACEITO e o backend auto-deriva do /etc/machine-id.
+        // O host real (Inspiron) tem machine-id começando com
+        // "b8d7c377" (visível em kryonixos/hosts/inspiron/default.nix).
         let mut value = plan_with_node_think_and_storage(
             serde_json::json!({ "enable": true }),
             storage_zfs_single_json(),
@@ -916,13 +1010,106 @@ mod tests {
             .as_object_mut()
             .unwrap()
             .insert("network".to_string(), network_with_dhcp_wan());
-        let err = serde_json::from_value::<InstallPlanV2>(value)
-            .unwrap_err()
-            .to_string();
+        let plan: InstallPlanV2 = serde_json::from_value(value).unwrap();
+
+        let think = plan.node_think.expect("node_think must be present");
+        let auto_id = think
+            .host_id
+            .as_ref()
+            .expect("hostId must be auto-generated from machine-id");
+        assert_eq!(auto_id.len(), 8, "auto-derived hostId must be 8 hex chars");
         assert!(
-            err.contains("nodeThink.hostId is required when storage uses ZFS"),
-            "unexpected error: {err}"
+            auto_id.chars().all(|c| c.is_ascii_hexdigit()),
+            "auto-derived hostId must be hex: {auto_id}"
         );
+        assert_ne!(auto_id, "00000000", "hostId=0 is invalid");
+    }
+
+    #[test]
+    fn node_think_with_explicit_host_id_preserves_user_value() {
+        // Quando o usuário fornece hostId explicitamente, é preservado
+        // mesmo que o machine-id esteja disponível. Garante que o
+        // auto-derive não sobrescreve a intenção do user.
+        let mut value = plan_with_node_think_and_storage(
+            serde_json::json!({ "enable": true, "hostId": "deadbeef" }),
+            storage_zfs_single_json(),
+        );
+        value
+            .as_object_mut()
+            .unwrap()
+            .insert("network".to_string(), network_with_dhcp_wan());
+        let plan: InstallPlanV2 = serde_json::from_value(value).unwrap();
+        assert_eq!(
+            plan.node_think.as_ref().unwrap().host_id.as_deref(),
+            Some("deadbeef")
+        );
+    }
+
+    #[test]
+    fn node_think_btrfs_without_host_id_remains_none() {
+        // Btrfs (sem ZFS) + Node Think + sem hostId: continua sendo None.
+        // Auto-derive SÓ acontece para ZFS. Btrfs/XFS/Ext4 não precisam
+        // de hostId (ZFS é o único FS que precisa de net-host-id).
+        let mut value = plan_with_node_think_and_storage(
+            serde_json::json!({ "enable": true }),
+            storage_btrfs_single_json(),
+        );
+        value
+            .as_object_mut()
+            .unwrap()
+            .insert("network".to_string(), network_with_dhcp_wan());
+        let plan: InstallPlanV2 = serde_json::from_value(value).unwrap();
+        assert!(plan.node_think.as_ref().unwrap().host_id.is_none());
+    }
+
+    #[test]
+    fn node_think_xfs_without_host_id_remains_none() {
+        // XFS (sem ZFS) + Node Think + sem hostId: também None.
+        // Confirma que a regra é genérica (FS != ZFS → hostId null).
+        let mut value = plan_with_node_think_and_storage(
+            serde_json::json!({ "enable": true }),
+            storage_xfs_single_json(),
+        );
+        value
+            .as_object_mut()
+            .unwrap()
+            .insert("network".to_string(), network_with_dhcp_wan());
+        let plan: InstallPlanV2 = serde_json::from_value(value).unwrap();
+        assert!(plan.node_think.as_ref().unwrap().host_id.is_none());
+    }
+
+    #[test]
+    fn derive_host_id_filters_and_lowercases_machine_id() {
+        // Helper interno para testar a derivação pura.
+        // machine-id pode vir com hífens (formato UUID) ou não; o
+        // derivador deve pegar os primeiros 8 hex válidos e
+        // lowercased.
+        let dir = std::env::temp_dir().join(format!("kryx-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("machine-id");
+
+        // Caso 1: UUID com hífens (formato padrão systemd)
+        std::fs::write(&path, "B8D7C377-C219-4646-BF0F-DE3044C6BD32\n").unwrap();
+        let id = derive_host_id_from_machine_id(&path).unwrap();
+        assert_eq!(id, "b8d7c377");
+
+        // Caso 2: hex puro sem hífens
+        std::fs::write(&path, "abcdef1234567890ABCDEF\n").unwrap();
+        let id = derive_host_id_from_machine_id(&path).unwrap();
+        assert_eq!(id, "abcdef12");
+
+        // Caso 3: all zeros é rejeitado
+        std::fs::write(&path, "00000000000000000000000000000000\n").unwrap();
+        let err = derive_host_id_from_machine_id(&path).unwrap_err();
+        assert!(err.contains("all zeros"), "unexpected error: {err}");
+
+        // Caso 4: muito curto é rejeitado
+        std::fs::write(&path, "abc\n").unwrap();
+        let err = derive_host_id_from_machine_id(&path).unwrap_err();
+        assert!(err.contains("has only 3 hex chars"), "unexpected: {err}");
+
+        // Limpa
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
