@@ -10,16 +10,36 @@ pub fn generate_nix_config(plan: &InstallPlanV2) -> Result<String, String> {
 
     // 2. Node Think Server (KCP)
     //
-    // A flag legada `plan.is_think_server` foi aposentada pelo tradutor.
-    // Toda a ativação agora vem de `plan.node_think`, que carrega o `hostId`
-    // obrigatório exigido por `node.thinkServer.hostId` no módulo Nix.
-    if let Some(think_plan) = &plan.node_think {
-        if think_plan.enable {
-            config.push_str("  node.thinkServer.enable = true;\n");
-            config.push_str(&format!(
-                "  node.thinkServer.hostId = \"{}\";\n",
-                think_plan.host_id
-            ));
+    // O bloco canônico é `plan.node_think`. A flag legada
+    // `plan.is_think_server` (boolean simples, aposentada) é mantida
+    // por compatibilidade com payloads V2 antigos: quando `true`, é
+    // tratada como `node_think.enable = true` com `hostId` ausente
+    // (uso sem ZFS, edge Think legado).
+    //
+    // A diretriz Nix `node.thinkServer.hostId` só é emitida quando o
+    // `hostId` está presente e não-vazio — o tradutor NÃO infere nem
+    // inventa o identificador. Quando ausente, o módulo Nix fica
+    // responsável por gerar o próprio (ou recusar, se ZFS exigir).
+    //
+    // Quando `enable` for `true`, a WAN já foi validada como
+    // obrigatória pelo validador de contrato
+    // (validate_node_think_plan). Aqui só emitimos as diretivas.
+    let think_enabled = plan
+        .node_think
+        .as_ref()
+        .is_some_and(|t| t.enable)
+        || plan.is_think_server;
+    if think_enabled {
+        config.push_str("  node.thinkServer.enable = true;\n");
+        let host_id = plan.node_think.as_ref().and_then(|t| t.host_id.as_ref());
+        if let Some(id) = host_id {
+            let trimmed = id.trim();
+            if !trimmed.is_empty() {
+                config.push_str(&format!(
+                    "  node.thinkServer.hostId = \"{}\";\n",
+                    trimmed
+                ));
+            }
         }
     }
 
@@ -232,7 +252,7 @@ mod tests {
             is_think_server: false,
             node_think: Some(crate::domain::config::NodeThinkPlan {
                 enable: true,
-                host_id: "8425e349".to_string(),
+                host_id: Some("8425e349".to_string()),
             }),
             repository: RepositoryPlan {
                 core_url: "url".to_string(),
@@ -284,7 +304,7 @@ mod tests {
             is_think_server: false,
             node_think: Some(crate::domain::config::NodeThinkPlan {
                 enable: false,
-                host_id: "deadbeef".to_string(),
+                host_id: Some("deadbeef".to_string()),
             }),
             repository: RepositoryPlan {
                 core_url: "url".to_string(),
