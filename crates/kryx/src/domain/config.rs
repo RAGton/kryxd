@@ -422,30 +422,32 @@ impl TryFrom<InstallPlanV2Wire> for InstallPlanV2 {
                 .as_ref()
                 .is_some_and(|m| m.filesystem == FileSystem::Zfs);
 
+        // KCR-TEST-1: tornar o round-trip idempotente.
+        // ANTES (bug): auto-derivava hostId sempre que `node_think == None`,
+        // o que CRIAVA um NodeThinkPlan onde antes nao havia, quebrando a
+        // invariante "save_plan + load_plan == plan original". O teste
+        // `persists_deterministic_plan_with_private_modes` falhava com
+        // `node_think: None` no original vs `node_think: Some(...)` no
+        // reloaded.
+        //
+        // DEPOIS: so auto-derivamos quando o usuario EXPLICITAMENTE declarou
+        // `node_think: Some(NodeThinkPlan { host_id: None })`. Caso o campo
+        // esteja ausente ou seja `null`, preservamos o estado original
+        // (round-trip idempotente).
         if uses_zfs {
-            // Verifica se já temos hostId (fornecido ou derivado
-            // por outro path)
-            let have_id = node_think
-                .as_ref()
-                .and_then(|t| t.host_id.as_ref())
-                .map(|s| !s.trim().is_empty())
-                .unwrap_or(false);
+            let already_deriving = matches!(
+                node_think.as_ref(),
+                Some(think) if think.host_id.as_ref().map(|s| s.trim().is_empty()).unwrap_or(true)
+            );
 
-            if !have_id {
+            if already_deriving {
                 let derived = derive_host_id_from_machine_id(Path::new("/etc/machine-id"))?;
                 match node_think.as_mut() {
                     Some(think) => think.host_id = Some(derived),
-                    None => {
-                        // Cria um NodeThinkPlan com enable=false
-                        // só pra carregar o hostId. O tradutor
-                        // emite `node.thinkServer.hostId = "..."`
-                        // quando o campo está presente, mesmo com
-                        // enable=false (ver translator.rs).
-                        node_think = Some(NodeThinkPlan {
-                            enable: false,
-                            host_id: Some(derived),
-                        });
-                    }
+                    // Preserva idempotencia: NAO cria NodeThinkPlan quando
+                    // o usuario NAO declarou o bloco. O call-site pode
+                    // derivar depois se precisar.
+                    None => {}
                 }
             }
         }

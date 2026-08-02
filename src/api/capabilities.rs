@@ -101,7 +101,9 @@ mod tests {
         let second = get_capabilities().await.unwrap().0;
         assert_eq!(first.schema_version, 1);
         assert_eq!(first.registry_digest, second.registry_digest);
-        assert_eq!(first.capabilities.len(), 43);
+        // KCR-TEST-1: registry tem 50 capabilities (atualizado em 2026-08-02,
+        // antes era 43 — drift documentado por audit 2026-07-27 §9).
+        assert_eq!(first.capabilities.len(), 50);
         assert!(first.capabilities.iter().any(|capability| {
             capability.id == "storage.topology.raid"
                 && capability.status == kryx::domain::CapabilityStatus::Unsupported
