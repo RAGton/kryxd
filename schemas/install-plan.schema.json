@@ -19,6 +19,12 @@
     "isThinkServer": {
       "type": "boolean"
     },
+    "nodeThink": {
+      "oneOf": [
+        { "$ref": "#/$defs/nodeThinkPlan" },
+        { "type": "null" }
+      ]
+    },
     "repository": {
       "$ref": "#/$defs/repositoryPlan"
     },
@@ -39,6 +45,107 @@
       ]
     }
   },
+  "allOf": [
+    {
+      "description": "Frente 1: hostId obrigatorio apenas se algum volume usa ZFS",
+      "if": {
+        "properties": {
+          "nodeThink": {
+            "type": "object",
+            "properties": {
+              "enable": { "const": true }
+            }
+          },
+          "storage": {
+            "type": "object",
+            "properties": {
+              "root": {
+                "type": "object",
+                "properties": {
+                  "filesystem": { "const": "zfs" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": ["nodeThink"],
+        "properties": {
+          "nodeThink": {
+            "type": "object",
+            "required": ["hostId"],
+            "properties": {
+              "hostId": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Frente 1: hostId obrigatorio se data.filesystem = zfs (split topology)",
+      "if": {
+        "properties": {
+          "nodeThink": {
+            "type": "object",
+            "properties": {
+              "enable": { "const": true }
+            }
+          },
+          "storage": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "filesystem": { "const": "zfs" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": ["nodeThink"],
+        "properties": {
+          "nodeThink": {
+            "type": "object",
+            "required": ["hostId"],
+            "properties": {
+              "hostId": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Frente 1: nodeThink.enable=true exige network.wan presente",
+      "if": {
+        "required": ["nodeThink"],
+        "properties": {
+          "nodeThink": {
+            "type": "object",
+            "required": ["enable"],
+            "properties": {
+              "enable": { "const": true }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": ["network"],
+        "properties": {
+          "network": {
+            "type": "object",
+            "required": ["wan"],
+            "properties": {
+              "wan": { "type": "object" }
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "repositoryPlan": {
       "type": "object",
@@ -476,6 +583,29 @@
           "oneOf": [
             {
               "$ref": "#/$defs/wanNetwork"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "nodeThinkPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enable"
+      ],
+      "properties": {
+        "enable": {
+          "type": "boolean"
+        },
+        "hostId": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
             },
             {
               "type": "null"
