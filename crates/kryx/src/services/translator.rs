@@ -1,4 +1,7 @@
-use crate::domain::config::{InstallPlanV2, NetworkMode, Topology, WanNetworkMode};
+use crate::domain::config::{InstallPlanV2, NetworkMode, WanNetworkMode};
+
+#[cfg(test)]
+use crate::domain::config::Topology;
 
 /// Gera a configuração Nix declarativa baseada no plano de instalação.
 pub fn generate_nix_config(plan: &InstallPlanV2) -> Result<String, String> {
@@ -36,73 +39,15 @@ pub fn generate_nix_config(plan: &InstallPlanV2) -> Result<String, String> {
         }
     }
 
-    // 3. Storage Topology
-    let topology_str = match plan.storage.topology {
-        Topology::Single => "single",
-        Topology::Split => "split",
-        Topology::Raid => "raid",
-        Topology::Manual => "manual",
-    };
-    config.push_str(&format!(
-        "  kryonix.storage.topology = \"{}\";\n",
-        topology_str
-    ));
-
-    // System Disks
-    if !plan.storage.system_disks.is_empty() {
-        let disks = plan
-            .storage
-            .system_disks
-            .iter()
-            .map(|d| format!("\"{}\"", d))
-            .collect::<Vec<_>>()
-            .join(" ");
-        config.push_str(&format!("  kryonix.storage.systemDisks = [ {} ];\n", disks));
-    }
-
-    // Data Disks
-    if !plan.storage.data_disks.is_empty() {
-        let disks = plan
-            .storage
-            .data_disks
-            .iter()
-            .map(|d| format!("\"{}\"", d))
-            .collect::<Vec<_>>()
-            .join(" ");
-        config.push_str(&format!("  kryonix.storage.dataDisks = [ {} ];\n", disks));
-    }
-
-    // Filesystems
-    if let Some(root) = &plan.storage.root {
-        let fs_str = format!("{:?}", root.filesystem).to_lowercase();
-        config.push_str(&format!(
-            "  kryonix.storage.root.filesystem = \"{}\";\n",
-            fs_str
-        ));
-    }
-
-    if let Some(data) = &plan.storage.data {
-        let fs_str = format!("{:?}", data.filesystem).to_lowercase();
-        config.push_str(&format!(
-            "  kryonix.storage.data.filesystem = \"{}\";\n",
-            fs_str
-        ));
-    }
-
-    // Quotas (ZFS / BTRFS)
-    if let Some(zfs) = &plan.storage.zfs {
-        config.push_str(&format!(
-            "  kryonix.storage.zfs.userRefquota = \"{}\";\n",
-            zfs.user_refquota
-        ));
-    }
-
-    if let Some(btrfs) = &plan.storage.btrfs {
-        config.push_str(&format!(
-            "  kryonix.storage.btrfs.userQgroupLimit = \"{}\";\n",
-            btrfs.user_qgroup_limit
-        ));
-    }
+    // 3. Storage — declaracao removida (D-2 da auditoria de
+    //    storage de 2026-08-02): o motor NixOS
+    //    (repos/kryonix/modules/nixos/features/storage.nix) nao
+    //    consome as opcoes `kryonix.storage.{topology, systemDisks,
+    //    dataDisks, root.filesystem, data.filesystem, zfs.*, btrfs.*}`,
+    //    entao a emissao era codigo morto. O particionamento real
+    //    e a geracao do `disko-config.nix` sao feitos por
+    //    `kryxd/src/services/partitioner.rs`, que le o mesmo
+    //    `StoragePlan` mas tem o proprio renderer canonico.
 
     // 4. Features
     for (category, feature_map) in &plan.features {
@@ -281,12 +226,17 @@ mod tests {
         assert!(result.contains("node.thinkServer.enable = true;"));
         assert!(result.contains("node.thinkServer.hostId = \"8425e349\";"));
         assert!(!result.contains("kryonix.thinkServer"));
-        assert!(result.contains("kryonix.storage.topology = \"split\";"));
-        assert!(result.contains("kryonix.storage.systemDisks = [ \"/dev/sda\" ];"));
-        assert!(result.contains("kryonix.storage.dataDisks = [ \"/dev/sdb\" ];"));
-        assert!(result.contains("kryonix.storage.root.filesystem = \"ext4\";"));
-        assert!(result.contains("kryonix.storage.data.filesystem = \"zfs\";"));
-        assert!(result.contains("kryonix.storage.zfs.userRefquota = \"100G\";"));
+        // D-2 (auditoria 2026-08-02): o motor NixOS nao consome
+        // kryonix.storage.*. Verificacao negativa — garantir que o
+        // tradutor NAO emite essas diretivas (codigo morto
+        // removido).
+        assert!(!result.contains("kryonix.storage.topology"));
+        assert!(!result.contains("kryonix.storage.systemDisks"));
+        assert!(!result.contains("kryonix.storage.dataDisks"));
+        assert!(!result.contains("kryonix.storage.root.filesystem"));
+        assert!(!result.contains("kryonix.storage.data.filesystem"));
+        assert!(!result.contains("kryonix.storage.zfs.userRefquota"));
+        assert!(!result.contains("kryonix.storage.btrfs.userQgroupLimit"));
         assert!(result.contains("kryonix.features.server.containers = true;"));
     }
 
@@ -499,7 +449,7 @@ mod tests {
         assert!(!result.contains("defaultGateway"));
 
         // Demais blocos continuam emitindo normalmente (sanity)
-        assert!(result.contains("kryonix.storage.topology"));
+        assert!(!result.contains("kryonix.storage.topology"));
         assert!(!result.contains("node.thinkServer"));
     }
 }
