@@ -173,29 +173,32 @@ function formatAjvErrors(errors) {
 export function buildInstallPlanPayload(draftInput) {
   const draft = createInstallPlanDraft(draftInput);
   const storageMode = sanitizeString(draft.storageMode) || 'automatic';
-  const diskProfile = storageMode === 'automatic' ? (sanitizeString(draft.diskProfile) || 'single') : storageMode;
-  const requestedDiskMode = sanitizeString(draft.diskMode) === 'two' ? 'two' : 'one';
   const sysDisk = sanitizeString(draft.sysDisk);
   const dataDiskCandidate = sanitizeString(draft.dataDisk);
   const isThinkServer = Boolean(draft.isThinkServer);
-  
+
   // Para RAID, os discos vêm do raidPlan se disponível
   const raidMembers = storageMode === 'raid' && draft.raidPlan?.devices ? draft.raidPlan.devices : uniqueStrings(draft.selectedDisks);
-  
+
   // Para LVM, os discos vêm do lvmPlan
   const lvmMembers = storageMode === 'lvm' && draft.lvmPlan?.physicalVolumes ? draft.lvmPlan.physicalVolumes : [];
 
-  const diskMode = (diskProfile === 'raid' || diskProfile === 'manual' || diskProfile === 'lvm') ? 'one' : requestedDiskMode;
-
-  const selectedDisks = diskProfile === 'raid'
+  // KCR UI-1: detectar topologia dinamicamente a partir do array de discos.
+  // storageMode override vence a detecção automatica (raid/manual/lvm).
+  // Regra: se selectedDisks tem 2 paths diferentes E dataDisk existe E difere
+  // de sysDisk → split; caso contrario → single.
+  // (KCR: isThinkServer NAO decide topologia — topologia é puramente derivada
+  // dos discos selecionados, independente do perfil/feature do sistema.)
+  const selectedDisks = storageMode === 'raid'
     ? uniqueStrings(raidMembers.length > 0 ? raidMembers : [sysDisk])
-    : diskProfile === 'manual'
+    : storageMode === 'manual'
       ? uniqueStrings([sysDisk, ...(draft.manualPartitions || []).map(p => p.device)].filter(Boolean))
-      : diskProfile === 'lvm'
+      : storageMode === 'lvm'
         ? uniqueStrings(lvmMembers.length > 0 ? lvmMembers : [sysDisk])
-        : uniqueStrings([sysDisk, ...(diskMode === 'two' ? [dataDiskCandidate] : [])].filter(Boolean));
+        : uniqueStrings([sysDisk, dataDiskCandidate].filter(Boolean));
 
-  const dataDisk = diskProfile === 'single' && diskMode === 'two' ? dataDiskCandidate || undefined : undefined;
+  const hasSeparateDataDisk = dataDiskCandidate && dataDiskCandidate !== sysDisk;
+  const topologyBySelection = selectedDisks.length >= 2 && hasSeparateDataDisk ? 'split' : 'single';
   const mgmtPrefix = netmaskToPrefix(draft.mgmtNetmask) ?? 0;
   const wanPrefix = netmaskToPrefix(draft.wanNetmask);
   const wanInterface = sanitizeString(draft.wanInterface);
@@ -261,8 +264,15 @@ export function buildInstallPlanPayload(draftInput) {
     .filter(f => f?.status === 'partial')
     .map(f => f.id);
 
-  const topology = isThinkServer ? 'single' : (diskMode === 'two' ? 'split' : 'single');
-  const unsupportedStorage = diskProfile === 'raid' || diskProfile === 'manual' || storageMode === 'lvm';
+  // KCR UI-1: topologia é puramente derivada do array de discos selecionados.
+  // storageMode='raid' vence a detecção automatica; caso contrario,
+  // topologyBySelection (split se sysDisk != dataDisk e 2+ discos).
+  // isThinkServer NAO decide topologia — topologia é independente da feature
+  // do sistema e vale para Desktop, Think Server, Node, etc.
+  const topology = storageMode === 'raid'
+    ? 'raid'
+    : topologyBySelection;
+  const unsupportedStorage = storageMode === 'raid' || storageMode === 'manual' || storageMode === 'lvm';
   if (unsupportedStorage) {
     throw new Error('A topologia RAID, manual ou LVM ainda é unsupported no InstallPlanV2.');
   }
@@ -272,11 +282,14 @@ export function buildInstallPlanPayload(draftInput) {
   if (selectedDisks.length === 0 || !sysDisk) {
     throw new Error('O InstallPlanV2 exige pelo menos um disco de sistema.');
   }
-  if (topology === 'split' && !dataDisk) {
-    throw new Error('O layout split exige um disco de dados.');
+  if (topology === 'split' && !hasSeparateDataDisk) {
+    throw new Error('O layout split exige um disco de dados distinto do sistema.');
   }
 
-  const rootFilesystem = isThinkServer ? 'zfs' : (sanitizeString(draft.rootFs) || 'btrfs');
+  // KCR UI-1: filesystem raiz e data são ortogonais ao perfil do sistema
+  // (Desktop / Think Server / Node). isThinkServer NAO força ZFS no root —
+  // a escolha de filesystem é puramente do usuario, independente do perfil.
+  const rootFilesystem = sanitizeString(draft.rootFs) || 'btrfs';
   const dataFilesystem = sanitizeString(draft.dataFs) || 'btrfs';
   const supportedFilesystems = new Set(['btrfs', 'zfs', 'ext4', 'xfs']);
   if (!supportedFilesystems.has(rootFilesystem) || !supportedFilesystems.has(dataFilesystem)) {
@@ -318,7 +331,7 @@ export function buildInstallPlanPayload(draftInput) {
   const storage = {
     topology,
     systemDisks: [sysDisk],
-    dataDisks: topology === 'split' ? [dataDisk] : [],
+    dataDisks: topology === 'split' ? [dataDiskCandidate] : [],
     root,
     data,
     raidLevel: null,
