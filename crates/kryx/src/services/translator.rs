@@ -24,21 +24,14 @@ pub fn generate_nix_config(plan: &InstallPlanV2) -> Result<String, String> {
     // Quando `enable` for `true`, a WAN já foi validada como
     // obrigatória pelo validador de contrato
     // (validate_node_think_plan). Aqui só emitimos as diretivas.
-    let think_enabled = plan
-        .node_think
-        .as_ref()
-        .is_some_and(|t| t.enable)
-        || plan.is_think_server;
+    let think_enabled = plan.node_think.as_ref().is_some_and(|t| t.enable) || plan.is_think_server;
     if think_enabled {
         config.push_str("  node.thinkServer.enable = true;\n");
         let host_id = plan.node_think.as_ref().and_then(|t| t.host_id.as_ref());
         if let Some(id) = host_id {
             let trimmed = id.trim();
             if !trimmed.is_empty() {
-                config.push_str(&format!(
-                    "  node.thinkServer.hostId = \"{}\";\n",
-                    trimmed
-                ));
+                config.push_str(&format!("  node.thinkServer.hostId = \"{}\";\n", trimmed));
             }
         }
     }

@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use once_cell::sync::Lazy;
 use regex::Regex;
-use serde::{Deserialize, Deserializer, Serialize, de};
+use serde::{de, Deserialize, Deserializer, Serialize};
 
 /// Topologia física solicitada para o armazenamento.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -394,14 +394,10 @@ fn validate_node_think_plan(
 
     match (&think.host_id, uses_zfs) {
         (None, true) => {
-            return Err(
-                "nodeThink.hostId is required when storage uses ZFS".to_string(),
-            );
+            return Err("nodeThink.hostId is required when storage uses ZFS".to_string());
         }
         (Some(id), _) if id.trim().is_empty() => {
-            return Err(
-                "nodeThink.hostId must not be empty when provided".to_string(),
-            );
+            return Err("nodeThink.hostId must not be empty when provided".to_string());
         }
         _ => {}
     }
@@ -409,15 +405,10 @@ fn validate_node_think_plan(
     // (2) WAN obrigatória
     match network {
         None => {
-            return Err(
-                "nodeThink.enable=true requires network.wan to be present".to_string(),
-            );
+            return Err("nodeThink.enable=true requires network.wan to be present".to_string());
         }
         Some(net) if net.wan.is_none() => {
-            return Err(
-                "nodeThink.enable=true requires network.wan to be configured"
-                    .to_string(),
-            );
+            return Err("nodeThink.enable=true requires network.wan to be configured".to_string());
         }
         _ => {}
     }
@@ -908,7 +899,10 @@ mod tests {
         let plan: InstallPlanV2 = serde_json::from_value(value).unwrap();
 
         assert!(plan.node_think.as_ref().unwrap().host_id.is_none());
-        assert_eq!(plan.storage.root.as_ref().unwrap().filesystem, FileSystem::Xfs);
+        assert_eq!(
+            plan.storage.root.as_ref().unwrap().filesystem,
+            FileSystem::Xfs
+        );
     }
 
     #[test]
