@@ -798,4 +798,185 @@ mod tests {
             "unexpected error: {err}"
         );
     }
+
+    // ── Frente 1: nodeThink+WAN mandatory + ZFS conditional hostId ──────────
+
+    /// Helper: monta um plano com `node_think` e `storage` customizados
+    /// a partir do fixture base. Preserva `repository`/`features`.
+    fn plan_with_node_think_and_storage(
+        node_think: serde_json::Value,
+        storage: serde_json::Value,
+    ) -> serde_json::Value {
+        let mut value = valid_plan_json();
+        let obj = value.as_object_mut().unwrap();
+        obj.remove("storage");
+        obj.insert("nodeThink".to_string(), node_think);
+        obj.insert("storage".to_string(), storage);
+        value
+    }
+
+    /// Helper: storage ZFS com quota e root em zfs.
+    fn storage_zfs_single_json() -> serde_json::Value {
+        serde_json::json!({
+            "topology": "single",
+            "systemDisks": ["/dev/nvme0n1"],
+            "dataDisks": [],
+            "root": { "filesystem": "zfs", "encryption": "none" },
+            "data": null,
+            "raidLevel": null,
+            "manualPartitions": [],
+            "zfs": { "userRefquota": "100G" }
+        })
+    }
+
+    /// Helper: storage Btrfs split com qgroup e data em btrfs.
+    /// NOTA: o validador exige `btrfs` block apenas quando `data.filesystem
+    /// == btrfs` (topologia split). Usar `root=btrfs` causaria rejeicao
+    /// do bloco btrfs, entao o helper usa split com root ext4 e data btrfs.
+    fn storage_btrfs_single_json() -> serde_json::Value {
+        serde_json::json!({
+            "topology": "split",
+            "systemDisks": ["/dev/nvme0n1"],
+            "dataDisks": ["/dev/nvme1n1"],
+            "root": { "filesystem": "ext4", "encryption": "none" },
+            "data": { "filesystem": "btrfs", "encryption": "none" },
+            "raidLevel": null,
+            "manualPartitions": [],
+            "btrfs": { "userQgroupLimit": "100G" }
+        })
+    }
+
+    /// Helper: storage XFS (sem bloco ZFS/Btrfs).
+    fn storage_xfs_single_json() -> serde_json::Value {
+        serde_json::json!({
+            "topology": "single",
+            "systemDisks": ["/dev/nvme0n1"],
+            "dataDisks": [],
+            "root": { "filesystem": "xfs", "encryption": "none" },
+            "data": null,
+            "raidLevel": null,
+            "manualPartitions": []
+        })
+    }
+
+    /// Helper: network com management + wan DHCP.
+    fn network_with_dhcp_wan() -> serde_json::Value {
+        serde_json::json!({
+            "management": network_management_dhcp_json(),
+            "wan": { "interface": "enp2s0", "mode": "dhcp" }
+        })
+    }
+
+    #[test]
+    fn node_think_btrfs_without_host_id_is_accepted() {
+        // Cenário 1 da Frente 1: Node Think ativo + Btrfs (sem ZFS)
+        // dispensa hostId, exige WAN. Plano completo: sucesso.
+        let mut value = plan_with_node_think_and_storage(
+            serde_json::json!({ "enable": true }),
+            storage_btrfs_single_json(),
+        );
+        value
+            .as_object_mut()
+            .unwrap()
+            .insert("network".to_string(), network_with_dhcp_wan());
+        let plan: InstallPlanV2 = serde_json::from_value(value).unwrap();
+
+        let think = plan.node_think.expect("node_think must be present");
+        assert!(think.enable);
+        assert!(think.host_id.is_none(), "hostId must be None for Btrfs");
+        let wan = plan
+            .network
+            .as_ref()
+            .and_then(|n| n.wan.as_ref())
+            .expect("wan must be present");
+        assert_eq!(wan.mode, WanNetworkMode::Dhcp);
+    }
+
+    #[test]
+    fn node_think_xfs_without_host_id_is_accepted() {
+        // Cenário 2 da Frente 1: XFS (filesystem novo, sem ZFS/Btrfs)
+        // também dispensa hostId. Garante que a regra de condicionalidade
+        // é genérica (não hardcoded em ZFS/Btrfs).
+        let mut value = plan_with_node_think_and_storage(
+            serde_json::json!({ "enable": true }),
+            storage_xfs_single_json(),
+        );
+        value
+            .as_object_mut()
+            .unwrap()
+            .insert("network".to_string(), network_with_dhcp_wan());
+        let plan: InstallPlanV2 = serde_json::from_value(value).unwrap();
+
+        assert!(plan.node_think.as_ref().unwrap().host_id.is_none());
+        assert_eq!(plan.storage.root.as_ref().unwrap().filesystem, FileSystem::Xfs);
+    }
+
+    #[test]
+    fn node_think_zfs_without_host_id_is_rejected() {
+        // Cenário 3 da Frente 1: Node Think + ZFS sem hostId -> rejeitado.
+        let mut value = plan_with_node_think_and_storage(
+            serde_json::json!({ "enable": true }),
+            storage_zfs_single_json(),
+        );
+        value
+            .as_object_mut()
+            .unwrap()
+            .insert("network".to_string(), network_with_dhcp_wan());
+        let err = serde_json::from_value::<InstallPlanV2>(value)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("nodeThink.hostId is required when storage uses ZFS"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn node_think_without_wan_is_rejected() {
+        // Cenário 4 da Frente 1: Node Think ativo sem WAN -> rejeitado.
+        // Testa os dois modos: (a) network: null, (b) network.wan: null.
+        let mut base = plan_with_node_think_and_storage(
+            serde_json::json!({ "enable": true }),
+            storage_btrfs_single_json(),
+        );
+
+        // (a) network: null
+        let mut case_a = base.clone();
+        case_a.as_object_mut().unwrap().remove("network");
+        let err_a = serde_json::from_value::<InstallPlanV2>(case_a)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err_a.contains("nodeThink.enable=true requires network.wan to be present"),
+            "unexpected error (a): {err_a}"
+        );
+
+        // (b) network presente mas sem wan
+        let mut case_b = base.clone();
+        case_b.as_object_mut().unwrap().insert(
+            "network".to_string(),
+            serde_json::json!({ "management": network_management_dhcp_json() }),
+        );
+        let err_b = serde_json::from_value::<InstallPlanV2>(case_b)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err_b.contains("nodeThink.enable=true requires network.wan to be configured"),
+            "unexpected error (b): {err_b}"
+        );
+    }
+
+    #[test]
+    fn node_think_disabled_does_not_require_wan_or_host_id() {
+        // Edge case: enable=false nao exige WAN nem hostId, mesmo com ZFS.
+        // Garante que o validador nao super-restringe planos inativos.
+        let mut value = plan_with_node_think_and_storage(
+            serde_json::json!({ "enable": false }),
+            storage_zfs_single_json(),
+        );
+        // network: null (edge offline puro com nodeThink desligado)
+        let plan: InstallPlanV2 = serde_json::from_value(value).unwrap();
+        assert!(!plan.node_think.as_ref().unwrap().enable);
+        assert!(plan.network.is_none());
+    }
 }
