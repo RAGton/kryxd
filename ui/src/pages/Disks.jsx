@@ -14,6 +14,7 @@ import {
   validateSplitDiskLayout,
   computeStorageValidation,
 } from '../utils/storagePlanner.js';
+import { useDiskTopology } from '../hooks/useDiskTopology.js';
 import { 
   buildProposedLayout, 
   validateProposedLayout, 
@@ -196,12 +197,16 @@ function DiskCard({ disk, selected, partData, onClick, mode = 'single' }) {
   );
 }
 
-function TabAutomatico({ wizard, eligibleDisks, partitions, onChange, onReload, eligiblePaths, diskInventory }) {
+function TabAutomatico({ wizard, eligibleDisks, partitions, onChange, onReload, eligiblePaths, diskInventory, topology }) {
   const { t } = useTranslation();
   const hasDisk = eligiblePaths.has(wizard.sysDisk);
   const blocked = diskInventory.filter(d => d.eligible === false);
-  const split = eligibleDisks.length >= 2 && eligibleDisks.length <= 3;
-  const rootOptions = split ? ['btrfs', 'zfs', 'ext4', 'xfs'] : ['btrfs', 'zfs'];
+  // KCR UI-2: topologia vem do hook useDiskTopology (single|split|raid),
+  // NAO mais derivada manualmente da contagem.
+  const rootOptions = topology === 'split' || topology === 'raid'
+    ? ['btrfs', 'zfs', 'ext4', 'xfs']
+    : ['btrfs', 'zfs'];
+  const dataOptions = ['btrfs', 'zfs', 'ext4', 'xfs'];
   const FsSelect = ({ field, options, label }) => (
     <label className="flex flex-col gap-1 text-xs text-slate-400">
       {label}
@@ -210,6 +215,124 @@ function TabAutomatico({ wizard, eligibleDisks, partitions, onChange, onReload, 
       </select>
     </label>
   );
+
+  // Helper para o caso split: clicar no disco A como sistema
+  const assignSysDisk = (path) => {
+    if (!eligiblePaths.has(path)) return;
+    if (topology === 'split' && wizard.dataDisk === path) {
+      // Inverter papéis: este disco era dados, vira sistema
+      onChange({ sysDisk: path, dataDisk: wizard.sysDisk || '', selectedDisks: [path, wizard.sysDisk].filter(Boolean) });
+    } else {
+      onChange({ sysDisk: path, selectedDisks: [path] });
+    }
+  };
+
+  const assignDataDisk = (path) => {
+    if (!eligiblePaths.has(path)) return;
+    if (topology === 'split' && wizard.sysDisk === path) {
+      // Inverter papéis
+      onChange({ sysDisk: wizard.dataDisk || '', dataDisk: path, selectedDisks: [wizard.dataDisk, path].filter(Boolean) });
+    } else {
+      onChange({ dataDisk: path, selectedDisks: [wizard.sysDisk, path].filter(Boolean) });
+    }
+  };
+
+  // Renders condicionais por topologia
+  const renderSingle = () => (
+    <div>
+      <div className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+        {t('storage.automatic.targetDisk')} ({eligibleDisks.length})
+      </div>
+      <div className="grid grid-cols-1 gap-3">
+        {eligibleDisks.map(disk => (
+          <DiskCard
+            key={disk.path}
+            disk={disk}
+            mode="single"
+            selected={wizard.sysDisk === disk.path}
+            partData={partitions[disk.name ?? disk.path?.split('/').pop()]}
+            onClick={() => assignSysDisk(disk.path)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderSplit = () => (
+    <div>
+      <div className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+        {t('storage.automatic.targetDisks', { defaultValue: 'Discos detectados (2)' })}
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {eligibleDisks.map(disk => {
+          const role = wizard.sysDisk === disk.path ? 'system'
+            : wizard.dataDisk === disk.path ? 'data'
+            : wizard.sysDisk ? ''  // disco ainda nao escolhido
+            : 'system'; // primeira interacao: assume sistema
+          const isSelected = role === 'system' || role === 'data';
+          return (
+            <DiskCard
+              key={disk.path}
+              disk={{ ...disk, role }}
+              mode="single"
+              selected={isSelected}
+              partData={partitions[disk.name ?? disk.path?.split('/').pop()]}
+              onClick={() => role === 'data' || (role === '' && wizard.sysDisk)
+                ? assignDataDisk(disk.path)
+                : assignSysDisk(disk.path)
+              }
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderRaid = () => (
+    <div>
+      <div className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+        {t('storage.automatic.targetDisks', { defaultValue: `Discos detectados (${eligibleDisks.length})` })}
+      </div>
+      <div className="rounded-xl border border-accent-blue/30 bg-accent-blue/10 p-4 mb-4">
+        <p className="text-[13px] font-bold text-accent-blue mb-1">
+          {t('storage.automatic.raidHintTitle', { defaultValue: '3+ discos detectados' })}
+        </p>
+        <p className="text-xs text-slate-300">
+          {t('storage.automatic.raidHintBody', {
+            defaultValue: 'Voce tem varios discos elegiveis. Considere configurar RAID no separador "RAID" para redundancia, ou selecione 2 discos para um layout split abaixo.'
+          })}
+        </p>
+      </div>
+      <div className="grid grid-cols-1 gap-3">
+        {eligibleDisks.slice(0, 2).map(disk => (
+          <DiskCard
+            key={disk.path}
+            disk={disk}
+            mode="single"
+            selected={wizard.sysDisk === disk.path}
+            partData={partitions[disk.name ?? disk.path?.split('/').pop()]}
+            onClick={() => assignSysDisk(disk.path)}
+          />
+        ))}
+      </div>
+      <p className="mt-3 text-[11px] text-slate-500">
+        {t('storage.automatic.raidMoreHint', { defaultValue: `+${eligibleDisks.length - 2} disco(s) adicionais disponiveis no separador RAID.` })}
+      </p>
+    </div>
+  );
+
+  const renderTargetDisks = () => {
+    if (eligibleDisks.length === 0) {
+      return (
+        <div className="py-3 text-[13px] font-medium text-slate-400 border border-white/5 bg-white/5 rounded-xl text-center">
+          {t('storage.automatic.noEligible')}
+        </div>
+      );
+    }
+    if (topology === 'split') return renderSplit();
+    if (topology === 'raid') return renderRaid();
+    return renderSingle();
+  };
 
   return (
     <div className="p-4 space-y-6">
@@ -224,36 +347,31 @@ function TabAutomatico({ wizard, eligibleDisks, partitions, onChange, onReload, 
         </button>
       </div>
 
-      <div>
-        <div className="mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-          {t('storage.automatic.targetDisk')} ({eligibleDisks.length})
-        </div>
-        {eligibleDisks.length === 0 ? (
-          <div className="py-3 text-[13px] font-medium text-slate-400 border border-white/5 bg-white/5 rounded-xl text-center">
-            {t('storage.automatic.noEligible')}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3">
-            {eligibleDisks.map(disk => (
-              <DiskCard
-                key={disk.path}
-                disk={disk}
-                selected={wizard.sysDisk === disk.path}
-                partData={partitions[disk.name ?? disk.path?.split('/').pop()]}
-                onClick={() => {
-                  if (eligiblePaths.has(disk.path)) {
-                    onChange({ sysDisk: disk.path, selectedDisks: [disk.path] });
-                  }
-                }}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      {renderTargetDisks()}
 
-      {eligibleDisks.length === 1 && <div className="mt-4"><h4 className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">{t('storage.automatic.singleDisk', { defaultValue: 'Single Disk' })}</h4><FsSelect field="rootFs" options={rootOptions} label={t('storage.automatic.rootFs', { defaultValue: 'Filesystem raiz' })} /></div>}
-      {split && <div className="mt-4 space-y-3"><h4 className="text-xs font-bold uppercase tracking-widest text-slate-400">{t('storage.automatic.splitDisks', { defaultValue: 'Split Disks' })}</h4><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><FsSelect field="rootFs" options={rootOptions} label={t('storage.automatic.rootFs', { defaultValue: 'Filesystem raiz' })} /><FsSelect field="dataFs" options={['btrfs', 'zfs']} label={t('storage.automatic.dataFs', { defaultValue: 'Filesystem de dados' })} /></div></div>}
-      {eligibleDisks.length >= 4 && <div className="mt-4 rounded-xl border border-accent-blue/30 bg-accent-blue/10 p-4 text-sm font-bold text-accent-blue">{t('storage.automatic.raidZpoolReco', { defaultValue: `Recomendação: use RAID/Zpool para estes ${eligibleDisks.length} discos elegíveis.` })}</div>}
+      {eligibleDisks.length === 1 && topology === 'single' && (
+        <div className="mt-4">
+          <h4 className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">
+            {t('storage.automatic.singleDisk', { defaultValue: 'Single Disk' })}
+          </h4>
+          <FsSelect field="rootFs" options={rootOptions} label={t('storage.automatic.rootFs', { defaultValue: 'Filesystem raiz' })} />
+        </div>
+      )}
+
+      {topology === 'split' && (
+        <div className="mt-4 space-y-3">
+          <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400">
+            {t('storage.automatic.splitDisks', { defaultValue: 'Split Disks' })}
+          </h4>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <FsSelect field="rootFs" options={rootOptions} label={t('storage.automatic.rootFs', { defaultValue: 'Filesystem raiz' })} />
+            <FsSelect field="dataFs" options={dataOptions} label={t('storage.automatic.dataFs', { defaultValue: 'Filesystem de dados' })} />
+          </div>
+          <p className="text-[11px] text-slate-500">
+            {t('storage.automatic.fsOrthogonalHint', { defaultValue: 'Os filesystems raiz e dados sao independentes (ortogonais) — voce pode escolher ext4 para raiz e zfs para dados, por exemplo.' })}
+          </p>
+        </div>
+      )}
 
       {blocked.length > 0 && (
         <div>
@@ -265,6 +383,7 @@ function TabAutomatico({ wizard, eligibleDisks, partitions, onChange, onReload, 
               <DiskCard
                 key={disk.path}
                 disk={disk}
+                mode="single"
                 selected={false}
                 partData={partitions[disk.name ?? disk.path?.split('/').pop()]}
               />
@@ -284,7 +403,9 @@ function TabAutomatico({ wizard, eligibleDisks, partitions, onChange, onReload, 
                 <span className="text-[10px] font-bold text-white">EFI</span>
               </div>
               <div className="flex-1 bg-accent-blue/80 flex items-center justify-center relative overflow-hidden">
-                <span className="text-[11px] font-bold text-white z-10">ROOT {wizard.isThinkServer ? 'ZFS' : 'BTRFS'} (~100%)</span>
+                <span className="text-[11px] font-bold text-white z-10">
+                  ROOT {(wizard.rootFs || 'btrfs').toUpperCase()} (~100%)
+                </span>
               </div>
             </div>
           </div>
@@ -307,14 +428,7 @@ function TabAutomatico({ wizard, eligibleDisks, partitions, onChange, onReload, 
                 <tr className="hover:bg-white/[0.02]">
                   <td className="px-4 py-3 font-mono text-accent-blue">/</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      {wizard.isThinkServer ? 'ZFS' : 'BTRFS'}
-                      {wizard.isThinkServer && (
-                        <span className="bg-accent-blue/20 text-accent-blue border border-accent-blue/30 px-2 py-0.5 rounded text-[9px] font-bold tracking-wider">
-                          Recomendado para Kryonix Think Server
-                        </span>
-                      )}
-                    </div>
+                    <span className="font-bold uppercase">{(wizard.rootFs || 'btrfs').toUpperCase()}</span>
                   </td>
                   <td className="px-4 py-3">~100%</td>
                 </tr>
@@ -748,6 +862,10 @@ export default function Disks({ wizard, uiState, onChange, validation }) {
   const eligiblePaths  = useMemo(() => new Set(eligibleDisks.map(d => d.path)), [eligibleDisks]);
   const layoutMode     = wizard.storageMode || 'automatic';
 
+  // KCR UI-2: hook canonico de topologia. Substitui a logica local
+  // `eligibleDisks.length >= 2 && <= 3` que era fragil.
+  const diskTopology = useDiskTopology(wizard, diskInventory);
+
   useEffect(() => {
     if (destructiveConfirmed !== uiState.destructiveConfirmed) {
       onChange({ destructiveConfirmed });
@@ -890,6 +1008,7 @@ export default function Disks({ wizard, uiState, onChange, validation }) {
                   diskInventory={diskInventory}
                   partitions={partitions}
                   onReload={reloadDisks}
+                  topology={diskTopology.profile}
                 />
               )}
               {activeTab === 1 && <TabManual wizard={wizard} onChange={onChange} eligibleDisks={eligibleDisks} />}
