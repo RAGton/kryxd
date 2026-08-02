@@ -97,3 +97,34 @@ Endpoints expostos (via Axum, porta 8080):
 ## Licença
 
 Unfree (uso interno Kryonix).
+
+---
+
+## Compatibilidade
+
+| Componente | Versao |
+|---|---|
+| NixOS | 26.05 (Kryonix OS) |
+| Kryonix (meta) | 26.05 |
+| Rust | toolchain 1.86 (Axum 0.7) |
+| Node.js | 22.x (Vite + React) |
+
+## Repos relacionados
+
+Este repo integra com (cross-links via `../<repo>/README.md`):
+
+- [`kryonix`](../kryonix/): motor / core da distro
+- [`kryonixos`](../kryonixos/): downstream / hosts reais
+- [`kryx-cli`](../kryx-cli/): CLI publicado `kryx`
+- [`kryonix-brain-lightrag`](../kryonix-brain-lightrag/): RAG engine (LightRAG)
+- [`kryonix-home`](../kryonix-home/): organizador de home directory
+- [`kryonix-aura`](../kryonix-aura/): agente Aura + automação
+- [`kryonix-assets`](../kryonix-assets/): wallpapers, temas, branding
+- [`kryonix-vault`](../kryonix-vault/): Obsidian vault (memória)
+
+Veja [`AGENTS.md`](../../AGENTS.md) do meta-repo para a visao consolidada.
+
+## Changelog
+
+- **2026-08-02**: sincronizado com template canonico ([`agents/kryonix-core/README-TEMPLATE.md`](../../agents/kryonix-core/README-TEMPLATE.md)) — secao Compatibilidade + Repos relacionados adicionadas. Conteudo existente preservado.
+- **2026-08-02**: KCP daemon + Installer backend + UI (refs KCR-UI-1, KCR-UI-2)
