@@ -361,7 +361,7 @@ test('serverIp valido no modo static: IP publico ou privado e aceito pelo regex'
   assert.equal(validation.fieldErrors.serverIp, undefined);
 });
 
-test('contract: buildInstallPlanV2 preserva features e exclui rede, identidade e secrets', () => {
+test('contract: buildInstallPlanPayload preserva features e exclui rede, identidade e secrets', () => {
   const draft = createValidDraft({
     selectedFeatures: ['storage.srv-data', 'ai.ollama', 'remote.openssh'],
     adminAuthorizedKeys: '[REDACTED]',

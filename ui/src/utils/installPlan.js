@@ -345,10 +345,6 @@ export function buildInstallPlanPayload(draftInput) {
   };
 }
 
-export function buildInstallPlanV2(wizardState) {
-  return buildInstallPlanPayload(wizardState);
-}
-
 export function buildInstallSecretsPayload(draftInput) {
   const draft = createInstallPlanDraft(draftInput);
   const wanMode = sanitizeString(draft.wanMode) || 'dhcp';
@@ -368,10 +364,6 @@ export function validateInstallPlanPayload(payload) {
     throw new Error(formatAjvErrors(validateSchema.errors));
   }
   return payload;
-}
-
-export function validateInstallPlanV2(plan) {
-  return validateInstallPlanPayload(plan);
 }
 
 export function getInstallPlanCompatibilityIssues(payload) {
@@ -458,8 +450,8 @@ function validateAdminStep(payload, secrets, result, draft) {
 
 function validateFinalDraft(draft, secrets, result) {
   try {
-    const plan = buildInstallPlanV2(draft);
-    validateInstallPlanV2(plan);
+    const plan = buildInstallPlanPayload(draft);
+    validateInstallPlanPayload(plan);
     for (const compatibilityIssue of getInstallPlanCompatibilityIssues(plan)) {
       addBlockingIssue(result, compatibilityIssue);
     }
