@@ -10,6 +10,7 @@ export const DRAFT_FIELD_NAMES = [
   'sourceClonePath',
   'sourceTargetPath',
   'sourceValidated',
+  'sourceError',
   'profileId',
   'selectedFeatures',
   'targetRemoteAccessEnabled',
@@ -58,6 +59,12 @@ export const DRAFT_FIELD_NAMES = [
   'lvmPlan',
   'raidPlan',
   'isThinkServer',
+  'githubAuthStatus',
+  'githubDeviceCode',
+  'githubTokenReady',
+  'createRepoName',
+  'createRepoPrivate',
+  'createdRepoUrl',
 ];
 
 export const UI_TRANSIENT_FIELD_NAMES = [
@@ -81,6 +88,8 @@ export const UI_TRANSIENT_FIELD_NAMES = [
   'installRunning',
   'githubSourceStatus',
   'githubSourceError',
+  'githubUserCode',
+  'githubVerificationUri',
 ];
 
 const DRAFT_FIELD_SET = new Set(DRAFT_FIELD_NAMES);
@@ -96,8 +105,6 @@ export const INITIAL_INSTALL_PLAN_DRAFT = {
   sourceValidated: false,
   sourceStatus: "idle",
   sourceError: null,
-
-  templateRepoUrl: "https://github.com/RAGton/Kryonixos.git",
 
   githubAuthStatus: "idle",
   githubDeviceCode: null,
