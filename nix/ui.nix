@@ -8,7 +8,7 @@ buildNpmPackage {
   version = "0.1.0";
   src = lib.cleanSource ../ui;
 
-  npmDepsHash = "sha256-e36ZFfsQoVphL5hzVdzrfxO78bUsV24KC/2VzPuSg9w=";
+  npmDepsHash = "sha256-ZjH2CUzwHWI9rUMMhY9jTGdWKya/HZxRcDmGpn3K2tU=";
 
   npmBuildScript = "build";
 

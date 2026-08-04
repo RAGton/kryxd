@@ -54,5 +54,29 @@
       );
 
       formatter = forEachSystem (system: (pkgsFor system).nixfmt-rfc-style);
+
+      devShells = forEachSystem (
+        system:
+        let
+          pkgs = pkgsFor system;
+        in
+        {
+          default = pkgs.mkShell {
+            inputsFrom = [ self.packages.${system}.kryxd ];
+
+            # Deps extras para desenvolvimento local que não entram no build de produção
+            nativeBuildInputs = with pkgs; [
+              pkg-config
+              llvmPackages_19.libclang
+              llvmPackages_19.llvm
+            ];
+
+            # libclang precisa achar libclang.so em runtime
+            LIBCLANG_PATH = "${pkgs.llvmPackages_19.libclang.lib}/lib";
+            # bindgen procura llvm-config
+            LLVM_CONFIG_PATH = "${pkgs.llvmPackages_19.llvm}/bin/llvm-config";
+          };
+        }
+      );
     };
 }
